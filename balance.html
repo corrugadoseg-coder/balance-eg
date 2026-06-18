@@ -101,6 +101,11 @@ td.num,th.num{font-family:'IBM Plex Mono';font-weight:500}
 .chip.bl{background:var(--paper2);color:var(--ink2);border:1px solid var(--edge)}
 .chip.ng{background:var(--ink);color:var(--paper)}
 .chip.rubro{background:var(--goldL);color:#8a6420;border:1px solid #e0c98a}
+.bndot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle}
+.bndot.bl{background:transparent;border:1.5px solid var(--edge)}
+.bndot.ng{background:var(--ink2);border:1.5px solid var(--ink2)}
+.bndot.btn-dot{cursor:pointer;padding:0;transition:.15s}
+.bndot.btn-dot:hover{box-shadow:0 0 0 3px var(--goldL)}
 .chipbtn{font-family:'IBM Plex Mono';font-size:10px;font-weight:600;padding:3px 9px;border-radius:3px;letter-spacing:.04em;cursor:pointer;transition:.12s;border:1px solid transparent}
 .chipbtn.bl{background:var(--paper2);color:var(--ink2);border-color:var(--edge)}
 .chipbtn.ng{background:var(--ink);color:var(--paper);border-color:#000}
@@ -235,18 +240,18 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 <section class="view" data-v="venta">
   <div class="card">
     <h2>Cargar ventas del mes</h2>
-    <p class="lead">A fin de mes registrá las ventas en blanco y en negro. El total se calcula solo.</p>
+    <p class="lead">A fin de mes registrá las ventas de cada tipo. El total se calcula solo.</p>
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr;">
       <div class="f">
         <label>Mes</label>
         <input id="v_mes" type="month">
       </div>
       <div class="f">
-        <label>Ventas en blanco</label>
+        <label>Ventas <span class="bndot bl" style="margin-left:4px" title="Tipo A"></span></label>
         <input id="v_blanco" class="mono" inputmode="decimal" placeholder="0,00">
       </div>
       <div class="f">
-        <label>Ventas en negro</label>
+        <label>Ventas <span class="bndot ng" style="margin-left:4px" title="Tipo B"></span></label>
         <input id="v_negro" class="mono" inputmode="decimal" placeholder="0,00">
       </div>
     </div>
@@ -266,13 +271,13 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 <section class="view" data-v="balance">
   <div class="card">
     <h2>Balance del mes</h2>
-    <p class="lead">Elegí un mes y mirá gastos por rubro, ventas y resultado. Cambiá entre total, blanco y negro.</p>
+    <p class="lead">Elegí un mes y mirá gastos por rubro, ventas y resultado. Cambiá entre total y cada tipo.</p>
     <div class="monthpick">
       <select id="b_mes"></select>
       <div class="viewtoggle" id="b_view">
         <button data-v="total" class="on">Total</button>
-        <button data-v="blanco">Solo blanco</button>
-        <button data-v="negro">Solo negro</button>
+        <button data-v="blanco">Tipo A</button>
+        <button data-v="negro">Tipo B</button>
       </div>
     </div>
     <div class="ledger" id="b_ledger"></div>
@@ -291,7 +296,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
       <div class="f"><label>Hasta (mes)</label><input id="i_hasta" type="month"></div>
       <div class="f"><label>Rubro</label><select id="i_rubro"><option value="">Todos</option></select></div>
       <div class="f"><label>Proveedor</label><select id="i_prov"><option value="">Todos</option></select></div>
-      <div class="f"><label>Tipo de dinero</label><select id="i_bn"><option value="">Blanco + Negro</option><option value="blanco">Solo blanco</option><option value="negro">Solo negro</option></select></div>
+      <div class="f"><label>Tipo</label><select id="i_bn"><option value="">Todos</option><option value="blanco">Tipo A</option><option value="negro">Tipo B</option></select></div>
     </div>
     <div class="row-actions" style="margin-top:0">
       <button class="btn gold sm" id="i_apply">Aplicar filtros</button>
@@ -309,7 +314,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   </div>
   <div class="grid2">
     <div class="chartwrap"><h3>Composición de gastos</h3><p class="cap">Participación de cada rubro en el período.</p><div class="chartbox"><canvas id="ch_pie"></canvas></div></div>
-    <div class="chartwrap"><h3>Blanco vs Negro</h3><p class="cap">Proporción de gastos y ventas por tipo.</p><div class="chartbox"><canvas id="ch_bn"></canvas></div></div>
+    <div class="chartwrap"><h3>Tipo A vs Tipo B</h3><p class="cap">Proporción de gastos y ventas por tipo.</p><div class="chartbox"><canvas id="ch_bn"></canvas></div></div>
   </div>
 
   <div class="card">
@@ -351,8 +356,7 @@ const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","S
    Pegá acá abajo, entre las comillas, la URL que termina en /exec
    que te dio "Implementar". Igual que en pedidos-eg.
    ===================================================================== */
-const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
-/* ===================================================================== */
+const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";/* ===================================================================== */
 
 let state={ gastos:[], ventas:{}, memoria:{}, subs:{} };  // subs: {RUBRO:[sub,...]}
 let balView="total";
@@ -479,7 +483,7 @@ $("g_add").onclick=async ()=>{
   const id=uid();
   state.gastos.push({id,fecha,prov,rubro,sub,monto,bn});
   if(nuevo)showMsg("g_msg","learn",`✓ Aprendido: "<b>${prov}</b>" → ${rubro}. La próxima se completa solo.`);
-  else showMsg("g_msg","ok",`Gasto agregado: ${money(monto)} · ${rubro}${sub?" · "+sub:""} · <b>${bn}</b>.`);
+  else showMsg("g_msg","ok",`Gasto agregado: ${money(monto)} · ${rubro}${sub?" · "+sub:""} · <b>Tipo ${bn==="negro"?"B":"A"}</b>.`);
   $("g_prov").value="";$("g_monto").value="";$("g_total").value="";$("g_sub").value="";
   updateFlag();
   renderGastos();
@@ -488,8 +492,8 @@ $("g_add").onclick=async ()=>{
 $("g_clear").onclick=()=>{$("g_prov").value="";$("g_monto").value="";$("g_total").value="";$("g_fecha").value=todayISO();updateFlag();hideMsg("g_msg");};
 
 
-function bnChip(bn){return bn==="negro"?'<span class="chip ng">NEGRO</span>':'<span class="chip bl">BLANCO</span>';}
-function bnChipBtn(bn,id){return `<button class="chipbtn ${bn==="negro"?"ng":"bl"}" data-toggle="${id}" title="Tocar para cambiar">${bn==="negro"?"NEGRO":"BLANCO"}</button>`;}
+function bnChip(bn){return bn==="negro"?'<span class="bndot ng" title="Tipo B"></span>':'<span class="bndot bl" title="Tipo A"></span>';}
+function bnChipBtn(bn,id){return `<button class="bndot btn-dot ${bn==="negro"?"ng":"bl"}" data-toggle="${id}" title="Cambiar tipo"></button>`;}
 
 function renderGastos(){
   refreshProvList();
@@ -514,7 +518,7 @@ $("v_add").onclick=async ()=>{
   if(!mes){showMsg("v_msg","learn","Elegí el mes.");return;}
   if(bl<=0&&ng<=0){showMsg("v_msg","learn","Cargá al menos un monto de ventas.");return;}
   state.ventas[mes]={blanco:bl,negro:ng};
-  showMsg("v_msg","ok",`Ventas de ${ymLabel(mes)} guardadas: blanco ${money(bl)}, negro ${money(ng)}.`);
+  showMsg("v_msg","ok",`Ventas de ${ymLabel(mes)} guardadas. Total ${money(bl+ng)}.`);
   $("v_blanco").value="";$("v_negro").value="";
   renderVentas();
   await apiPost({action:"addVenta",mes,blanco:bl,negro:ng});
@@ -523,7 +527,7 @@ function renderVentas(){
   const tb=$("v_tbl").querySelector("tbody");
   const keys=Object.keys(state.ventas).sort();
   if(!keys.length){tb.innerHTML=`<tr><td colspan="5"><div class="empty">Todavía no cargaste ventas.</div></td></tr>`;return;}
-  let h=`<tr><th class="l">Mes</th><th class="num">Blanco</th><th class="num">Negro</th><th class="num">Total</th><th></th></tr>`;
+  let h=`<tr><th class="l">Mes</th><th class="num">Tipo <span class="bndot bl"></span></th><th class="num">Tipo <span class="bndot ng"></span></th><th class="num">Total</th><th></th></tr>`;
   keys.forEach(k=>{const v=state.ventas[k];const t=v.blanco+v.negro;
     h+=`<tr><td class="l">${ymLabel(k)}</td><td class="num">${money(v.blanco)}</td><td class="num">${money(v.negro)}</td>
     <td class="num"><b>${money(t)}</b></td><td><button class="del" data-k="${k}">✕</button></td></tr>`;});
@@ -556,7 +560,7 @@ function drawBalance(){
   state.gastos.filter(g=>ym(g.fecha)===mes).forEach(g=>{const v=gastoVal(g,bn);gByR[g.rubro]=(gByR[g.rubro]||0)+v;gTot+=v;});
   const vTot=ventaVal(mes,bn);
   const res=vTot-gTot;
-  const lbl=bn==="total"?"":` · ${bn}`;
+  const lbl=bn==="total"?"":(bn==="blanco"?" · Tipo A":" · Tipo B");
   $("b_ledger").innerHTML=`
     <div class="led"><div class="l">Ventas${lbl}</div><div class="v">${money0(vTot)}</div><div class="sub">${ymLabel(mes)}</div></div>
     <div class="led"><div class="l">Gastos${lbl}</div><div class="v">${money0(gTot)}</div><div class="sub">${Object.values(gByR).filter(x=>x>0).length} rubros con movimiento</div></div>
@@ -636,8 +640,8 @@ function drawCharts(meses,V,G,R,gFiltered,fbn){
   const vBl=meses.reduce((s,k)=>s+ventaVal(k,"blanco"),0);
   const vNg=meses.reduce((s,k)=>s+ventaVal(k,"negro"),0);
   mkChart("ch_bn",{type:"bar",data:{labels:["Gastos","Ventas"],datasets:[
-    {label:"Blanco",data:[gBl,vBl],backgroundColor:"#c9bda4",borderRadius:2},
-    {label:"Negro",data:[gNg,vNg],backgroundColor:"#23201a",borderRadius:2}]},
+    {label:"Tipo A",data:[gBl,vBl],backgroundColor:"#c9bda4",borderRadius:2},
+    {label:"Tipo B",data:[gNg,vNg],backgroundColor:"#23201a",borderRadius:2}]},
     options:{maintainAspectRatio:false,plugins:{legend:{labels:{usePointStyle:true,boxWidth:8}},tooltip:{callbacks:{label:c=>c.dataset.label+": "+money(c.parsed.y)}}},
     scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,ticks:{callback:moneyM}}}}});
 }
@@ -685,7 +689,7 @@ function buildObs(meses,V,G,R,gFiltered){
   const gNg=gFiltered.filter(x=>x.bn==="negro").reduce((s,x)=>s+x.monto,0);
   const gAll=gFiltered.reduce((s,x)=>s+x.monto,0);
   if(gAll>0){const pn=(gNg/gAll*100).toFixed(0);
-    items.push({c:"flat",t:`El <b>${pn}%</b> de los gastos del período fueron en negro.`});}
+    items.push({c:"flat",t:`El <b>${pn}%</b> de los gastos del período fueron de Tipo B.`});}
   // sugerencia de ajuste
   const negR=R.filter(x=>x<0).length;
   if(negR>0)items.push({c:"up",t:`<b>Ajuste sugerido:</b> ${negR} ${negR===1?"mes cerró":"meses cerraron"} en rojo. Mirá los rubros más pesados de esos meses y evaluá dónde recortar o cómo reforzar ventas.`});
@@ -711,7 +715,7 @@ $("i_export").onclick=()=>{
   const d=window._lastInforme; if(!d||!d.g.length){alert("No hay datos para exportar con los filtros actuales.");return;}
   const wb=XLSX.utils.book_new();
   const det=[["Fecha","Proveedor","Rubro","Subcategoría","Tipo","Monto sin IVA"]];
-  d.g.slice().sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(x=>det.push([x.fecha,x.prov,x.rubro,x.sub||"",x.bn,x.monto]));
+  d.g.slice().sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(x=>det.push([x.fecha,x.prov,x.rubro,x.sub||"",x.bn==="negro"?"B":"A",x.monto]));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(det),"Detalle");
   const res=[["Mes","Ventas","Gastos","Resultado"]];
   d.meses.forEach((m,i)=>res.push([ymLabel(m),d.serV[i],d.serG[i],d.serR[i]]));
@@ -730,14 +734,14 @@ $("d_xlsx").onclick=()=>{
   if(!state.gastos.length&&!Object.keys(state.ventas).length){alert("No hay datos para exportar.");return;}
   const wb=XLSX.utils.book_new();
   const det=[["Fecha","Proveedor","Rubro","Subcategoría","Tipo","Monto sin IVA"]];
-  state.gastos.slice().sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(x=>det.push([x.fecha,x.prov,x.rubro,x.sub||"",x.bn,x.monto]));
+  state.gastos.slice().sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(x=>det.push([x.fecha,x.prov,x.rubro,x.sub||"",x.bn==="negro"?"B":"A",x.monto]));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(det),"Gastos");
   const meses=mesesConDatos();
   const head=["Rubro",...meses.map(ymLabel),"TOTAL"];
   const res=[head];
   RUBROS.forEach(r=>{const row=[r];let tot=0;meses.forEach(m=>{const v=state.gastos.filter(x=>x.rubro===r&&ym(x.fecha)===m).reduce((s,x)=>s+x.monto,0);row.push(v);tot+=v;});row.push(tot);if(tot>0)res.push(row);});
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(res),"Gastos por rubro");
-  const vts=[["Mes","Ventas blanco","Ventas negro","Total ventas","Gastos","Resultado"]];
+  const vts=[["Mes","Ventas Tipo A","Ventas Tipo B","Total ventas","Gastos","Resultado"]];
   meses.forEach(m=>{const vb=ventaVal(m,"blanco"),vn=ventaVal(m,"negro"),g=state.gastos.filter(x=>ym(x.fecha)===m).reduce((s,x)=>s+x.monto,0);vts.push([ymLabel(m),vb,vn,vb+vn,g,vb+vn-g]);});
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(vts),"Resumen mensual");
   XLSX.writeFile(wb,"balance_2026_completo.xlsx");
