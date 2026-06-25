@@ -174,8 +174,9 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <button class="tab" data-v="venta"><span class="n">02</span>Ventas del mes</button>
     <button class="tab" data-v="balance"><span class="n">03</span>Balance mensual</button>
     <button class="tab" data-v="impuestos"><span class="n">04</span>Impuestos</button>
-    <button class="tab" data-v="informes"><span class="n">05</span>Informes</button>
-    <button class="tab" data-v="datos"><span class="n">06</span>Datos</button>
+    <button class="tab" data-v="cheque"><span class="n">05</span>Imp. Cheque</button>
+    <button class="tab" data-v="informes"><span class="n">06</span>Informes</button>
+    <button class="tab" data-v="datos"><span class="n">07</span>Datos</button>
   </nav>
 </header>
 
@@ -239,6 +240,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
       <label>Filtrar por proveedor</label>
       <select id="g_filtprov"><option value="">Todos</option></select>
     </div>
+    <div id="g_count" style="font-size:13px;color:var(--faint);margin-bottom:10px;font-family:'IBM Plex Mono',monospace"></div>
     <div style="overflow-x:auto"><table id="g_tbl"><tbody></tbody></table></div>
   </div>
 </section>
@@ -345,7 +347,34 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   </div>
 </section>
 
-<!-- ===== 05 INFORMES ===== -->
+<!-- ===== 05 IMP CHEQUE (1,2‰) ===== -->
+<section class="view" data-v="cheque">
+  <div class="card">
+    <h2>Impuesto al cheque (Ley 25.413)</h2>
+    <p class="lead">Pegá el texto del extracto bancario del mes. La app busca las líneas "LEY 25413" (crédito y débito) y las suma sola. Verificá el detalle antes de guardar.</p>
+    <div class="monthpick" style="margin-bottom:14px">
+      <select id="ch_mes"></select>
+    </div>
+    <div class="f">
+      <label>Pegá acá el extracto del mes</label>
+      <textarea id="ch_texto" rows="8" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Abrí el PDF del banco, seleccioná todo (Ctrl+A), copiá (Ctrl+C) y pegá acá (Ctrl+V)."></textarea>
+    </div>
+    <div class="row-actions">
+      <button class="btn gold" id="ch_calc">Calcular del extracto</button>
+      <button class="btn ghost sm" id="ch_clear">Limpiar</button>
+    </div>
+    <div class="msg" id="ch_msg"></div>
+    <div id="ch_result"></div>
+  </div>
+
+  <div class="card">
+    <h2>Registro mensual del 1,2‰</h2>
+    <p class="lead">Totales guardados por mes. Marcá "Compensado" cuando lo uses contra anticipos de Ganancias.</p>
+    <div style="overflow-x:auto"><table id="ch_tbl"><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- ===== 06 INFORMES ===== -->
 <section class="view" data-v="informes">
   <div class="card">
     <h2>Informes y análisis</h2>
@@ -415,10 +444,9 @@ const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","S
    Pegá acá abajo, entre las comillas, la URL que termina en /exec
    que te dio "Implementar". Igual que en pedidos-eg.
    ===================================================================== */
-const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
-/* ===================================================================== */
+const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";/* ===================================================================== */
 
-let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{} };  // impuestos: {"2026-01":{...}}
+let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{} };  // impuestos: {"2026-01":{...}}
 let balView="total";
 const $=id=>document.getElementById(id);
 /* Normaliza proveedor: saca espacios extra y pone Mayúscula Inicial en cada palabra */
@@ -469,7 +497,7 @@ function setSync(estado,txt){ const b=$("savebox");
 /* ---- llamadas a la planilla ---- */
 async function apiGet(){
   const r=await fetch(API); const j=await r.json();
-  if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; }
+  if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; }
   return j;
 }
 async function apiPost(payload){
@@ -516,6 +544,7 @@ $$(".tab").forEach(t=>t.onclick=()=>{
   const v=t.dataset.v; $$(".view").forEach(x=>x.classList.toggle("on",x.dataset.v===v));
   if(v==="balance")renderBalance();
   if(v==="impuestos")renderImpuestosTab();
+  if(v==="cheque")renderChequeTab();
   if(v==="informes")applyFilters();
   if(v==="datos")renderStats();
 });
@@ -606,6 +635,13 @@ function renderGastos(){
   let base=state.gastos.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
   if(fprov)base=base.filter(g=>g.prov.toLowerCase()===fprov);
   const list=base.slice(0,fprov?500:40);
+  // contador de registros
+  const totalGral=state.gastos.length;
+  if(fprov){
+    $("g_count").textContent=`${base.length} registro(s) de este proveedor · ${totalGral} en total`;
+  } else {
+    $("g_count").textContent=`${totalGral} registro(s) en total${totalGral>40?" · mostrando los 40 más recientes":""}`;
+  }
   if(!list.length){tb.innerHTML=`<tr><td colspan="6"><div class="empty">${fprov?"Este proveedor no tiene gastos cargados.":"Todavía no cargaste gastos."}</div></td></tr>`;return;}
   let h=`<tr><th class="l">Fecha</th><th class="l">Proveedor</th><th class="l">Rubro</th><th>Tipo</th><th class="num">Monto sin IVA</th><th></th></tr>`;
   list.forEach(g=>{ h+=`<tr><td class="l">${fechaLinda(g.fecha)}</td><td class="l">${g.prov}</td>
@@ -768,6 +804,7 @@ function cargarFormImp(){
 }
 $("t_save").onclick=async ()=>{
   const mes=$("t_mes").value; if(!mes){showMsg("t_msg","learn","No hay mes seleccionado.");return;}
+  const ivaExtractoPrev=(state.impuestos[mes]||{}).ivaExtracto||0;  // preservar lo que vino del extracto
   const payload={
     mes,
     retBancIIBB:parseNum($("t_retbanc").value)||0,
@@ -775,9 +812,10 @@ $("t_save").onclick=async ()=>{
     iibbContador:parseNum($("t_iibbcont").value)||0,
     alicIIBB:parseNum($("t_alic").value)||DEF_ALIC,
     coefCABA:parseNum($("t_cc").value)||DEF_CC,
-    coefBsAs:parseNum($("t_cb").value)||DEF_CB
+    coefBsAs:parseNum($("t_cb").value)||DEF_CB,
+    ivaExtracto:ivaExtractoPrev
   };
-  state.impuestos[mes]={ivaContador:payload.ivaContador,retBancIIBB:payload.retBancIIBB,iibbContador:payload.iibbContador,alicIIBB:payload.alicIIBB,coefCABA:payload.coefCABA,coefBsAs:payload.coefBsAs};
+  state.impuestos[mes]={ivaContador:payload.ivaContador,retBancIIBB:payload.retBancIIBB,iibbContador:payload.iibbContador,alicIIBB:payload.alicIIBB,coefCABA:payload.coefCABA,coefBsAs:payload.coefBsAs,ivaExtracto:ivaExtractoPrev};
   showMsg("t_msg","ok",`Datos de impuestos de ${ymLabel(mes)} guardados.`);
   drawImpuestos();
   await apiPost({action:"setImpuestos",...payload});
@@ -785,12 +823,14 @@ $("t_save").onclick=async ()=>{
 
 function ivaMes(mes){ // calcula componentes de IVA del mes
   const gm=state.gastos.filter(g=>ym(g.fecha)===mes);
-  const ivaCompra=gm.reduce((s,x)=>s+(x.iva||0),0);
+  const ivaCompraFc=gm.reduce((s,x)=>s+(x.iva||0),0);
+  const ivaBanco=(state.impuestos[mes]||{}).ivaExtracto||0;
+  const ivaCompra=ivaCompraFc+ivaBanco;
   const percIVA=gm.reduce((s,x)=>s+(x.piva||0),0);
   const v=state.ventas[mes]||{};
   const ivaVentas=v.ivaDebito||0, retIVA=v.retIVA||0;
   const estim=ivaVentas-ivaCompra-percIVA-retIVA;
-  return {ivaVentas,ivaCompra,percIVA,retIVA,estim};
+  return {ivaVentas,ivaCompra,ivaCompraFc,ivaBanco,percIVA,retIVA,estim};
 }
 function iibbMes(mes){
   const d=datosMes(mes);
@@ -821,6 +861,8 @@ function drawImpuestos(){
       <div class="led"><div class="l">Estimado a pagar</div><div class="v ${iva.estim>=0?'neg':'pos'}">${money0(Math.abs(iva.estim))}</div><div class="sub">${iva.estim>=0?'a pagar':'a favor'}</div></div>
     </div>
     <table style="max-width:560px"><tbody>
+      <tr><td class="l">IVA compras de facturas</td><td class="num">${money(iva.ivaCompraFc)}</td></tr>
+      ${iva.ivaBanco?`<tr><td class="l">IVA del banco (extracto)</td><td class="num">${money(iva.ivaBanco)}</td></tr>`:""}
       <tr><td class="l">(−) Percepciones IVA (proveedores)</td><td class="num">${money(iva.percIVA)}</td></tr>
       <tr><td class="l">(−) Retenciones IVA (clientes)</td><td class="num">${money(iva.retIVA)}</td></tr>
       <tr class="tot"><td class="l">Estimado por la app</td><td class="num">${money(iva.estim)}</td></tr>
@@ -855,6 +897,112 @@ function drawImpuestos(){
     </tbody></table>
     <small class="note">El IIBB se calcula con la alícuota sobre la porción de Bs As (coeficiente editable). El saldo a favor del mes anterior se toma del valor "Al contador" del mes previo (si fue negativo). Confirmá siempre con tu contador.</small>`;
 }
+
+/* ===== PESTAÑA IMP. CHEQUE (1,2‰) ===== */
+function renderChequeTab(){
+  const sel=$("ch_mes");
+  // meses: los que tengan datos en cualquier lado + el actual
+  let meses=new Set(mesesConDatos());
+  Object.keys(state.cheque).forEach(m=>meses.add(m));
+  meses.add(curMonthISO());
+  const arr=[...meses].sort();
+  const prev=sel.value;
+  sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
+  if(arr.includes(prev))sel.value=prev; else sel.value=arr[arr.length-1];
+  renderChequeTabla();
+}
+/* parsea el extracto: agrupa TODOS los cargos bancarios por concepto (nombre del banco).
+   Excluye lo que no es gasto bancario (transferencias, sueldos, cheques, rescates, etc.) */
+function parseCheque(texto){
+  const EXCLUIR=["TRANSF SUELDOS","TRANSFERENCIA","P.CHEQUE","SUSCRIPCION","AC RESCATE","RECAUDACION","TRANSPORTE","DEBITO FISCAL"];
+  const lineas=texto.split(/\n/);
+  const grupos={};
+  let total=0, sircreb=0, ley=0, ivaCom=0;
+  lineas.forEach(l=>{
+    // captura concepto (N/D ... o DEBITO FISCAL IVA) + primer importe argentino
+    const m=l.match(/\d{2}-[A-Za-z]{3}-\d{4}\s+(N\/D\s+.+?|DEBITO FISCAL IVA)\s+([\d.]+,\d{2})\s/);
+    if(!m)return;
+    const concepto=m[1].trim();
+    const val=parseFloat(m[2].replace(/\./g,"").replace(",","."));
+    if(isNaN(val))return;
+    const cu=concepto.toUpperCase();
+    // IVA sobre comisiones lo tratamos aparte (lo sumamos al final, no se excluye)
+    const esIVA = cu.indexOf("DEBITO FISCAL IVA")!==-1;
+    if(!esIVA && EXCLUIR.some(x=>cu.indexOf(x)!==-1)) return;
+    // normaliza LEY 25413 (CRED/DEBIT) a un solo grupo
+    let key=concepto;
+    if(cu.indexOf("LEY 25413")!==-1){ key="N/D LEY 25413"; ley+=val; }
+    if(cu.indexOf("RET IB SIRCREB")!==-1){ sircreb+=val; }
+    if(esIVA){ key="DEBITO FISCAL IVA"; ivaCom+=val; }
+    grupos[key]=(grupos[key]||0)+val;
+    total+=val;
+  });
+  return {grupos,total,ley,sircreb,ivaCom};
+}
+$("ch_calc").onclick=()=>{
+  const texto=$("ch_texto").value;
+  if(!texto.trim()){showMsg("ch_msg","learn","Pegá primero el texto del extracto.");return;}
+  const {grupos,total,ley,sircreb,ivaCom}=parseCheque(texto);
+  const claves=Object.keys(grupos);
+  if(!claves.length){showMsg("ch_msg","learn","No encontré cargos bancarios en el texto. Verificá que pegaste el extracto completo.");$("ch_result").innerHTML="";return;}
+  showMsg("ch_msg","ok",`Detecté <b>${claves.length}</b> concepto(s). Verificá el desglose contra tu planilla antes de guardar.`);
+  let filas=claves.sort().map(k=>`<tr><td class="l">${k}</td><td class="num">${money(grupos[k])}</td></tr>`).join("");
+  $("ch_result").innerHTML=`
+    <div class="sectlabel" style="margin-top:8px">Desglose de gastos bancarios del mes (nombres del banco)</div>
+    <table style="max-width:560px;margin:8px 0 14px"><tbody>
+      ${filas}
+      <tr class="tot"><td class="l"><b>Subtotal detectado</b></td><td class="num"><b>${money(total)}</b></td></tr>
+    </tbody></table>
+    <div class="ledger" style="margin:8px 0 14px">
+      <div class="led"><div class="l">1,2‰ (Ley 25413)</div><div class="v">${money0(ley)}</div><div class="sub">→ Ganancias</div></div>
+      <div class="led"><div class="l">Ret. SIRCREB</div><div class="v">${money0(sircreb)}</div><div class="sub">→ IIBB</div></div>
+      <div class="led"><div class="l">IVA comisiones</div><div class="v">${money0(ivaCom)}</div></div>
+    </div>
+    <div class="row-actions"><button class="btn" id="ch_save">Guardar ${ymLabel($("ch_mes").value)}</button></div>
+    <small class="note">Al guardar: el 1,2‰ va al registro de abajo (para Ganancias) y las retenciones SIRCREB se cargan como "Retenciones bancarias IIBB" del mes en Impuestos. El desglose completo es informativo, para que lo compares con tu planilla.</small>`;
+  $("ch_save").onclick=async ()=>{
+    const mes=$("ch_mes").value;
+    const prevComp=(state.cheque[mes]||{}).compensado||false;
+    state.cheque[mes]={total:ley,compensado:prevComp};
+    const imp=state.impuestos[mes]||{};
+    imp.retBancIIBB=sircreb;
+    imp.ivaExtracto=ivaCom;
+    if(!imp.alicIIBB)imp.alicIIBB=DEF_ALIC;
+    if(!imp.coefCABA)imp.coefCABA=DEF_CC;
+    if(!imp.coefBsAs)imp.coefBsAs=DEF_CB;
+    state.impuestos[mes]=imp;
+    renderChequeTabla();
+    showMsg("ch_msg","ok",`Guardado ${ymLabel(mes)}: 1,2‰ <b>${money(ley)}</b> · SIRCREB <b>${money(sircreb)}</b> · IVA banco <b>${money(ivaCom)}</b> (cargados en Impuestos).`);
+    $("ch_result").innerHTML="";$("ch_texto").value="";
+    await apiPost({action:"setCheque",mes,total:ley,compensado:prevComp});
+    await apiPost({action:"setImpuestos",mes,ivaContador:imp.ivaContador||0,retBancIIBB:sircreb,iibbContador:imp.iibbContador||0,alicIIBB:imp.alicIIBB,coefCABA:imp.coefCABA,coefBsAs:imp.coefBsAs,ivaExtracto:ivaCom});
+  };
+};
+$("ch_clear").onclick=()=>{$("ch_texto").value="";$("ch_result").innerHTML="";hideMsg("ch_msg");};
+
+function renderChequeTabla(){
+  const tb=$("ch_tbl").querySelector("tbody");
+  const keys=Object.keys(state.cheque).sort();
+  if(!keys.length){tb.innerHTML=`<tr><td colspan="4"><div class="empty">Todavía no guardaste ningún mes.</div></td></tr>`;return;}
+  let h=`<tr><th class="l">Mes</th><th class="num">Total 1,2‰</th><th>Compensado</th><th></th></tr>`;
+  let tot=0;
+  keys.forEach(k=>{const c=state.cheque[k];tot+=c.total;
+    h+=`<tr><td class="l">${ymLabel(k)}</td><td class="num">${money(c.total)}</td>
+    <td><button class="bndot btn-dot ${c.compensado?'ng':'bl'}" data-comp="${k}" title="${c.compensado?'Compensado':'Sin compensar'}"></button></td>
+    <td><button class="del" data-delch="${k}">✕</button></td></tr>`;});
+  h+=`<tr class="tot"><td class="l"><b>Total acumulado</b></td><td class="num"><b>${money(tot)}</b></td><td colspan="2"></td></tr>`;
+  tb.innerHTML=h;
+  tb.querySelectorAll("[data-comp]").forEach(b=>b.onclick=async ()=>{
+    const k=b.dataset.comp; state.cheque[k].compensado=!state.cheque[k].compensado;
+    renderChequeTabla();
+    await apiPost({action:"setCheque",mes:k,total:state.cheque[k].total,compensado:state.cheque[k].compensado});
+  });
+  tb.querySelectorAll("[data-delch]").forEach(b=>b.onclick=async ()=>{
+    const k=b.dataset.delch;
+    if(confirm("¿Borrar el registro de "+ymLabel(k)+"?")){ delete state.cheque[k]; renderChequeTabla(); await apiPost({action:"setCheque",mes:k,total:0,compensado:false}); }
+  });
+}
+
 function initInformeSelectors(){
   const mapa={};
   state.gastos.forEach(g=>{ const k=capProv(g.prov); if(k)mapa[k]=true; });
