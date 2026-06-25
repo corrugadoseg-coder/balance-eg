@@ -216,15 +216,15 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
       </div>
     </div>
     <div class="sectlabel" style="margin-top:22px">IVA y percepciones</div>
-    <div class="grid" style="grid-template-columns:1fr 1fr 1fr;align-items:end">
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr;align-items:end">
       <div class="f"><label>Alícuota IVA</label>
         <select id="g_alic"><option value="21">21%</option><option value="10.5">10,5%</option><option value="27">27%</option><option value="0">Exento / sin IVA</option></select>
       </div>
+      <div class="f"><label>IVA <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">lo calcula la app</span></label>
+        <input id="g_iva" class="mono" readonly placeholder="0,00" style="background:var(--paper2);color:var(--ink)"></div>
       <div class="f"><label>Percepción IVA <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">a mano</span></label><input id="g_piva" class="mono" inputmode="decimal" placeholder="0,00"></div>
       <div class="f"><label>Percepción IIBB <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">a mano</span></label><input id="g_piibb" class="mono" inputmode="decimal" placeholder="0,00"></div>
     </div>
-    <div id="g_ivacalc" style="margin-top:8px;font-size:12px;color:var(--faint);font-family:'IBM Plex Mono',monospace"></div>
-    <input type="hidden" id="g_iva">
     <div class="msg" id="g_msg"></div>
     <div class="row-actions">
       <button class="btn" id="g_add">Agregar gasto</button>
@@ -411,7 +411,7 @@ const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","S
    Pegá acá abajo, entre las comillas, la URL que termina en /exec
    que te dio "Implementar". Igual que en pedidos-eg.
    ===================================================================== */
-const API="const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
+const API="PEGÁ_TU_URL_/exec_ACÁ";
 /* ===================================================================== */
 
 let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{} };  // impuestos: {"2026-01":{...}}
@@ -522,20 +522,31 @@ $("g_prov").addEventListener("input",()=>{
   else hideMsg("g_msg");
 });
 
-/* ---- IVA calc: del neto + alícuota, muestra el IVA en chico ---- */
+/* ---- IVA calc: del neto + alícuota, llena la casilla IVA ---- */
 function calcIvaShow(){
   const neto=parseNum($("g_monto").value);
   const a=parseFloat($("g_alic").value);
-  const box=$("g_ivacalc");
-  if(isNaN(neto)||neto<=0){ box.textContent=""; $("g_iva").value=""; return; }
+  if(isNaN(neto)||neto<=0){ $("g_iva").value=""; return; }
   const iva=a>0 ? Math.round(neto*a/100*100)/100 : 0;
-  $("g_iva").value=iva;
-  box.innerHTML = a>0
-    ? `IVA ${a}%: <b style="color:var(--ink)">${money(iva)}</b> &nbsp;·&nbsp; total con IVA: ${money(neto+iva)}`
-    : `Sin IVA (exento)`;
+  $("g_iva").value=iva.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 $("g_monto").addEventListener("input",calcIvaShow);
 $("g_alic").addEventListener("change",calcIvaShow);
+
+/* ---- Enter pasa al siguiente campo (carga rápida) ---- */
+(function(){
+  const orden=["g_prov","g_monto","g_rubro","g_sub","g_alic","g_piva","g_piibb"];
+  orden.forEach((id,i)=>{
+    const el=$(id); if(!el)return;
+    el.addEventListener("keydown",e=>{
+      if(e.key==="Enter"){
+        e.preventDefault();
+        if(id==="g_piibb"){ $("g_add").click(); return; }  // último: agrega
+        const next=$(orden[i+1]); if(next)next.focus();
+      }
+    });
+  });
+})();
 
 function showMsg(id,cls,html){const m=$(id);m.className="msg show "+cls;m.innerHTML=html;}
 function hideMsg(id){$(id).className="msg";}
@@ -563,13 +574,13 @@ $("g_add").onclick=async ()=>{
   if(nuevo)showMsg("g_msg","learn",`✓ Aprendido: "<b>${prov}</b>" → ${rubro}. La próxima se completa solo.`);
   else showMsg("g_msg","ok",`Gasto agregado: ${money(monto)} + IVA ${money(iva)} · ${rubro}${sub?" · "+sub:""} · <b>Tipo ${bn==="negro"?"B":"A"}</b>.`);
   $("g_prov").value="";$("g_monto").value="";$("g_sub").value="";
-  $("g_piva").value="";$("g_piibb").value="";$("g_iva").value="";$("g_ivacalc").textContent="";
+  $("g_piva").value="";$("g_piibb").value="";$("g_iva").value="";
   $("g_alic").value="21";
   updateFlag();
   renderGastos();
   await apiPost({action:"addGasto",id,fecha,prov,rubro,sub,bn,monto,iva,piva,piibb});
 };
-$("g_clear").onclick=()=>{$("g_prov").value="";$("g_monto").value="";$("g_fecha").value=todayISO();$("g_sub").value="";$("g_piva").value="";$("g_piibb").value="";$("g_iva").value="";$("g_ivacalc").textContent="";$("g_alic").value="21";updateFlag();hideMsg("g_msg");};
+$("g_clear").onclick=()=>{$("g_prov").value="";$("g_monto").value="";$("g_fecha").value=todayISO();$("g_sub").value="";$("g_piva").value="";$("g_piibb").value="";$("g_iva").value="";$("g_alic").value="21";updateFlag();hideMsg("g_msg");};
 
 
 function bnChip(bn){return bn==="negro"?'<span class="bndot ng" title="Tipo B"></span>':'<span class="bndot bl" title="Tipo A"></span>';}
