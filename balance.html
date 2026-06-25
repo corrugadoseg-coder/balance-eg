@@ -1,1 +1,1016 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Balance Interno — Gestión 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+:root{
+  --paper:#f4efe4; --paper2:#ebe3d4; --card:#fbf8f1; --edge:#d8cdb8;
+  --ink:#23201a; --ink2:#5c5346; --faint:#8a8073;
+  --green:#3f6b4f; --greenL:#e3ece2; --red:#a3402f; --redL:#f0ddd6;
+  --gold:#b5842f; --goldL:#f1e6cc; --blue:#37536b;
+  --negro:#23201a; --blanco:#c9bda4;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;
+  background-image:
+    repeating-linear-gradient(0deg,transparent,transparent 31px,rgba(120,90,40,.04) 31px,rgba(120,90,40,.04) 32px);
+  min-height:100vh}
+.wrap{max-width:1180px;margin:0 auto;padding:0 22px 80px}
+
+/* HEADER */
+header{padding:30px 0 0}
+.masthead{display:flex;justify-content:space-between;align-items:flex-end;
+  border-bottom:3px double var(--ink);padding-bottom:14px}
+.brand .kicker{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.32em;
+  text-transform:uppercase;color:var(--gold);font-weight:600}
+.brand h1{font-family:'Spectral',serif;font-weight:800;font-size:40px;line-height:1;letter-spacing:-.01em;margin-top:4px}
+.brand .sub{font-style:italic;color:var(--ink2);font-size:14px;margin-top:6px;font-family:'Spectral',serif}
+.savebox{text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--faint)}
+.savebox .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--gold);margin-right:5px}
+.savebox.saved .dot{background:var(--green)} .savebox.unsaved .dot{background:var(--red)}
+
+/* TABS */
+nav.tabs{display:flex;gap:0;margin:22px 0 26px;border-bottom:1px solid var(--edge);flex-wrap:wrap}
+.tab{font-family:'IBM Plex Sans';font-size:14px;font-weight:600;color:var(--faint);
+  padding:11px 20px;cursor:pointer;border:none;background:none;position:relative;letter-spacing:.01em}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink)}
+.tab.on::after{content:"";position:absolute;left:0;bottom:-1px;width:100%;height:3px;background:var(--gold)}
+.tab .n{font-family:'IBM Plex Mono';font-size:10px;color:var(--gold);margin-right:7px;vertical-align:2px}
+
+.view{display:none;animation:fade .25s ease}
+.view.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* CARDS */
+.card{background:var(--card);border:1px solid var(--edge);border-radius:3px;padding:24px;margin-bottom:20px;
+  box-shadow:0 1px 0 rgba(255,255,255,.7) inset, 0 2px 8px rgba(80,60,20,.04)}
+.card h2{font-family:'Spectral',serif;font-size:23px;font-weight:700;margin-bottom:3px}
+.card .lead{color:var(--ink2);font-size:13.5px;margin-bottom:20px;font-style:italic;font-family:'Spectral',serif}
+.sectlabel{font-family:'IBM Plex Mono';font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--gold);font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.sectlabel::after{content:"";flex:1;height:1px;background:var(--edge)}
+
+/* FORM */
+.grid{display:grid;gap:14px}
+.f{display:flex;flex-direction:column;gap:6px}
+.f label{font-family:'IBM Plex Mono';font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);font-weight:600}
+input,select{background:#fff;border:1px solid var(--edge);color:var(--ink);
+  padding:11px 12px;border-radius:3px;font-family:'IBM Plex Sans';font-size:14px;width:100%;transition:.12s}
+input:focus,select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px var(--goldL)}
+input.mono{font-family:'IBM Plex Mono';font-weight:500}
+
+/* toggle blanco/negro */
+.bn{display:flex;border:1px solid var(--edge);border-radius:3px;overflow:hidden;width:100%}
+.bn button{flex:1;padding:11px 8px;border:none;background:#fff;cursor:pointer;font-family:'IBM Plex Sans';
+  font-size:13px;font-weight:600;color:var(--faint);display:flex;align-items:center;justify-content:center;gap:7px;transition:.12s}
+.bn button .sw{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--faint)}
+.bn button.on[data-v="blanco"]{background:var(--paper2);color:var(--ink)}
+.bn button.on[data-v="blanco"] .sw{background:var(--blanco);border-color:var(--ink2)}
+.bn button.on[data-v="negro"]{background:var(--ink);color:#fff}
+.bn button.on[data-v="negro"] .sw{background:#000;border-color:#000}
+
+.btn{background:var(--ink);border:none;color:var(--paper);padding:12px 26px;border-radius:3px;
+  font-family:'IBM Plex Sans';font-size:14px;font-weight:600;cursor:pointer;transition:.14s;letter-spacing:.02em}
+.btn:hover{background:#000}
+.btn.ghost{background:none;border:1px solid var(--edge);color:var(--ink2)}
+.btn.ghost:hover{border-color:var(--ink);color:var(--ink);background:none}
+.btn.gold{background:var(--gold)} .btn.gold:hover{background:#a0742a}
+.btn.sm{padding:8px 16px;font-size:13px}
+.row-actions{display:flex;gap:11px;flex-wrap:wrap;margin-top:20px;align-items:center}
+
+.msg{margin-top:14px;padding:11px 14px;border-radius:3px;font-size:13px;display:none}
+.msg.show{display:block}
+.msg.ok{background:var(--greenL);border:1px solid #b9d0b9;color:var(--green)}
+.msg.learn{background:var(--goldL);border:1px solid #e0c98a;color:#8a6420}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:10px 10px;text-align:right;border-bottom:1px solid var(--edge)}
+th:first-child,td:first-child,th.l,td.l{text-align:left}
+thead th{font-family:'IBM Plex Mono';color:var(--ink2);font-weight:600;font-size:10.5px;
+  text-transform:uppercase;letter-spacing:.06em;border-bottom:1.5px solid var(--ink)}
+tbody tr:hover{background:var(--paper)}
+td.num,th.num{font-family:'IBM Plex Mono';font-weight:500}
+.chip{display:inline-block;font-family:'IBM Plex Mono';font-size:10px;font-weight:600;padding:2px 7px;border-radius:3px;letter-spacing:.04em}
+.chip.bl{background:var(--paper2);color:var(--ink2);border:1px solid var(--edge)}
+.chip.ng{background:var(--ink);color:var(--paper)}
+.chip.rubro{background:var(--goldL);color:#8a6420;border:1px solid #e0c98a}
+.bndot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle}
+.bndot.bl{background:transparent;border:1.5px solid var(--edge)}
+.bndot.ng{background:var(--ink2);border:1.5px solid var(--ink2)}
+.bndot.btn-dot{cursor:pointer;padding:0;transition:.15s}
+.bndot.btn-dot:hover{box-shadow:0 0 0 3px var(--goldL)}
+.chipbtn{font-family:'IBM Plex Mono';font-size:10px;font-weight:600;padding:3px 9px;border-radius:3px;letter-spacing:.04em;cursor:pointer;transition:.12s;border:1px solid transparent}
+.chipbtn.bl{background:var(--paper2);color:var(--ink2);border-color:var(--edge)}
+.chipbtn.ng{background:var(--ink);color:var(--paper);border-color:#000}
+.chipbtn:hover{box-shadow:0 0 0 2px var(--goldL);border-color:var(--gold)}
+.del{color:var(--red);cursor:pointer;border:none;background:none;font-size:16px;line-height:1;font-weight:700}
+tr.tot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:none;font-family:'IBM Plex Mono'}
+.empty{text-align:center;padding:38px 20px;color:var(--faint);font-style:italic;font-family:'Spectral',serif;font-size:15px}
+
+/* FILTER BAR */
+.filterbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;
+  background:var(--paper2);border:1px solid var(--edge);border-radius:3px;padding:16px;margin-bottom:20px}
+
+/* KPI ledger row */
+.ledger{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--ink);border-radius:3px;overflow:hidden;margin-bottom:22px}
+.led{padding:18px 20px;border-right:1px solid var(--edge);background:var(--card)}
+.led:last-child{border-right:none}
+.led .l{font-family:'IBM Plex Mono';font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2);font-weight:600}
+.led .v{font-family:'Spectral',serif;font-size:30px;font-weight:700;margin-top:7px;letter-spacing:-.01em}
+.led .v.pos{color:var(--green)} .led .v.neg{color:var(--red)}
+.led .sub{font-family:'IBM Plex Mono';font-size:11px;color:var(--faint);margin-top:4px}
+
+.viewtoggle{display:inline-flex;border:1px solid var(--edge);border-radius:3px;overflow:hidden;margin-bottom:20px}
+.viewtoggle button{padding:8px 18px;border:none;background:var(--card);cursor:pointer;
+  font-family:'IBM Plex Sans';font-size:13px;font-weight:600;color:var(--faint);border-right:1px solid var(--edge)}
+.viewtoggle button:last-child{border-right:none}
+.viewtoggle button.on{background:var(--ink);color:var(--paper)}
+
+.chartwrap{background:var(--card);border:1px solid var(--edge);border-radius:3px;padding:20px;margin-bottom:20px}
+.chartwrap h3{font-family:'Spectral',serif;font-size:18px;font-weight:600;margin-bottom:2px}
+.chartwrap .cap{font-size:12.5px;color:var(--faint);margin-bottom:16px;font-style:italic;font-family:'Spectral',serif}
+.chartbox{position:relative;height:300px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+
+/* observations */
+.obs{background:var(--card);border:1px solid var(--edge);border-left:4px solid var(--gold);border-radius:3px;padding:18px 20px;margin-bottom:14px}
+.obs h3{font-family:'Spectral',serif;font-size:18px;font-weight:700;margin-bottom:12px}
+.obs ul{list-style:none}
+.obs li{padding:9px 0 9px 26px;position:relative;font-size:14px;line-height:1.5;border-bottom:1px dotted var(--edge)}
+.obs li:last-child{border-bottom:none}
+.obs li::before{content:"§";position:absolute;left:0;top:9px;color:var(--gold);font-family:'Spectral',serif;font-weight:700}
+.obs li.up::before{content:"▲";color:var(--red);font-size:11px;top:11px}
+.obs li.down::before{content:"▼";color:var(--green);font-size:11px;top:11px}
+.obs li.flat::before{content:"●";color:var(--faint);font-size:10px;top:11px}
+.obs li b{font-weight:700}
+
+.monthpick{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.monthpick select{width:auto;min-width:170px}
+small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spectral',serif}
+
+@media(max-width:820px){.grid2{grid-template-columns:1fr}.ledger{grid-template-columns:1fr}.led{border-right:none;border-bottom:1px solid var(--edge)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="masthead">
+    <div class="brand">
+      <div class="kicker">Libro de Gestión Interna</div>
+      <h1>Balance Interno</h1>
+      <div class="sub">Ejercicio 2026 · gastos, ventas y resultado por rubro</div>
+    </div>
+    <div class="savebox" id="savebox"><span class="dot"></span><span id="saveTxt">conectando…</span></div>
+  </div>
+  <nav class="tabs">
+    <button class="tab on" data-v="gasto"><span class="n">01</span>Cargar gasto</button>
+    <button class="tab" data-v="venta"><span class="n">02</span>Ventas del mes</button>
+    <button class="tab" data-v="balance"><span class="n">03</span>Balance mensual</button>
+    <button class="tab" data-v="impuestos"><span class="n">04</span>Impuestos</button>
+    <button class="tab" data-v="informes"><span class="n">05</span>Informes</button>
+    <button class="tab" data-v="datos"><span class="n">06</span>Datos</button>
+  </nav>
+</header>
+
+<!-- ===== 01 CARGAR GASTO ===== -->
+<section class="view on" data-v="gasto">
+  <div class="card">
+    <h2>Registrar un gasto</h2>
+    <p class="lead">Cargá cada factura con su proveedor y monto. El rubro se completa solo cuando el proveedor ya es conocido.</p>
+    <div class="sectlabel">Datos de la factura</div>
+    <div class="grid" style="grid-template-columns:1.6fr 1fr;">
+      <div class="f">
+        <label>Proveedor</label>
+        <input id="g_prov" list="provlist" placeholder="Ej. YPF, Transportes López, AFIP…" autocomplete="off">
+        <datalist id="provlist"></datalist>
+      </div>
+      <div class="f">
+        <label>Fecha</label>
+        <input id="g_fecha" type="date">
+      </div>
+    </div>
+    <div class="grid" style="grid-template-columns:1fr 1.2fr;margin-top:14px;">
+      <div class="f">
+        <label>Monto sin IVA</label>
+        <input id="g_monto" class="mono" inputmode="decimal" placeholder="0,00">
+      </div>
+      <div class="f">
+        <label>Rubro</label>
+        <select id="g_rubro"></select>
+      </div>
+    </div>
+    <div class="grid" style="grid-template-columns:1fr;margin-top:14px;">
+      <div class="f">
+        <label>Subcategoría <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px;margin-left:6px">opcional</span></label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="g_sub" style="flex:1"></select>
+          <button class="btn ghost sm" id="g_subadd" type="button" title="Agregar una subcategoría nueva a este rubro">+ Nueva</button>
+        </div>
+      </div>
+    </div>
+    <div class="sectlabel" style="margin-top:22px">IVA y percepciones</div>
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr;align-items:end">
+      <div class="f"><label>Alícuota IVA</label>
+        <select id="g_alic"><option value="21">21%</option><option value="10.5">10,5%</option><option value="27">27%</option><option value="0">Exento / sin IVA</option></select>
+      </div>
+      <div class="f"><label>IVA <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">lo calcula la app</span></label>
+        <input id="g_iva" class="mono" readonly placeholder="0,00" style="background:var(--paper2);color:var(--ink)"></div>
+      <div class="f"><label>Percepción IVA <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">a mano</span></label><input id="g_piva" class="mono" inputmode="decimal" placeholder="0,00"></div>
+      <div class="f"><label>Percepción IIBB <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">a mano</span></label><input id="g_piibb" class="mono" inputmode="decimal" placeholder="0,00"></div>
+    </div>
+    <div class="msg" id="g_msg"></div>
+    <div class="row-actions">
+      <button class="btn" id="g_add">Agregar gasto</button>
+      <button class="btn ghost" id="g_clear">Limpiar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Últimos gastos cargados</h2>
+    <p class="lead">Se muestran los más recientes primero. Borrá con la cruz si te equivocaste.</p>
+    <div style="overflow-x:auto"><table id="g_tbl"><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- ===== 02 VENTAS ===== -->
+<section class="view" data-v="venta">
+  <div class="card">
+    <h2>Cargar ventas del mes</h2>
+    <p class="lead">A fin de mes registrá las ventas de cada tipo. El total se calcula solo.</p>
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="f">
+        <label>Mes</label>
+        <input id="v_mes" type="month">
+      </div>
+      <div class="f">
+        <label>Ventas <span class="bndot bl" style="margin-left:4px" title="Tipo A"></span></label>
+        <input id="v_blanco" class="mono" inputmode="decimal" placeholder="0,00">
+      </div>
+      <div class="f">
+        <label>Ventas <span class="bndot ng" style="margin-left:4px" title="Tipo B"></span></label>
+        <input id="v_negro" class="mono" inputmode="decimal" placeholder="0,00">
+      </div>
+    </div>
+    <div class="grid" style="grid-template-columns:1fr 2fr;margin-top:14px;max-width:520px">
+      <div class="f">
+        <label>IVA de ventas <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px;margin-left:6px">se calcula al 21%, editable</span></label>
+        <input id="v_ivad" class="mono" inputmode="decimal" placeholder="0,00">
+      </div>
+      <div class="f" style="justify-content:flex-end">
+        <button class="btn ghost sm" id="v_calciva" type="button">Calcular IVA (21% de las ventas)</button>
+      </div>
+    </div>
+    <div class="sectlabel" style="margin-top:22px">Retenciones que te hicieron los clientes <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px;margin-left:6px">total del mes · opcional</span></div>
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="f"><label>Retención IVA</label><input id="v_riva" class="mono" inputmode="decimal" placeholder="0,00"></div>
+      <div class="f"><label>Retención IIBB</label><input id="v_riibb" class="mono" inputmode="decimal" placeholder="0,00"></div>
+      <div class="f"><label>Retención Ganancias</label><input id="v_rgan" class="mono" inputmode="decimal" placeholder="0,00"></div>
+    </div>
+    <div class="msg" id="v_msg"></div>
+    <div class="row-actions">
+      <button class="btn" id="v_add">Guardar ventas del mes</button>
+      <small class="note">Si el mes ya tenía ventas cargadas, se reemplazan.</small>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Ventas registradas</h2>
+    <div style="overflow-x:auto"><table id="v_tbl"><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- ===== 03 BALANCE ===== -->
+<section class="view" data-v="balance">
+  <div class="card">
+    <h2>Balance del mes</h2>
+    <p class="lead">Elegí un mes y mirá gastos por rubro, ventas y resultado. Cambiá entre total y cada tipo.</p>
+    <div class="monthpick">
+      <select id="b_mes"></select>
+      <div class="viewtoggle" id="b_view">
+        <button data-v="total" class="on">Total</button>
+        <button data-v="blanco">Tipo A</button>
+        <button data-v="negro">Tipo B</button>
+      </div>
+    </div>
+    <div class="ledger" id="b_ledger"></div>
+    <div class="sectlabel">Gastos por rubro</div>
+    <div style="overflow-x:auto"><table id="b_tbl"><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- ===== 04 IMPUESTOS ===== -->
+<section class="view" data-v="impuestos">
+  <div class="card">
+    <h2>Impuestos del mes</h2>
+    <p class="lead">Elegí un mes. La app estima IVA e IIBB con tus datos. Cargá los valores del contador cuando los tengas para ver la diferencia y arrastrar el saldo.</p>
+    <div class="monthpick">
+      <select id="t_mes"></select>
+    </div>
+    <div class="sectlabel">Datos que cargás vos para este mes</div>
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="f"><label>Retenciones bancarias IIBB</label><input id="t_retbanc" class="mono" inputmode="decimal" placeholder="0,00"></div>
+      <div class="f"><label>IVA al contador <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">cuando lo tengas</span></label><input id="t_ivacont" class="mono" inputmode="decimal" placeholder="0,00"></div>
+      <div class="f"><label>IIBB al contador <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">cuando lo tengas</span></label><input id="t_iibbcont" class="mono" inputmode="decimal" placeholder="0,00"></div>
+    </div>
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
+      <div class="f"><label>Alícuota IIBB %</label><input id="t_alic" class="mono" inputmode="decimal" placeholder="3"></div>
+      <div class="f"><label>Coef. CABA %</label><input id="t_cc" class="mono" inputmode="decimal" placeholder="87.76"></div>
+      <div class="f"><label>Coef. Bs As %</label><input id="t_cb" class="mono" inputmode="decimal" placeholder="12.24"></div>
+    </div>
+    <div class="msg" id="t_msg"></div>
+    <div class="row-actions">
+      <button class="btn" id="t_save">Guardar datos del mes</button>
+      <small class="note">Los coeficientes y la alícuota se guardan por mes; si cambian, los editás.</small>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>IVA — estimación</h2>
+    <div id="t_iva"></div>
+  </div>
+
+  <div class="card">
+    <h2>IIBB — estimación</h2>
+    <div id="t_iibb"></div>
+  </div>
+</section>
+
+<!-- ===== 05 INFORMES ===== -->
+<section class="view" data-v="informes">
+  <div class="card">
+    <h2>Informes y análisis</h2>
+    <p class="lead">Filtrá por período, rubro, proveedor o tipo de dinero. Los gráficos y las observaciones se recalculan.</p>
+    <div class="filterbar">
+      <div class="f"><label>Desde (mes)</label><input id="i_desde" type="month"></div>
+      <div class="f"><label>Hasta (mes)</label><input id="i_hasta" type="month"></div>
+      <div class="f"><label>Rubro</label><select id="i_rubro"><option value="">Todos</option></select></div>
+      <div class="f"><label>Proveedor</label><select id="i_prov"><option value="">Todos</option></select></div>
+      <div class="f"><label>Tipo</label><select id="i_bn"><option value="">Todos</option><option value="blanco">Tipo A</option><option value="negro">Tipo B</option></select></div>
+    </div>
+    <div class="row-actions" style="margin-top:0">
+      <button class="btn gold sm" id="i_apply">Aplicar filtros</button>
+      <button class="btn ghost sm" id="i_reset">Limpiar filtros</button>
+    </div>
+  </div>
+
+  <div class="ledger" id="i_ledger"></div>
+
+  <div class="obs" id="i_obs"></div>
+
+  <div class="grid2">
+    <div class="chartwrap"><h3>Ventas vs Gastos</h3><p class="cap">Por mes, según el filtro aplicado.</p><div class="chartbox"><canvas id="ch_vg"></canvas></div></div>
+    <div class="chartwrap"><h3>Resultado mensual</h3><p class="cap">Ventas menos gastos, mes a mes.</p><div class="chartbox"><canvas id="ch_res"></canvas></div></div>
+  </div>
+  <div class="grid2">
+    <div class="chartwrap"><h3>Composición de gastos</h3><p class="cap">Participación de cada rubro en el período.</p><div class="chartbox"><canvas id="ch_pie"></canvas></div></div>
+    <div class="chartwrap"><h3>Tipo A vs Tipo B</h3><p class="cap">Proporción de gastos y ventas por tipo.</p><div class="chartbox"><canvas id="ch_bn"></canvas></div></div>
+  </div>
+
+  <div class="card">
+    <h2>Detalle del período</h2>
+    <div style="overflow-x:auto"><table id="i_tbl"><tbody></tbody></table></div>
+    <div class="row-actions"><button class="btn ghost sm" id="i_export">Exportar este informe a Excel</button></div>
+  </div>
+</section>
+
+<!-- ===== 05 DATOS ===== -->
+<section class="view" data-v="datos">
+  <div class="card">
+    <h2>Datos y sincronización</h2>
+    <p class="lead">Todo se guarda solo en tu planilla de Google a medida que cargás. No hace falta guardar a mano.</p>
+    <div class="row-actions" style="margin-top:0">
+      <button class="btn gold" id="d_reload">Recargar desde la planilla</button>
+      <button class="btn ghost" id="d_xlsx">Exportar todo a Excel</button>
+    </div>
+    <div class="msg" id="d_msg"></div>
+    <div class="sectlabel" style="margin-top:26px">Estado</div>
+    <table style="max-width:480px">
+      <tbody id="d_stats"></tbody>
+    </table>
+    <div class="sectlabel" style="margin-top:26px">Conexión</div>
+    <p style="font-size:13px;color:var(--ink2)" id="d_conn">—</p>
+  </div>
+</section>
+
+</div>
+<script>
+/* ===== Balance Interno 2026 — lógica ===== */
+const RUBROS=["MATERIA PRIMA","GASTOS DE FABRICACIÓN","BIENES DE CAMBIO","FLETE Y NAFTA",
+"LOCACION, ABL Y SERVICIOS","GASTOS DE ADMINISTRACIÓN","GASTOS VS Y MANTENIMIENTO",
+"GASTOS PERSONAL","HONORARIOS","CCSS, SIND Y SUELDOS","IMPOSITIVO","RETIROS"];
+const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+
+/* =====================================================================
+   CONEXIÓN CON LA PLANILLA (Google Apps Script)
+   Pegá acá abajo, entre las comillas, la URL que termina en /exec
+   que te dio "Implementar". Igual que en pedidos-eg.
+   ===================================================================== */
+const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
+/* ===================================================================== */
+
+let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{} };  // impuestos: {"2026-01":{...}}
+let balView="total";
+const $=id=>document.getElementById(id);
+const $$=s=>document.querySelectorAll(s);
+
+/* ---- number parsing (acepta . o , como decimal) ---- */
+const parseNum=s=>{ if(typeof s==="number")return s; if(!s&&s!==0)return NaN;
+  let str=String(s).trim().replace(/[^0-9.,\-]/g,"");
+  if(!str)return NaN;
+  const hasC=str.includes(","),hasP=str.includes(".");
+  if(hasC&&hasP){ if(str.lastIndexOf(",")>str.lastIndexOf(".")) str=str.replace(/\./g,"").replace(",","."); else str=str.replace(/,/g,""); }
+  else if(hasC){ str=str.replace(",","."); }
+  else if(hasP){ const p=str.split("."); if(p.length>2||p[p.length-1].length===3) str=str.replace(/\./g,""); }
+  return parseFloat(str); };
+const money=n=>"$"+(Math.round((n||0)*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const money0=n=>"$"+Math.round(n||0).toLocaleString("es-AR");
+const moneyM=n=>{const a=Math.abs(n); if(a>=1e6)return "$"+(n/1e6).toLocaleString("es-AR",{maximumFractionDigits:1})+"M"; if(a>=1e3)return "$"+(n/1e3).toLocaleString("es-AR",{maximumFractionDigits:0})+"K"; return money0(n);};
+const ym=d=>fechaCorta(d).slice(0,7);
+const ymLabel=k=>{const[y,m]=k.split("-");return MESN[+m-1]+" "+y;};
+const todayISO=()=>new Date().toISOString().slice(0,10);
+const curMonthISO=()=>new Date().toISOString().slice(0,7);
+/* normaliza cualquier fecha (texto raro, ISO con hora, Date) a YYYY-MM-DD */
+function fechaCorta(f){
+  if(!f) return "";
+  let s=String(f).trim();
+  // ya viene como 2026-06-17...
+  let m=s.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return m[1]+"-"+m[2]+"-"+m[3];
+  // viene como objeto Date serializado (con GMT, etc.)
+  let d=new Date(s);
+  if(!isNaN(d)) return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  return s;
+}
+function fechaLinda(f){ const c=fechaCorta(f); if(!c) return ""; const p=c.split("-"); return p.length===3?p[2]+"/"+p[1]+"/"+p[0]:c; }
+const uid=()=>Date.now()+"-"+Math.floor(Math.random()*10000);
+
+/* ---- indicador de estado (sincronización) ---- */
+function setSync(estado,txt){ const b=$("savebox");
+  b.className="savebox "+(estado==="ok"?"saved":estado==="busy"?"":"unsaved");
+  $("saveTxt").textContent=txt||(estado==="ok"?"sincronizado":estado==="busy"?"guardando…":"sin conexión");
+}
+
+/* ---- llamadas a la planilla ---- */
+async function apiGet(){
+  const r=await fetch(API); const j=await r.json();
+  if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; }
+  return j;
+}
+async function apiPost(payload){
+  setSync("busy");
+  try{
+    await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
+    setSync("ok");
+    return true;
+  }catch(e){ setSync("err","error al guardar"); return false; }
+}
+
+/* ---- init UI ---- */
+function initSelects(){
+  $("g_rubro").innerHTML=RUBROS.map(r=>`<option>${r}</option>`).join("");
+  $("i_rubro").innerHTML='<option value="">Todos</option>'+RUBROS.map(r=>`<option>${r}</option>`).join("");
+  $("g_fecha").value=todayISO();
+  $("v_mes").value=curMonthISO();
+}
+
+/* ---- subcategorías: llenar según rubro ---- */
+function fillSubs(){
+  const rubro=$("g_rubro").value;
+  const lista=(state.subs[rubro]||[]).slice().sort((a,b)=>a.localeCompare(b));
+  const prev=$("g_sub").value;
+  $("g_sub").innerHTML=`<option value="">— sin subcategoría —</option>`+lista.map(s=>`<option>${s}</option>`).join("");
+  if(lista.includes(prev))$("g_sub").value=prev;
+}
+$("g_rubro").addEventListener("change",fillSubs);
+$("g_subadd").onclick=async ()=>{
+  const rubro=$("g_rubro").value;
+  const nombre=(prompt("Nueva subcategoría para «"+rubro+"»:")||"").trim();
+  if(!nombre)return;
+  if(!state.subs[rubro])state.subs[rubro]=[];
+  if(!state.subs[rubro].some(s=>s.toLowerCase()===nombre.toLowerCase())){
+    state.subs[rubro].push(nombre);
+  }
+  fillSubs(); $("g_sub").value=nombre;
+  await apiPost({action:"addSub",rubro,sub:nombre});
+};
+
+/* ---- tabs ---- */
+$$(".tab").forEach(t=>t.onclick=()=>{
+  $$(".tab").forEach(x=>x.classList.remove("on")); t.classList.add("on");
+  const v=t.dataset.v; $$(".view").forEach(x=>x.classList.toggle("on",x.dataset.v===v));
+  if(v==="balance")renderBalance();
+  if(v==="impuestos")renderImpuestosTab();
+  if(v==="informes")applyFilters();
+  if(v==="datos")renderStats();
+});
+
+/* ---- blanco/negro: solo por código (*), sin nada visible ---- */
+function montoEsNegro(){ return $("g_monto").value.trim().startsWith("*"); }
+function tipoActual(){ return montoEsNegro()?"negro":"blanco"; }
+function updateFlag(){}  // sin indicador visible
+
+/* ---- proveedor reconoce rubro ---- */
+$("g_prov").addEventListener("input",()=>{
+  const k=$("g_prov").value.trim().toLowerCase();
+  if(state.memoria[k]){ $("g_rubro").value=state.memoria[k]; fillSubs(); showMsg("g_msg","ok",`Rubro reconocido: <b>${state.memoria[k]}</b>`); }
+  else hideMsg("g_msg");
+});
+
+/* ---- IVA calc: del neto + alícuota, llena la casilla IVA ---- */
+function calcIvaShow(){
+  const neto=parseNum($("g_monto").value);
+  const a=parseFloat($("g_alic").value);
+  if(isNaN(neto)||neto<=0){ $("g_iva").value=""; return; }
+  const iva=a>0 ? Math.round(neto*a/100*100)/100 : 0;
+  $("g_iva").value=iva.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+$("g_monto").addEventListener("input",calcIvaShow);
+$("g_alic").addEventListener("change",calcIvaShow);
+
+/* ---- Enter pasa al siguiente campo (carga rápida) ---- */
+(function(){
+  const orden=["g_prov","g_monto","g_rubro","g_sub","g_alic","g_piva","g_piibb"];
+  orden.forEach((id,i)=>{
+    const el=$(id); if(!el)return;
+    el.addEventListener("keydown",e=>{
+      if(e.key==="Enter"){
+        e.preventDefault();
+        if(id==="g_piibb"){ $("g_add").click(); return; }  // último: agrega
+        const next=$(orden[i+1]); if(next)next.focus();
+      }
+    });
+  });
+})();
+
+function showMsg(id,cls,html){const m=$(id);m.className="msg show "+cls;m.innerHTML=html;}
+function hideMsg(id){$(id).className="msg";}
+
+/* ---- agregar gasto ---- */
+$("g_add").onclick=async ()=>{
+  const prov=$("g_prov").value.trim();
+  const fecha=$("g_fecha").value;
+  const bn=tipoActual();
+  const monto=parseNum($("g_monto").value);  // parseNum ya ignora el *
+  const rubro=$("g_rubro").value;
+  if(!prov){showMsg("g_msg","learn","Falta el proveedor.");return;}
+  if(!fecha){showMsg("g_msg","learn","Falta la fecha.");return;}
+  if(isNaN(monto)||monto<=0){showMsg("g_msg","learn","El monto sin IVA no es válido.");return;}
+  const k=prov.toLowerCase();
+  const nuevo=!state.memoria[k];
+  state.memoria[k]=rubro;
+  const sub=$("g_sub").value||"";
+  const a=parseFloat($("g_alic").value);
+  const iva=a>0 ? Math.round(monto*a/100*100)/100 : 0;
+  const piva=parseNum($("g_piva").value)||0;
+  const piibb=parseNum($("g_piibb").value)||0;
+  const id=uid();
+  state.gastos.push({id,fecha,prov,rubro,sub,monto,bn,iva,piva,piibb});
+  if(nuevo)showMsg("g_msg","learn",`✓ Aprendido: "<b>${prov}</b>" → ${rubro}. La próxima se completa solo.`);
+  else showMsg("g_msg","ok",`Gasto agregado: ${money(monto)} + IVA ${money(iva)} · ${rubro}${sub?" · "+sub:""} · <b>Tipo ${bn==="negro"?"B":"A"}</b>.`);
+  $("g_prov").value="";$("g_monto").value="";$("g_sub").value="";
+  $("g_piva").value="";$("g_piibb").value="";$("g_iva").value="";
+  $("g_alic").value="21";
+  updateFlag();
+  renderGastos();
+  await apiPost({action:"addGasto",id,fecha,prov,rubro,sub,bn,monto,iva,piva,piibb});
+};
+$("g_clear").onclick=()=>{$("g_prov").value="";$("g_monto").value="";$("g_fecha").value=todayISO();$("g_sub").value="";$("g_piva").value="";$("g_piibb").value="";$("g_iva").value="";$("g_alic").value="21";updateFlag();hideMsg("g_msg");};
+
+
+function bnChip(bn){return bn==="negro"?'<span class="bndot ng" title="Tipo B"></span>':'<span class="bndot bl" title="Tipo A"></span>';}
+function bnChipBtn(bn,id){return `<button class="bndot btn-dot ${bn==="negro"?"ng":"bl"}" data-toggle="${id}" title="Cambiar tipo"></button>`;}
+
+function renderGastos(){
+  refreshProvList();
+  const tb=$("g_tbl").querySelector("tbody");
+  const list=state.gastos.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,40);
+  if(!list.length){tb.innerHTML=`<tr><td colspan="6"><div class="empty">Todavía no cargaste gastos.</div></td></tr>`;return;}
+  let h=`<tr><th class="l">Fecha</th><th class="l">Proveedor</th><th class="l">Rubro</th><th>Tipo</th><th class="num">Monto sin IVA</th><th></th></tr>`;
+  list.forEach(g=>{ h+=`<tr><td class="l">${fechaLinda(g.fecha)}</td><td class="l">${g.prov}</td>
+    <td class="l"><span class="chip rubro">${g.rubro}</span>${g.sub?`<div style="font-size:11px;color:var(--faint);margin-top:3px">${g.sub}</div>`:""}</td><td>${bnChipBtn(g.bn,g.id)}</td>
+    <td class="num">${money(g.monto)}</td><td><button class="del" data-id="${g.id}">✕</button></td></tr>`; });
+  tb.innerHTML=h;
+  tb.querySelectorAll(".del").forEach(b=>b.onclick=async ()=>{ if(confirm("¿Borrar este gasto?")){const id=b.dataset.id; state.gastos=state.gastos.filter(g=>g.id!==id); renderGastos(); await apiPost({action:"deleteGasto",id});} });
+  tb.querySelectorAll("[data-toggle]").forEach(b=>b.onclick=async ()=>{ const id=b.dataset.toggle; const g=state.gastos.find(x=>x.id===id); if(!g)return; g.bn=g.bn==="negro"?"blanco":"negro"; renderGastos(); await apiPost({action:"updateTipo",id,bn:g.bn}); });
+}
+function refreshProvList(){ $("provlist").innerHTML=Object.keys(state.memoria).map(k=>`<option value="${k}">`).join(""); }
+
+/* ---- ventas ---- */
+$("v_add").onclick=async ()=>{
+  const mes=$("v_mes").value;
+  const bl=parseNum($("v_blanco").value)||0;
+  const ng=parseNum($("v_negro").value)||0;
+  if(!mes){showMsg("v_msg","learn","Elegí el mes.");return;}
+  if(bl<=0&&ng<=0){showMsg("v_msg","learn","Cargá al menos un monto de ventas.");return;}
+  const ivaDebito=parseNum($("v_ivad").value)||0;
+  const retIVA=parseNum($("v_riva").value)||0;
+  const retIIBB=parseNum($("v_riibb").value)||0;
+  const retGan=parseNum($("v_rgan").value)||0;
+  state.ventas[mes]={blanco:bl,negro:ng,ivaDebito,retIVA,retIIBB,retGan};
+  showMsg("v_msg","ok",`Ventas de ${ymLabel(mes)} guardadas. Total ${money(bl+ng)}.`);
+  $("v_blanco").value="";$("v_negro").value="";$("v_ivad").value="";
+  $("v_riva").value="";$("v_riibb").value="";$("v_rgan").value="";
+  renderVentas();
+  await apiPost({action:"addVenta",mes,blanco:bl,negro:ng,ivaDebito,retIVA,retIIBB,retGan});
+};
+$("v_calciva").onclick=()=>{
+  const bl=parseNum($("v_blanco").value)||0, ng=parseNum($("v_negro").value)||0;
+  const base=bl+ng;
+  if(base<=0){showMsg("v_msg","learn","Cargá primero los montos de ventas.");return;}
+  $("v_ivad").value=(Math.round(base*0.21*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  showMsg("v_msg","ok",`IVA estimado al 21%: <b>${money(base*0.21)}</b>. Podés corregirlo si hace falta.`);
+};
+function renderVentas(){
+  const tb=$("v_tbl").querySelector("tbody");
+  const keys=Object.keys(state.ventas).sort();
+  if(!keys.length){tb.innerHTML=`<tr><td colspan="5"><div class="empty">Todavía no cargaste ventas.</div></td></tr>`;return;}
+  let h=`<tr><th class="l">Mes</th><th class="num">Tipo <span class="bndot bl"></span></th><th class="num">Tipo <span class="bndot ng"></span></th><th class="num">Total</th><th></th></tr>`;
+  keys.forEach(k=>{const v=state.ventas[k];const t=v.blanco+v.negro;
+    h+=`<tr><td class="l">${ymLabel(k)}</td><td class="num">${money(v.blanco)}</td><td class="num">${money(v.negro)}</td>
+    <td class="num"><b>${money(t)}</b></td><td><button class="del" data-k="${k}">✕</button></td></tr>`;});
+  tb.innerHTML=h;
+  tb.querySelectorAll(".del").forEach(b=>b.onclick=async ()=>{if(confirm("¿Borrar las ventas de este mes?")){const mes=b.dataset.k;delete state.ventas[mes];renderVentas();await apiPost({action:"addVenta",mes,blanco:0,negro:0,ivaDebito:0,retIVA:0,retIIBB:0,retGan:0});}});
+}
+
+/* ---- helpers de cálculo ---- */
+function gastoVal(g,bn){ if(bn==="total")return g.monto; return g.bn===bn?g.monto:0; }
+function ventaVal(k,bn){ const v=state.ventas[k]; if(!v)return 0; if(bn==="total")return v.blanco+v.negro; return v[bn]||0; }
+function mesesConDatos(){
+  const s=new Set([...state.gastos.map(g=>ym(g.fecha)),...Object.keys(state.ventas)]);
+  return [...s].sort();
+}
+
+/* ---- balance mensual ---- */
+function renderBalance(){
+  const sel=$("b_mes"); const meses=mesesConDatos();
+  const prev=sel.value;
+  sel.innerHTML=meses.length?meses.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join(""):`<option value="">Sin datos</option>`;
+  if(meses.includes(prev))sel.value=prev; else if(meses.length)sel.value=meses[meses.length-1];
+  drawBalance();
+  sel.onchange=drawBalance;
+  $$("#b_view button").forEach(b=>b.onclick=()=>{$$("#b_view button").forEach(x=>x.classList.remove("on"));b.classList.add("on");balView=b.dataset.v;drawBalance();});
+}
+function drawBalance(){
+  const mes=$("b_mes").value; if(!mes){$("b_ledger").innerHTML="";$("b_tbl").querySelector("tbody").innerHTML=`<tr><td><div class="empty">No hay datos para mostrar.</div></td></tr>`;return;}
+  const bn=balView;
+  const gByR={}; let gTot=0;
+  state.gastos.filter(g=>ym(g.fecha)===mes).forEach(g=>{const v=gastoVal(g,bn);gByR[g.rubro]=(gByR[g.rubro]||0)+v;gTot+=v;});
+  const vTot=ventaVal(mes,bn);
+  const res=vTot-gTot;
+  const lbl=bn==="total"?"":(bn==="blanco"?" · Tipo A":" · Tipo B");
+  $("b_ledger").innerHTML=`
+    <div class="led"><div class="l">Ventas${lbl}</div><div class="v">${money0(vTot)}</div><div class="sub">${ymLabel(mes)}</div></div>
+    <div class="led"><div class="l">Gastos${lbl}</div><div class="v">${money0(gTot)}</div><div class="sub">${Object.values(gByR).filter(x=>x>0).length} rubros con movimiento</div></div>
+    <div class="led"><div class="l">Resultado${lbl}</div><div class="v ${res>=0?'pos':'neg'}">${money0(res)}</div><div class="sub">${vTot>0?(res/vTot*100).toFixed(1)+"% margen":"sin ventas cargadas"}</div></div>`;
+  const tb=$("b_tbl").querySelector("tbody");
+  let h=`<tr><th class="l">Rubro</th><th class="num">Monto</th><th class="num">% de gastos</th></tr>`;
+  RUBROS.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a]).forEach(r=>{
+    h+=`<tr><td class="l">${r}</td><td class="num">${money(gByR[r])}</td><td class="num">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`;});
+  h+=`<tr class="tot"><td class="l">TOTAL GASTOS</td><td class="num">${money(gTot)}</td><td class="num">100%</td></tr>`;
+  tb.innerHTML=h;
+}
+
+/* ---- informes / filtros ---- */
+let charts={};
+function applyFilters(){
+  initInformeSelectors();
+  const desde=$("i_desde").value, hasta=$("i_hasta").value;
+  const fr=$("i_rubro").value, fp=$("i_prov").value, fbn=$("i_bn").value;
+  const inRange=k=>(!desde||k>=desde)&&(!hasta||k<=hasta);
+  // gastos filtrados
+  let g=state.gastos.filter(x=>inRange(ym(x.fecha)));
+  if(fr)g=g.filter(x=>x.rubro===fr);
+  if(fp)g=g.filter(x=>x.prov.toLowerCase()===fp);
+  if(fbn)g=g.filter(x=>x.bn===fbn);
+  // meses del rango
+  let meses=mesesConDatos().filter(inRange);
+  // series por mes
+  const serV=meses.map(k=>fbn?ventaVal(k,fbn):ventaVal(k,"total"));
+  const serG=meses.map(k=>g.filter(x=>ym(x.fecha)===k).reduce((s,x)=>s+x.monto,0));
+  const serR=meses.map((_,i)=>serV[i]-serG[i]);
+  const totV=serV.reduce((a,b)=>a+b,0), totG=serG.reduce((a,b)=>a+b,0), totR=totV-totG;
+  // ledger
+  $("i_ledger").innerHTML=`
+    <div class="led"><div class="l">Ventas del período</div><div class="v">${money0(totV)}</div><div class="sub">${meses.length} ${meses.length===1?'mes':'meses'}</div></div>
+    <div class="led"><div class="l">Gastos del período</div><div class="v">${money0(totG)}</div><div class="sub">${g.length} movimientos</div></div>
+    <div class="led"><div class="l">Resultado</div><div class="v ${totR>=0?'pos':'neg'}">${money0(totR)}</div><div class="sub">${totV?(totR/totV*100).toFixed(1)+"% margen":"—"}</div></div>`;
+  drawCharts(meses,serV,serG,serR,g,fbn);
+  buildObs(meses,serV,serG,serR,g);
+  renderInformeTable(g);
+  window._lastInforme={g,meses,serV,serG,serR};
+}
+
+/* ---- panel de impuestos (estimativo) ---- */
+/* ===== PESTAÑA IMPUESTOS ===== */
+const DEF_ALIC=3, DEF_CC=87.76, DEF_CB=12.24;
+function datosMes(mes){ // datos cargados a mano para el mes, con defaults
+  const d=state.impuestos[mes]||{};
+  return {
+    ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
+    alicIIBB:d.alicIIBB||DEF_ALIC, coefCABA:d.coefCABA||DEF_CC, coefBsAs:d.coefBsAs||DEF_CB
+  };
+}
+function mesAnterior(mes){ const [y,m]=mes.split("-").map(Number); const d=new Date(y,m-2,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+
+function renderImpuestosTab(){
+  const sel=$("t_mes"); const meses=mesesConDatos();
+  const prev=sel.value;
+  sel.innerHTML=meses.length?meses.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join(""):`<option value="">Sin datos</option>`;
+  if(meses.includes(prev))sel.value=prev; else if(meses.length)sel.value=meses[meses.length-1];
+  sel.onchange=()=>{cargarFormImp();drawImpuestos();};
+  cargarFormImp();
+  drawImpuestos();
+}
+function cargarFormImp(){
+  const mes=$("t_mes").value; if(!mes)return;
+  const d=datosMes(mes);
+  const f=n=>n?n.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2}):"";
+  $("t_retbanc").value=f(d.retBancIIBB);
+  $("t_ivacont").value=f(d.ivaContador);
+  $("t_iibbcont").value=f(d.iibbContador);
+  $("t_alic").value=d.alicIIBB;
+  $("t_cc").value=d.coefCABA;
+  $("t_cb").value=d.coefBsAs;
+}
+$("t_save").onclick=async ()=>{
+  const mes=$("t_mes").value; if(!mes){showMsg("t_msg","learn","No hay mes seleccionado.");return;}
+  const payload={
+    mes,
+    retBancIIBB:parseNum($("t_retbanc").value)||0,
+    ivaContador:parseNum($("t_ivacont").value)||0,
+    iibbContador:parseNum($("t_iibbcont").value)||0,
+    alicIIBB:parseNum($("t_alic").value)||DEF_ALIC,
+    coefCABA:parseNum($("t_cc").value)||DEF_CC,
+    coefBsAs:parseNum($("t_cb").value)||DEF_CB
+  };
+  state.impuestos[mes]={ivaContador:payload.ivaContador,retBancIIBB:payload.retBancIIBB,iibbContador:payload.iibbContador,alicIIBB:payload.alicIIBB,coefCABA:payload.coefCABA,coefBsAs:payload.coefBsAs};
+  showMsg("t_msg","ok",`Datos de impuestos de ${ymLabel(mes)} guardados.`);
+  drawImpuestos();
+  await apiPost({action:"setImpuestos",...payload});
+};
+
+function ivaMes(mes){ // calcula componentes de IVA del mes
+  const gm=state.gastos.filter(g=>ym(g.fecha)===mes);
+  const ivaCompra=gm.reduce((s,x)=>s+(x.iva||0),0);
+  const percIVA=gm.reduce((s,x)=>s+(x.piva||0),0);
+  const v=state.ventas[mes]||{};
+  const ivaVentas=v.ivaDebito||0, retIVA=v.retIVA||0;
+  const estim=ivaVentas-ivaCompra-percIVA-retIVA;
+  return {ivaVentas,ivaCompra,percIVA,retIVA,estim};
+}
+function iibbMes(mes){
+  const d=datosMes(mes);
+  const v=state.ventas[mes]||{};
+  const ventasNetas=(v.blanco||0)+(v.negro||0);
+  const baseBsAs=ventasNetas*(d.coefBsAs/100);   // el IIBB se calcula sobre la porción Bs As
+  const iibbBruto=baseBsAs*(d.alicIIBB/100);
+  const gm=state.gastos.filter(g=>ym(g.fecha)===mes);
+  const percProv=gm.reduce((s,x)=>s+(x.piibb||0),0);
+  const retCli=v.retIIBB||0;
+  const retBanc=d.retBancIIBB||0;
+  const deducciones=percProv+retCli+retBanc;
+  const saldoAnt=(state.impuestos[mesAnterior(mes)]||{}).iibbContador||0;
+  return {ventasNetas,baseBsAs,iibbBruto,percProv,retCli,retBanc,deducciones,saldoAnt,alic:d.alicIIBB,coefCABA:d.coefCABA,coefBsAs:d.coefBsAs};
+}
+
+function drawImpuestos(){
+  const mes=$("t_mes").value;
+  if(!mes){$("t_iva").innerHTML=`<div class="empty">No hay datos.</div>`;$("t_iibb").innerHTML="";return;}
+  const d=datosMes(mes);
+  // ---- IVA ----
+  const iva=ivaMes(mes);
+  const difIVA=d.ivaContador? (iva.estim-d.ivaContador):null;
+  $("t_iva").innerHTML=`
+    <div class="ledger" style="margin-bottom:14px">
+      <div class="led"><div class="l">IVA ventas (débito)</div><div class="v">${money0(iva.ivaVentas)}</div></div>
+      <div class="led"><div class="l">IVA compras (crédito)</div><div class="v">${money0(iva.ivaCompra)}</div></div>
+      <div class="led"><div class="l">Estimado a pagar</div><div class="v ${iva.estim>=0?'neg':'pos'}">${money0(Math.abs(iva.estim))}</div><div class="sub">${iva.estim>=0?'a pagar':'a favor'}</div></div>
+    </div>
+    <table style="max-width:560px"><tbody>
+      <tr><td class="l">(−) Percepciones IVA (proveedores)</td><td class="num">${money(iva.percIVA)}</td></tr>
+      <tr><td class="l">(−) Retenciones IVA (clientes)</td><td class="num">${money(iva.retIVA)}</td></tr>
+      <tr class="tot"><td class="l">Estimado por la app</td><td class="num">${money(iva.estim)}</td></tr>
+      <tr><td class="l">Al contador</td><td class="num">${d.ivaContador?money(d.ivaContador):"—"}</td></tr>
+      ${difIVA!==null?`<tr><td class="l">Diferencia</td><td class="num" style="color:${Math.abs(difIVA)<1?'var(--green)':'var(--red)'}">${money(difIVA)}</td></tr>`:""}
+    </tbody></table>`;
+  // ---- IIBB ----
+  const ii=iibbMes(mes);
+  const saldoAntCont=(state.impuestos[mesAnterior(mes)]||{}).iibbContador||0;
+  // estim = bruto - deducciones - (saldo a favor anterior). Saldo a favor anterior = si "al contador" anterior fue negativo.
+  const saldoFavorAnt = saldoAntCont<0 ? -saldoAntCont : 0;
+  const estimIIBB = ii.iibbBruto - ii.deducciones - saldoFavorAnt;
+  const difIIBB = d.iibbContador? (estimIIBB-d.iibbContador):null;
+  $("t_iibb").innerHTML=`
+    <div class="ledger" style="margin-bottom:14px">
+      <div class="led"><div class="l">Ventas netas</div><div class="v">${money0(ii.ventasNetas)}</div></div>
+      <div class="led"><div class="l">IIBB ${ii.alic}% s/ porción Bs As</div><div class="v">${money0(ii.iibbBruto)}</div></div>
+      <div class="led"><div class="l">Estimado a pagar</div><div class="v ${estimIIBB>=0?'neg':'pos'}">${money0(Math.abs(estimIIBB))}</div><div class="sub">${estimIIBB>=0?'a pagar':'a favor'}</div></div>
+    </div>
+    <table style="max-width:620px"><tbody>
+      <tr><td class="l">Porción CABA (${ii.coefCABA}%) — informativo</td><td class="num">${money(ii.ventasNetas*ii.coefCABA/100)}</td></tr>
+      <tr><td class="l">Porción Bs As (${ii.coefBsAs}%) — base del cálculo</td><td class="num">${money(ii.baseBsAs)}</td></tr>
+      <tr><td class="l">IIBB ${ii.alic}% sobre porción Bs As</td><td class="num">${money(ii.iibbBruto)}</td></tr>
+      <tr class="tot"><td class="l">Deducciones (SIRCREB)</td><td class="num">${money(ii.deducciones)}</td></tr>
+      <tr><td class="l">— Retenciones bancarias</td><td class="num">${money(ii.retBanc)}</td></tr>
+      <tr><td class="l">— Percepciones proveedores</td><td class="num">${money(ii.percProv)}</td></tr>
+      <tr><td class="l">— Retenciones clientes</td><td class="num">${money(ii.retCli)}</td></tr>
+      <tr><td class="l">(−) Saldo a favor mes anterior</td><td class="num">${money(saldoFavorAnt)}</td></tr>
+      <tr class="tot"><td class="l">Estimado por la app</td><td class="num">${money(estimIIBB)}</td></tr>
+      <tr><td class="l">Al contador</td><td class="num">${d.iibbContador?money(d.iibbContador):"—"}</td></tr>
+      ${difIIBB!==null?`<tr><td class="l">Diferencia</td><td class="num" style="color:${Math.abs(difIIBB)<1?'var(--green)':'var(--red)'}">${money(difIIBB)}</td></tr>`:""}
+    </tbody></table>
+    <small class="note">El IIBB se calcula con la alícuota sobre la porción de Bs As (coeficiente editable). El saldo a favor del mes anterior se toma del valor "Al contador" del mes previo (si fue negativo). Confirmá siempre con tu contador.</small>`;
+}
+function initInformeSelectors(){
+  const provs=[...new Set(state.gastos.map(g=>g.prov))].sort((a,b)=>a.localeCompare(b));
+  const cur=$("i_prov").value;
+  $("i_prov").innerHTML='<option value="">Todos</option>'+provs.map(p=>`<option value="${p.toLowerCase()}">${p}</option>`).join("");
+  if([...$("i_prov").options].some(o=>o.value===cur))$("i_prov").value=cur;
+  const meses=mesesConDatos();
+  if(meses.length&&!$("i_desde").value)$("i_desde").value=meses[0];
+  if(meses.length&&!$("i_hasta").value)$("i_hasta").value=meses[meses.length-1];
+}
+$("i_apply").onclick=applyFilters;
+$("i_reset").onclick=()=>{$("i_desde").value="";$("i_hasta").value="";$("i_rubro").value="";$("i_prov").value="";$("i_bn").value="";applyFilters();};
+
+function mkChart(id,cfg){ if(charts[id])charts[id].destroy(); charts[id]=new Chart($(id),cfg); }
+const PAL=["#b5842f","#3f6b4f","#37536b","#a3402f","#8a6db0","#5c8a6d","#c9a14a","#7b6b8a","#6b8aa3","#a38a5c","#4f6b5c","#8a5c4f"];
+function drawCharts(meses,V,G,R,gFiltered,fbn){
+  Chart.defaults.font.family="'IBM Plex Sans',sans-serif";
+  Chart.defaults.color="#5c5346";
+  Chart.defaults.borderColor="#d8cdb8";
+  const labels=meses.map(ymLabel);
+  mkChart("ch_vg",{type:"bar",data:{labels,datasets:[
+    {label:"Ventas",data:V,backgroundColor:"#3f6b4f",borderRadius:2},
+    {label:"Gastos",data:G,backgroundColor:"#a3402f",borderRadius:2}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{labels:{usePointStyle:true,boxWidth:8}},tooltip:{callbacks:{label:c=>c.dataset.label+": "+money(c.parsed.y)}}},
+    scales:{y:{ticks:{callback:moneyM}},x:{grid:{display:false}}}}});
+  mkChart("ch_res",{type:"line",data:{labels,datasets:[{label:"Resultado",data:R,borderColor:"#b5842f",backgroundColor:"rgba(181,132,47,.12)",borderWidth:2.5,tension:.3,fill:true,pointRadius:3,pointBackgroundColor:"#b5842f"}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>money(c.parsed.y)}}},
+    scales:{y:{ticks:{callback:moneyM}},x:{grid:{display:false}}}}});
+  const byR={}; gFiltered.forEach(x=>byR[x.rubro]=(byR[x.rubro]||0)+x.monto);
+  const rl=Object.keys(byR).sort((a,b)=>byR[b]-byR[a]);
+  mkChart("ch_pie",{type:"doughnut",data:{labels:rl,datasets:[{data:rl.map(r=>byR[r]),backgroundColor:PAL,borderColor:"#fbf8f1",borderWidth:2}]},
+    options:{maintainAspectRatio:false,cutout:"56%",plugins:{legend:{position:"right",labels:{boxWidth:10,font:{size:10.5},padding:6,usePointStyle:true}},
+    tooltip:{callbacks:{label:c=>{const t=rl.reduce((s,r)=>s+byR[r],0);return c.label+": "+money(c.parsed)+" ("+(c.parsed/t*100).toFixed(1)+"%)";}}}}}});
+  // blanco vs negro: gastos y ventas
+  const gBl=gFiltered.filter(x=>x.bn==="blanco").reduce((s,x)=>s+x.monto,0);
+  const gNg=gFiltered.filter(x=>x.bn==="negro").reduce((s,x)=>s+x.monto,0);
+  const vBl=meses.reduce((s,k)=>s+ventaVal(k,"blanco"),0);
+  const vNg=meses.reduce((s,k)=>s+ventaVal(k,"negro"),0);
+  mkChart("ch_bn",{type:"bar",data:{labels:["Gastos","Ventas"],datasets:[
+    {label:"Tipo A",data:[gBl,vBl],backgroundColor:"#c9bda4",borderRadius:2},
+    {label:"Tipo B",data:[gNg,vNg],backgroundColor:"#23201a",borderRadius:2}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{labels:{usePointStyle:true,boxWidth:8}},tooltip:{callbacks:{label:c=>c.dataset.label+": "+money(c.parsed.y)}}},
+    scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,ticks:{callback:moneyM}}}}});
+}
+
+/* ---- observaciones automáticas ---- */
+function buildObs(meses,V,G,R,gFiltered){
+  const o=$("i_obs"); let items=[];
+  if(meses.length===0){o.innerHTML="<h3>Observaciones</h3><p style='font-style:italic;color:var(--faint)'>No hay datos en el período seleccionado.</p>";return;}
+  const n=meses.length;
+  // margen último mes
+  const lastV=V[n-1],lastG=G[n-1],lastR=R[n-1];
+  if(lastV>0){const mg=(lastR/lastV*100).toFixed(1);
+    items.push({c:lastR>=0?"down":"up",t:`En <b>${ymLabel(meses[n-1])}</b> el resultado fue <b>${money0(lastR)}</b>, un margen del <b>${mg}%</b> sobre ventas.`});}
+  // comparación con mes anterior
+  if(n>=2){
+    const dG=G[n-1]-G[n-2]; const pG=G[n-2]?(dG/G[n-2]*100):0;
+    items.push({c:dG>0?"up":"down",t:`Los gastos ${dG>0?"subieron":"bajaron"} <b>${Math.abs(pG).toFixed(1)}%</b> respecto a ${ymLabel(meses[n-2])} (${money0(G[n-2])} → ${money0(G[n-1])}).`});
+    const dV=V[n-1]-V[n-2]; const pV=V[n-2]?(dV/V[n-2]*100):0;
+    if(V[n-2]>0)items.push({c:dV>=0?"down":"up",t:`Las ventas ${dV>=0?"crecieron":"cayeron"} <b>${Math.abs(pV).toFixed(1)}%</b> contra el mes anterior.`});
+  }
+  // promedio vs último
+  if(n>=3){
+    const avgG=G.slice(0,n-1).reduce((a,b)=>a+b,0)/(n-1);
+    const d=G[n-1]-avgG; const p=avgG?(d/avgG*100):0;
+    if(Math.abs(p)>=8)items.push({c:d>0?"up":"down",t:`El gasto del último mes está <b>${Math.abs(p).toFixed(0)}% ${d>0?"por encima":"por debajo"}</b> del promedio de los meses previos.`});
+  }
+  // rubro más pesado y su evolución
+  const byR={}; gFiltered.forEach(x=>byR[x.rubro]=(byR[x.rubro]||0)+x.monto);
+  const top=Object.keys(byR).sort((a,b)=>byR[b]-byR[a])[0];
+  if(top){const tot=Object.values(byR).reduce((a,b)=>a+b,0);
+    items.push({c:"flat",t:`El rubro de mayor peso es <b>${top}</b>, con el <b>${(byR[top]/tot*100).toFixed(0)}%</b> de los gastos del período.`});}
+  // rubro de mayor salto mes a mes
+  if(n>=2){
+    const lastMes=meses[n-1],prevMes=meses[n-2];
+    const rl={};
+    RUBROS.forEach(r=>{
+      const a=gFiltered.filter(x=>x.rubro===r&&ym(x.fecha)===prevMes).reduce((s,x)=>s+x.monto,0);
+      const b=gFiltered.filter(x=>x.rubro===r&&ym(x.fecha)===lastMes).reduce((s,x)=>s+x.monto,0);
+      if(a>0&&b>0)rl[r]=(b-a)/a*100;
+    });
+    const worst=Object.keys(rl).sort((x,y)=>rl[y]-rl[x])[0];
+    if(worst&&rl[worst]>15)items.push({c:"up",t:`<b>${worst}</b> es el rubro que más se disparó este mes: <b>+${rl[worst].toFixed(0)}%</b> contra ${ymLabel(prevMes)}. Conviene revisarlo.`});
+  }
+  // blanco/negro
+  const gNg=gFiltered.filter(x=>x.bn==="negro").reduce((s,x)=>s+x.monto,0);
+  const gAll=gFiltered.reduce((s,x)=>s+x.monto,0);
+  if(gAll>0){const pn=(gNg/gAll*100).toFixed(0);
+    items.push({c:"flat",t:`El <b>${pn}%</b> de los gastos del período fueron de Tipo B.`});}
+  // sugerencia de ajuste
+  const negR=R.filter(x=>x<0).length;
+  if(negR>0)items.push({c:"up",t:`<b>Ajuste sugerido:</b> ${negR} ${negR===1?"mes cerró":"meses cerraron"} en rojo. Mirá los rubros más pesados de esos meses y evaluá dónde recortar o cómo reforzar ventas.`});
+  else if(n>=2&&R[n-1]<R[n-2])items.push({c:"flat",t:`<b>Ajuste sugerido:</b> el resultado viene en baja. Vigilá el rubro de mayor salto y sostené el nivel de ventas.`});
+  else items.push({c:"down",t:`<b>Buena señal:</b> el período cierra en positivo y sin meses en rojo. Mantené el control sobre el rubro más pesado.`});
+
+  o.innerHTML=`<h3>Observaciones del período</h3><ul>${items.map(i=>`<li class="${i.c}">${i.t}</li>`).join("")}</ul>
+    <small class="note">Observaciones generadas automáticamente a partir de tus datos. Son orientativas, no reemplazan tu criterio.</small>`;
+}
+
+function renderInformeTable(g){
+  const tb=$("i_tbl").querySelector("tbody");
+  const list=g.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  if(!list.length){tb.innerHTML=`<tr><td colspan="5"><div class="empty">Sin movimientos para los filtros elegidos.</div></td></tr>`;return;}
+  let h=`<tr><th class="l">Fecha</th><th class="l">Proveedor</th><th class="l">Rubro</th><th class="l">Subcat.</th><th>Tipo</th><th class="num">Monto</th></tr>`;
+  list.slice(0,200).forEach(x=>{h+=`<tr><td class="l">${fechaLinda(x.fecha)}</td><td class="l">${x.prov}</td><td class="l"><span class="chip rubro">${x.rubro}</span></td><td class="l">${x.sub||"—"}</td><td>${bnChip(x.bn)}</td><td class="num">${money(x.monto)}</td></tr>`;});
+  if(list.length>200)h+=`<tr><td colspan="6"><small class="note">Mostrando 200 de ${list.length} movimientos. Exportá a Excel para verlos todos.</small></td></tr>`;
+  tb.innerHTML=h;
+}
+
+/* ---- export informe ---- */
+$("i_export").onclick=()=>{
+  const d=window._lastInforme; if(!d||!d.g.length){alert("No hay datos para exportar con los filtros actuales.");return;}
+  const wb=XLSX.utils.book_new();
+  const det=[["Fecha","Proveedor","Rubro","Subcategoría","Tipo","Monto sin IVA","IVA","Perc IVA","Perc IIBB"]];
+  d.g.slice().sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(x=>det.push([fechaCorta(x.fecha),x.prov,x.rubro,x.sub||"",x.bn==="negro"?"B":"A",x.monto,x.iva||0,x.piva||0,x.piibb||0]));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(det),"Detalle");
+  const res=[["Mes","Ventas","Gastos","Resultado"]];
+  d.meses.forEach((m,i)=>res.push([ymLabel(m),d.serV[i],d.serG[i],d.serR[i]]));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(res),"Resumen mensual");
+  // hoja impuestos
+  const imp=[["Mes","IVA ventas","IVA compras","Perc IVA","Ret IVA","Saldo IVA est.","Perc IIBB","Ret IIBB","Ret Ganancias"]];
+  d.meses.forEach(m=>{
+    const gm=d.g.filter(x=>ym(x.fecha)===m);
+    const ivaC=gm.reduce((s,x)=>s+(x.iva||0),0), pv=gm.reduce((s,x)=>s+(x.piva||0),0), pii=gm.reduce((s,x)=>s+(x.piibb||0),0);
+    const vv=state.ventas[m]||{}; const ivaV=vv.ivaDebito||0, rIVA=vv.retIVA||0, rIIBB=vv.retIIBB||0, rGan=vv.retGan||0;
+    imp.push([ymLabel(m),ivaV,ivaC,pv,rIVA,ivaV-ivaC-pv-rIVA,pii,rIIBB,rGan]);
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(imp),"Impuestos (estimado)");
+  XLSX.writeFile(wb,"informe_balance.xlsx");
+};
+
+/* ---- datos: recargar / export ---- */
+$("d_reload").onclick=async ()=>{
+  showMsg("d_msg","ok","Recargando desde la planilla…");
+  const j=await apiGet();
+  if(j&&j.ok){ renderAll(); showMsg("d_msg","ok",`Recargado: ${state.gastos.length} gastos, ${Object.keys(state.ventas).length} meses de ventas.`); }
+  else showMsg("d_msg","learn","No se pudo conectar con la planilla. Revisá la URL (API) y tu conexión.");
+};
+$("d_xlsx").onclick=()=>{
+  if(!state.gastos.length&&!Object.keys(state.ventas).length){alert("No hay datos para exportar.");return;}
+  const wb=XLSX.utils.book_new();
+  const det=[["Fecha","Proveedor","Rubro","Subcategoría","Tipo","Monto sin IVA"]];
+  state.gastos.slice().sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(x=>det.push([x.fecha,x.prov,x.rubro,x.sub||"",x.bn==="negro"?"B":"A",x.monto]));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(det),"Gastos");
+  const meses=mesesConDatos();
+  const head=["Rubro",...meses.map(ymLabel),"TOTAL"];
+  const res=[head];
+  RUBROS.forEach(r=>{const row=[r];let tot=0;meses.forEach(m=>{const v=state.gastos.filter(x=>x.rubro===r&&ym(x.fecha)===m).reduce((s,x)=>s+x.monto,0);row.push(v);tot+=v;});row.push(tot);if(tot>0)res.push(row);});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(res),"Gastos por rubro");
+  const vts=[["Mes","Ventas Tipo A","Ventas Tipo B","Total ventas","Gastos","Resultado"]];
+  meses.forEach(m=>{const vb=ventaVal(m,"blanco"),vn=ventaVal(m,"negro"),g=state.gastos.filter(x=>ym(x.fecha)===m).reduce((s,x)=>s+x.monto,0);vts.push([ymLabel(m),vb,vn,vb+vn,g,vb+vn-g]);});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(vts),"Resumen mensual");
+  XLSX.writeFile(wb,"balance_2026_completo.xlsx");
+  showMsg("d_msg","ok","Excel generado con gastos, rubros y resumen mensual.");
+};
+
+function renderStats(){
+  const meses=mesesConDatos();
+  const tg=state.gastos.reduce((s,x)=>s+x.monto,0);
+  const tv=Object.keys(state.ventas).reduce((s,k)=>s+ventaVal(k,"total"),0);
+  $("d_stats").innerHTML=`
+    <tr><td class="l">Gastos cargados</td><td class="num">${state.gastos.length}</td></tr>
+    <tr><td class="l">Meses con ventas</td><td class="num">${Object.keys(state.ventas).length}</td></tr>
+    <tr><td class="l">Proveedores aprendidos</td><td class="num">${Object.keys(state.memoria).length}</td></tr>
+    <tr><td class="l">Período</td><td class="num">${meses.length?ymLabel(meses[0])+" – "+ymLabel(meses[meses.length-1]):"—"}</td></tr>
+    <tr><td class="l">Total gastos histórico</td><td class="num">${money0(tg)}</td></tr>
+    <tr><td class="l">Total ventas histórico</td><td class="num">${money0(tv)}</td></tr>`;
+  $("d_conn").textContent=API.indexOf("PEGÁ_TU_URL")===0?"⚠ Falta configurar la URL de la planilla (constante API en el código).":"Conectada a tu planilla de Google.";
+}
+
+function renderAll(){ renderGastos(); renderVentas(); renderBalance(); renderStats(); }
+
+/* ---- boot ---- */
+initSelects();
+updateFlag();
+(async function(){
+  if(API.indexOf("PEGÁ_TU_URL")===0){ setSync("err","sin configurar"); renderAll();
+    showMsg("d_msg","learn","Todavía no pegaste la URL de la planilla. Abrí el archivo, buscá <b>const API</b> y pegá tu enlace /exec."); return; }
+  setSync("busy","conectando…");
+  const j=await apiGet();
+  if(j&&j.ok){ setSync("ok"); fillSubs(); renderAll(); }
+  else { setSync("err","sin conexión"); renderAll(); }
+})();
+
+</script>
+</body>
+</html>
 
