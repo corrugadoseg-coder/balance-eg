@@ -415,12 +415,18 @@ const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","S
    Pegá acá abajo, entre las comillas, la URL que termina en /exec
    que te dio "Implementar". Igual que en pedidos-eg.
    ===================================================================== */
-const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
+const API="PEGÁ_TU_URL_/exec_ACÁ";
 /* ===================================================================== */
 
 let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{} };  // impuestos: {"2026-01":{...}}
 let balView="total";
 const $=id=>document.getElementById(id);
+/* Normaliza proveedor: saca espacios extra y pone Mayúscula Inicial en cada palabra */
+function capProv(s){
+  return String(s||"").trim().replace(/\s+/g," ")
+    .toLowerCase()
+    .replace(/(^|\s|&|\/|-)([a-záéíóúñ])/g, (m,p,c)=>p+c.toUpperCase());
+}
 const $$=s=>document.querySelectorAll(s);
 
 /* ---- number parsing (acepta . o , como decimal) ---- */
@@ -559,7 +565,7 @@ function hideMsg(id){$(id).className="msg";}
 
 /* ---- agregar gasto ---- */
 $("g_add").onclick=async ()=>{
-  const prov=$("g_prov").value.trim();
+  const prov=capProv($("g_prov").value);
   const fecha=$("g_fecha").value;
   const bn=tipoActual();
   const monto=parseNum($("g_monto").value);  // parseNum ya ignora el *
@@ -613,7 +619,10 @@ function renderGastos(){
 function poblarFiltroProv(){
   const sel=$("g_filtprov"); if(!sel)return;
   const cur=sel.value;
-  const provs=[...new Set(state.gastos.map(g=>g.prov))].sort((a,b)=>a.localeCompare(b));
+  // agrupa por nombre normalizado para no duplicar por mayúsculas
+  const mapa={};
+  state.gastos.forEach(g=>{ const k=capProv(g.prov); if(k)mapa[k]=true; });
+  const provs=Object.keys(mapa).sort((a,b)=>a.localeCompare(b));
   sel.innerHTML='<option value="">Todos</option>'+provs.map(p=>`<option value="${p.toLowerCase()}">${p}</option>`).join("");
   if([...sel.options].some(o=>o.value===cur))sel.value=cur;
 }
@@ -847,7 +856,9 @@ function drawImpuestos(){
     <small class="note">El IIBB se calcula con la alícuota sobre la porción de Bs As (coeficiente editable). El saldo a favor del mes anterior se toma del valor "Al contador" del mes previo (si fue negativo). Confirmá siempre con tu contador.</small>`;
 }
 function initInformeSelectors(){
-  const provs=[...new Set(state.gastos.map(g=>g.prov))].sort((a,b)=>a.localeCompare(b));
+  const mapa={};
+  state.gastos.forEach(g=>{ const k=capProv(g.prov); if(k)mapa[k]=true; });
+  const provs=Object.keys(mapa).sort((a,b)=>a.localeCompare(b));
   const cur=$("i_prov").value;
   $("i_prov").innerHTML='<option value="">Todos</option>'+provs.map(p=>`<option value="${p.toLowerCase()}">${p}</option>`).join("");
   if([...$("i_prov").options].some(o=>o.value===cur))$("i_prov").value=cur;
