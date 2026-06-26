@@ -236,9 +236,15 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   <div class="card">
     <h2>Últimos gastos cargados</h2>
     <p class="lead">Se muestran los más recientes primero. Borrá con la cruz si te equivocaste.</p>
-    <div class="f" style="max-width:340px;margin-bottom:14px">
-      <label>Filtrar por proveedor</label>
-      <select id="g_filtprov"><option value="">Todos</option></select>
+    <div class="grid" style="grid-template-columns:1fr 1fr;max-width:700px;margin-bottom:14px;gap:14px">
+      <div class="f">
+        <label>Filtrar por proveedor</label>
+        <select id="g_filtprov"><option value="">Todos</option></select>
+      </div>
+      <div class="f">
+        <label>Filtrar por rubro</label>
+        <select id="g_filtrubro"><option value="">Todos</option></select>
+      </div>
     </div>
     <div id="g_count" style="font-size:13px;color:var(--faint);margin-bottom:10px;font-family:'IBM Plex Mono',monospace"></div>
     <div style="overflow-x:auto"><table id="g_tbl"><tbody></tbody></table></div>
@@ -444,7 +450,8 @@ const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","S
    Pegá acá abajo, entre las comillas, la URL que termina en /exec
    que te dio "Implementar". Igual que en pedidos-eg.
    ===================================================================== */
-const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";/* ===================================================================== */
+const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
+/* ===================================================================== */
 
 let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{} };  // impuestos: {"2026-01":{...}}
 let balView="total";
@@ -630,27 +637,40 @@ function bnChipBtn(bn,id){return `<button class="bndot btn-dot ${bn==="negro"?"n
 function renderGastos(){
   refreshProvList();
   poblarFiltroProv();
+  poblarFiltroRubro();
   const tb=$("g_tbl").querySelector("tbody");
   const fprov=$("g_filtprov").value;
+  const frubro=$("g_filtrubro").value;
+  const filtrando=fprov||frubro;
   let base=state.gastos.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
   if(fprov)base=base.filter(g=>g.prov.toLowerCase()===fprov);
-  const list=base.slice(0,fprov?500:40);
+  if(frubro)base=base.filter(g=>g.rubro===frubro);
+  const list=base.slice(0,filtrando?500:40);
   // contador de registros
   const totalGral=state.gastos.length;
-  if(fprov){
-    $("g_count").textContent=`${base.length} registro(s) de este proveedor · ${totalGral} en total`;
+  if(filtrando){
+    let desc=[];
+    if(fprov)desc.push("proveedor");
+    if(frubro)desc.push("rubro");
+    $("g_count").textContent=`${base.length} registro(s) filtrados por ${desc.join(" y ")} · ${totalGral} en total`;
   } else {
     $("g_count").textContent=`${totalGral} registro(s) en total${totalGral>40?" · mostrando los 40 más recientes":""}`;
   }
-  if(!list.length){tb.innerHTML=`<tr><td colspan="6"><div class="empty">${fprov?"Este proveedor no tiene gastos cargados.":"Todavía no cargaste gastos."}</div></td></tr>`;return;}
+  if(!list.length){tb.innerHTML=`<tr><td colspan="6"><div class="empty">${filtrando?"No hay gastos con ese filtro.":"Todavía no cargaste gastos."}</div></td></tr>`;return;}
   let h=`<tr><th class="l">Fecha</th><th class="l">Proveedor</th><th class="l">Rubro</th><th>Tipo</th><th class="num">Monto sin IVA</th><th></th></tr>`;
   list.forEach(g=>{ h+=`<tr><td class="l">${fechaLinda(g.fecha)}</td><td class="l">${g.prov}</td>
     <td class="l"><span class="chip rubro">${g.rubro}</span>${g.sub?`<div style="font-size:11px;color:var(--faint);margin-top:3px">${g.sub}</div>`:""}</td><td>${bnChipBtn(g.bn,g.id)}</td>
     <td class="num">${money(g.monto)}</td><td><button class="del" data-id="${g.id}">✕</button></td></tr>`; });
-  if(fprov){const totP=list.reduce((s,x)=>s+x.monto,0);h+=`<tr class="tot"><td class="l" colspan="4"><b>Total ${list.length} gasto(s) de este proveedor</b></td><td class="num"><b>${money(totP)}</b></td><td></td></tr>`;}
+  if(filtrando){const totP=list.reduce((s,x)=>s+x.monto,0);h+=`<tr class="tot"><td class="l" colspan="4"><b>Total ${list.length} gasto(s) filtrados</b></td><td class="num"><b>${money(totP)}</b></td><td></td></tr>`;}
   tb.innerHTML=h;
   tb.querySelectorAll(".del").forEach(b=>b.onclick=async ()=>{ if(confirm("¿Borrar este gasto?")){const id=b.dataset.id; state.gastos=state.gastos.filter(g=>g.id!==id); renderGastos(); await apiPost({action:"deleteGasto",id});} });
   tb.querySelectorAll("[data-toggle]").forEach(b=>b.onclick=async ()=>{ const id=b.dataset.toggle; const g=state.gastos.find(x=>x.id===id); if(!g)return; g.bn=g.bn==="negro"?"blanco":"negro"; renderGastos(); await apiPost({action:"updateTipo",id,bn:g.bn}); });
+}
+function poblarFiltroRubro(){
+  const sel=$("g_filtrubro"); if(!sel)return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Todos</option>'+RUBROS.map(r=>`<option value="${r}">${r}</option>`).join("");
+  if([...sel.options].some(o=>o.value===cur))sel.value=cur;
 }
 function poblarFiltroProv(){
   const sel=$("g_filtprov"); if(!sel)return;
@@ -664,6 +684,7 @@ function poblarFiltroProv(){
 }
 function refreshProvList(){ $("provlist").innerHTML=Object.keys(state.memoria).map(k=>`<option value="${k}">`).join(""); }
 $("g_filtprov").addEventListener("change",renderGastos);
+$("g_filtrubro").addEventListener("change",renderGastos);
 
 /* ---- ventas ---- */
 $("v_add").onclick=async ()=>{
