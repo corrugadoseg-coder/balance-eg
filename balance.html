@@ -249,6 +249,45 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div id="g_count" style="font-size:13px;color:var(--faint);margin-bottom:10px;font-family:'IBM Plex Mono',monospace"></div>
     <div style="overflow-x:auto"><table id="g_tbl"><tbody></tbody></table></div>
   </div>
+
+  <!-- Modal editar gasto -->
+  <div id="ed_overlay" style="display:none;position:fixed;inset:0;background:rgba(35,32,26,.55);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px">
+    <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:680px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+      <h2 style="margin-top:0">Editar gasto</h2>
+      <div class="grid" style="grid-template-columns:2fr 1fr">
+        <div class="f"><label>Proveedor</label><input id="ed_prov" class="mono"></div>
+        <div class="f"><label>Fecha</label><input id="ed_fecha" type="date"></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px">
+        <div class="f"><label>Monto sin IVA</label><input id="ed_monto" class="mono" inputmode="decimal"></div>
+        <div class="f"><label>Rubro</label><select id="ed_rubro"></select></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr;margin-top:14px">
+        <div class="f"><label>Subcategoría</label><select id="ed_sub"></select></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr;margin-top:14px;align-items:end">
+        <div class="f"><label>Alícuota IVA</label>
+          <select id="ed_alic"><option value="21">21%</option><option value="10.5">10,5%</option><option value="27">27%</option><option value="0">Exento</option></select>
+        </div>
+        <div class="f"><label>IVA</label><input id="ed_iva" class="mono" readonly style="background:var(--paper2)"></div>
+        <div class="f"><label>Percep. IVA</label><input id="ed_piva" class="mono" inputmode="decimal"></div>
+        <div class="f"><label>Percep. IIBB</label><input id="ed_piibb" class="mono" inputmode="decimal"></div>
+      </div>
+      <div class="f" style="margin-top:16px">
+        <label>Tipo</label>
+        <div style="display:flex;gap:16px;align-items:center">
+          <label style="display:flex;gap:6px;align-items:center;cursor:pointer;text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-size:14px"><input type="radio" name="ed_tipo" value="blanco"> <span class="bndot bl"></span> Tipo A</label>
+          <label style="display:flex;gap:6px;align-items:center;cursor:pointer;text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-size:14px"><input type="radio" name="ed_tipo" value="negro"> <span class="bndot ng"></span> Tipo B</label>
+        </div>
+      </div>
+      <input type="hidden" id="ed_id">
+      <div class="msg" id="ed_msg"></div>
+      <div class="row-actions" style="margin-top:18px">
+        <button class="btn" id="ed_save">Guardar cambios</button>
+        <button class="btn ghost" id="ed_cancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- ===== 02 VENTAS ===== -->
@@ -450,8 +489,7 @@ const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","S
    Pegá acá abajo, entre las comillas, la URL que termina en /exec
    que te dio "Implementar". Igual que en pedidos-eg.
    ===================================================================== */
-const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
-/* ===================================================================== */
+const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";/* ===================================================================== */
 
 let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{} };  // impuestos: {"2026-01":{...}}
 let balView="total";
@@ -660,12 +698,79 @@ function renderGastos(){
   let h=`<tr><th class="l">Fecha</th><th class="l">Proveedor</th><th class="l">Rubro</th><th>Tipo</th><th class="num">Monto sin IVA</th><th></th></tr>`;
   list.forEach(g=>{ h+=`<tr><td class="l">${fechaLinda(g.fecha)}</td><td class="l">${g.prov}</td>
     <td class="l"><span class="chip rubro">${g.rubro}</span>${g.sub?`<div style="font-size:11px;color:var(--faint);margin-top:3px">${g.sub}</div>`:""}</td><td>${bnChipBtn(g.bn,g.id)}</td>
-    <td class="num">${money(g.monto)}</td><td><button class="del" data-id="${g.id}">✕</button></td></tr>`; });
+    <td class="num">${money(g.monto)}</td><td style="white-space:nowrap"><button class="del" data-edit="${g.id}" title="Editar" style="color:var(--ink2)">✎</button> <button class="del" data-id="${g.id}" title="Borrar">✕</button></td></tr>`; });
   if(filtrando){const totP=list.reduce((s,x)=>s+x.monto,0);h+=`<tr class="tot"><td class="l" colspan="4"><b>Total ${list.length} gasto(s) filtrados</b></td><td class="num"><b>${money(totP)}</b></td><td></td></tr>`;}
   tb.innerHTML=h;
   tb.querySelectorAll(".del").forEach(b=>b.onclick=async ()=>{ if(confirm("¿Borrar este gasto?")){const id=b.dataset.id; state.gastos=state.gastos.filter(g=>g.id!==id); renderGastos(); await apiPost({action:"deleteGasto",id});} });
   tb.querySelectorAll("[data-toggle]").forEach(b=>b.onclick=async ()=>{ const id=b.dataset.toggle; const g=state.gastos.find(x=>x.id===id); if(!g)return; g.bn=g.bn==="negro"?"blanco":"negro"; renderGastos(); await apiPost({action:"updateTipo",id,bn:g.bn}); });
+  tb.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>abrirEdicion(b.dataset.edit));
 }
+
+/* ---- editar gasto (modal) ---- */
+function abrirEdicion(id){
+  const g=state.gastos.find(x=>x.id===id); if(!g)return;
+  $("ed_id").value=g.id;
+  $("ed_prov").value=g.prov;
+  $("ed_fecha").value=fechaCorta(g.fecha);
+  $("ed_monto").value=g.monto;
+  $("ed_rubro").innerHTML=RUBROS.map(r=>`<option>${r}</option>`).join("");
+  $("ed_rubro").value=g.rubro;
+  edFillSubs(g.sub);
+  // alícuota: deducir de iva/monto
+  let alic="21";
+  if(g.monto>0 && g.iva>0){ const r=Math.round(g.iva/g.monto*1000)/10; if(Math.abs(r-10.5)<1)alic="10.5"; else if(Math.abs(r-27)<1)alic="27"; else alic="21"; }
+  else if(g.iva===0) alic= g.bn==="negro" ? "21" : "0";
+  $("ed_alic").value=alic;
+  $("ed_iva").value=(g.iva||0).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  $("ed_piva").value=g.piva||"";
+  $("ed_piibb").value=g.piibb||"";
+  document.querySelectorAll('input[name="ed_tipo"]').forEach(r=>r.checked=(r.value===g.bn));
+  hideMsg("ed_msg");
+  $("ed_overlay").style.display="flex";
+}
+function edFillSubs(sel){
+  const rubro=$("ed_rubro").value;
+  const lista=(state.subs[rubro]||[]).slice().sort((a,b)=>a.localeCompare(b));
+  $("ed_sub").innerHTML=`<option value="">— sin subcategoría —</option>`+lista.map(s=>`<option>${s}</option>`).join("");
+  if(sel && lista.includes(sel))$("ed_sub").value=sel;
+}
+$("ed_rubro").addEventListener("change",()=>edFillSubs(""));
+function edCalcIva(){
+  const neto=parseNum($("ed_monto").value);
+  const a=parseFloat($("ed_alic").value);
+  const esNegro=document.querySelector('input[name="ed_tipo"]:checked')?.value==="negro";
+  if(esNegro||isNaN(neto)||neto<=0){ $("ed_iva").value=esNegro?"0,00":""; return; }
+  const iva=a>0?Math.round(neto*a/100*100)/100:0;
+  $("ed_iva").value=iva.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+$("ed_monto").addEventListener("input",edCalcIva);
+$("ed_alic").addEventListener("change",edCalcIva);
+document.querySelectorAll('input[name="ed_tipo"]').forEach(r=>r.addEventListener("change",edCalcIva));
+$("ed_cancel").onclick=()=>{$("ed_overlay").style.display="none";};
+$("ed_overlay").addEventListener("click",e=>{ if(e.target===$("ed_overlay"))$("ed_overlay").style.display="none"; });
+$("ed_save").onclick=async ()=>{
+  const id=$("ed_id").value;
+  const g=state.gastos.find(x=>x.id===id); if(!g)return;
+  const prov=capProv($("ed_prov").value);
+  const fecha=$("ed_fecha").value;
+  const monto=parseNum($("ed_monto").value);
+  const rubro=$("ed_rubro").value;
+  const sub=$("ed_sub").value||"";
+  const bn=document.querySelector('input[name="ed_tipo"]:checked')?.value||"blanco";
+  const a=parseFloat($("ed_alic").value);
+  const iva=(bn==="negro"||!(a>0))?0:Math.round(monto*a/100*100)/100;
+  const piva=parseNum($("ed_piva").value)||0;
+  const piibb=parseNum($("ed_piibb").value)||0;
+  if(!prov){showMsg("ed_msg","learn","Falta el proveedor.");return;}
+  if(!fecha){showMsg("ed_msg","learn","Falta la fecha.");return;}
+  if(isNaN(monto)||monto<=0){showMsg("ed_msg","learn","El monto no es válido.");return;}
+  // actualizar en memoria
+  Object.assign(g,{prov,fecha,monto,rubro,sub,bn,iva,piva,piibb});
+  state.memoria[prov.toLowerCase()]=rubro;
+  $("ed_overlay").style.display="none";
+  renderGastos();
+  await apiPost({action:"updateGasto",id,fecha,prov,rubro,sub,bn,monto,iva,piva,piibb});
+};
 function poblarFiltroRubro(){
   const sel=$("g_filtrubro"); if(!sel)return;
   const cur=sel.value;
