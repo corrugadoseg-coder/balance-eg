@@ -493,6 +493,10 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
         </div>
         <div class="f"><label>IVA</label><input id="evb_iva" class="mono" readonly style="background:var(--paper2)"></div>
       </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px">
+        <div class="f"><label>Percep. IVA</label><input id="evb_piva" class="mono" inputmode="decimal" placeholder="0"></div>
+        <div class="f"><label>Percep. IIBB</label><input id="evb_piibb" class="mono" inputmode="decimal" placeholder="0"></div>
+      </div>
       <input type="hidden" id="evb_id">
       <div class="msg" id="evb_msg"></div>
       <div class="row-actions" style="margin-top:18px">
@@ -602,7 +606,7 @@ const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","S
    Pegá acá abajo, entre las comillas, la URL que termina en /exec
    que te dio "Implementar". Igual que en pedidos-eg.
    ===================================================================== */
-const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
+const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1
 /* ===================================================================== */
 
 let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[] };  // impuestos: {"2026-01":{...}}
@@ -1409,6 +1413,8 @@ function abrirEnviarBalance(id){
   $("evb_rubro").value="LOCACION, ABL Y SERVICIOS";
   evbFillSubs("");
   $("evb_alic").value="21";
+  $("evb_piva").value="";
+  $("evb_piibb").value="";
   evbCalcIva();
   if(s.enBalance)showMsg("evb_msg","learn","Ojo: este servicio ya fue enviado al balance antes. Si confirmás, se cargará de nuevo.");
   else hideMsg("evb_msg");
@@ -1442,14 +1448,16 @@ $("evb_save").onclick=async ()=>{
   if(!fecha){showMsg("evb_msg","learn","Falta la fecha de emisión.");return;}
   if(isNaN(monto)||monto<=0){showMsg("evb_msg","learn","El monto no es válido.");return;}
   const iva=a>0?Math.round(monto*a/100*100)/100:0;
+  const piva=parseNum($("evb_piva").value)||0;
+  const piibb=parseNum($("evb_piibb").value)||0;
   const id=uid();
-  state.gastos.push({id,fecha,prov,rubro,sub,monto,bn:"blanco",iva,piva:0,piibb:0});
+  state.gastos.push({id,fecha,prov,rubro,sub,monto,bn:"blanco",iva,piva,piibb});
   state.memoria[prov.toLowerCase()]=rubro;
   s.enBalance=true;
   $("evb_overlay").style.display="none";
   drawServicios();
-  showMsg("sv_msg","ok",`"${prov}" enviado al balance: ${money(monto)} + IVA ${money(iva)} (emisión ${fechaLinda(fecha)}).`);
-  await apiPost({action:"addGasto",id,fecha,prov,rubro,sub,bn:"blanco",monto,iva,piva:0,piibb:0});
+  showMsg("sv_msg","ok",`"${prov}" enviado al balance: ${money(monto)} + IVA ${money(iva)}${piibb?" + IIBB "+money(piibb):""} (emisión ${fechaLinda(fecha)}).`);
+  await apiPost({action:"addGasto",id,fecha,prov,rubro,sub,bn:"blanco",monto,iva,piva,piibb});
   await apiPost(Object.assign({action:"setServicio"},s));
 };
 
