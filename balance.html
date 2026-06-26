@@ -470,6 +470,37 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
       </div>
     </div>
   </div>
+
+  <!-- Modal enviar al balance -->
+  <div id="evb_overlay" style="display:none;position:fixed;inset:0;background:rgba(35,32,26,.55);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px">
+    <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:640px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+      <h2 style="margin-top:0">Enviar al balance</h2>
+      <p class="lead">Revisá los datos. El gasto entra al balance por <b>fecha de emisión</b> de la factura (no por el vencimiento).</p>
+      <div class="grid" style="grid-template-columns:2fr 1fr">
+        <div class="f"><label>Proveedor</label><input id="evb_prov"></div>
+        <div class="f"><label>Fecha de emisión</label><input id="evb_fecha" type="date"></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px">
+        <div class="f"><label>Monto sin IVA</label><input id="evb_monto" class="mono" inputmode="decimal"></div>
+        <div class="f"><label>Rubro</label><select id="evb_rubro"></select></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr;margin-top:14px">
+        <div class="f"><label>Subcategoría</label><select id="evb_sub"></select></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px">
+        <div class="f"><label>Alícuota IVA</label>
+          <select id="evb_alic"><option value="21">21%</option><option value="10.5">10,5%</option><option value="27">27%</option><option value="0">Exento</option></select>
+        </div>
+        <div class="f"><label>IVA</label><input id="evb_iva" class="mono" readonly style="background:var(--paper2)"></div>
+      </div>
+      <input type="hidden" id="evb_id">
+      <div class="msg" id="evb_msg"></div>
+      <div class="row-actions" style="margin-top:18px">
+        <button class="btn" id="evb_save">Confirmar y enviar al balance</button>
+        <button class="btn ghost" id="evb_cancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- ===== 07 RESUMEN ANUAL ===== -->
@@ -1289,7 +1320,7 @@ function drawServicios(){
       <td class="l"><span style="font-size:12px">${s.entidad||""}</span></td>
       <td class="num">${s.monto?money(s.monto):'<span style="color:var(--faint)">—</span>'}</td>
       <td><button class="estado-btn ${s.estado==="Pagado"?'pagado':'pend'}" data-est="${s.id}">${s.estado==="Pagado"?"Pagado":"Pendiente"}</button></td>
-      <td style="white-space:nowrap"><button class="del" data-eds="${s.id}" title="Editar">✎</button> <button class="del" data-dels="${s.id}" title="Borrar">✕</button></td>
+      <td style="white-space:nowrap"><button class="del" data-balance="${s.id}" title="${s.enBalance?'Ya enviado al balance — reenviar':'Enviar al balance'}" style="color:${s.enBalance?'var(--green)':'var(--ink2)'}">${s.enBalance?'✓$':'→$'}</button> <button class="del" data-eds="${s.id}" title="Editar">✎</button> <button class="del" data-dels="${s.id}" title="Borrar">✕</button></td>
     </tr>`;
   });
   tb.innerHTML=h;
@@ -1313,6 +1344,7 @@ function drawServicios(){
     if(confirm("¿Borrar este servicio del mes?")){ const id=b.dataset.dels; state.servicios=state.servicios.filter(x=>x.id!==id); drawServicios(); await apiPost({action:"deleteServicio",id}); }
   });
   tb.querySelectorAll("[data-eds]").forEach(b=>b.onclick=()=>abrirEditServicio(b.dataset.eds));
+  tb.querySelectorAll("[data-balance]").forEach(b=>b.onclick=()=>abrirEnviarBalance(b.dataset.balance));
 }
 function curISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 
@@ -1362,6 +1394,62 @@ $("eds_save").onclick=async ()=>{
   s.obs=$("eds_obs").value.trim();
   $("eds_overlay").style.display="none";
   drawServicios();
+  await apiPost(Object.assign({action:"setServicio"},s));
+};
+
+/* ---- enviar servicio al balance ---- */
+function abrirEnviarBalance(id){
+  const s=state.servicios.find(x=>x.id===id); if(!s)return;
+  $("evb_id").value=s.id;
+  $("evb_prov").value=s.servicio;
+  // fecha de emisión: pre-cargo con vencimiento como referencia, pero la editás
+  $("evb_fecha").value=s.venc||curISO();
+  $("evb_monto").value=s.monto||"";
+  $("evb_rubro").innerHTML=RUBROS.map(r=>`<option>${r}</option>`).join("");
+  $("evb_rubro").value="LOCACION, ABL Y SERVICIOS";
+  evbFillSubs("");
+  $("evb_alic").value="21";
+  evbCalcIva();
+  if(s.enBalance)showMsg("evb_msg","learn","Ojo: este servicio ya fue enviado al balance antes. Si confirmás, se cargará de nuevo.");
+  else hideMsg("evb_msg");
+  $("evb_overlay").style.display="flex";
+}
+function evbFillSubs(sel){
+  const rubro=$("evb_rubro").value;
+  const lista=(state.subs[rubro]||[]).slice().sort((a,b)=>a.localeCompare(b));
+  $("evb_sub").innerHTML=`<option value="">— sin subcategoría —</option>`+lista.map(x=>`<option ${x===sel?"selected":""}>${x}</option>`).join("");
+}
+$("evb_rubro").addEventListener("change",()=>evbFillSubs(""));
+function evbCalcIva(){
+  const neto=parseNum($("evb_monto").value);
+  const a=parseFloat($("evb_alic").value);
+  if(isNaN(neto)||neto<=0){ $("evb_iva").value=""; return; }
+  const iva=a>0?Math.round(neto*a/100*100)/100:0;
+  $("evb_iva").value=iva.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+$("evb_monto").addEventListener("input",evbCalcIva);
+$("evb_alic").addEventListener("change",evbCalcIva);
+$("evb_cancel").onclick=()=>{$("evb_overlay").style.display="none";};
+$("evb_overlay").addEventListener("click",e=>{ if(e.target===$("evb_overlay"))$("evb_overlay").style.display="none"; });
+$("evb_save").onclick=async ()=>{
+  const s=state.servicios.find(x=>x.id===$("evb_id").value); if(!s)return;
+  const prov=capProv($("evb_prov").value);
+  const fecha=$("evb_fecha").value;
+  const monto=parseNum($("evb_monto").value);
+  const rubro=$("evb_rubro").value;
+  const sub=$("evb_sub").value||"";
+  const a=parseFloat($("evb_alic").value);
+  if(!fecha){showMsg("evb_msg","learn","Falta la fecha de emisión.");return;}
+  if(isNaN(monto)||monto<=0){showMsg("evb_msg","learn","El monto no es válido.");return;}
+  const iva=a>0?Math.round(monto*a/100*100)/100:0;
+  const id=uid();
+  state.gastos.push({id,fecha,prov,rubro,sub,monto,bn:"blanco",iva,piva:0,piibb:0});
+  state.memoria[prov.toLowerCase()]=rubro;
+  s.enBalance=true;
+  $("evb_overlay").style.display="none";
+  drawServicios();
+  showMsg("sv_msg","ok",`"${prov}" enviado al balance: ${money(monto)} + IVA ${money(iva)} (emisión ${fechaLinda(fecha)}).`);
+  await apiPost({action:"addGasto",id,fecha,prov,rubro,sub,bn:"blanco",monto,iva,piva:0,piibb:0});
   await apiPost(Object.assign({action:"setServicio"},s));
 };
 
