@@ -193,7 +193,18 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 
 <!-- ===== 01 CARGAR GASTO ===== -->
 <section class="view on" data-v="gasto">
+  <div class="card" id="chooser_card" style="text-align:center">
+    <h2 style="margin-bottom:6px">¿Qué querés cargar?</h2>
+    <p class="lead" style="margin-bottom:18px">Elegí si es un gasto común (una factura) o un servicio recurrente (con vencimiento y pago).</p>
+    <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
+      <button class="btn" id="ch_gasto" style="min-width:180px;padding:18px 24px;font-size:15px">📄 Gasto<br><span style="font-size:11px;font-weight:400;opacity:.8">una factura para el balance</span></button>
+      <button class="btn gold" id="ch_servicio" style="min-width:180px;padding:18px 24px;font-size:15px">🔁 Servicio<br><span style="font-size:11px;font-weight:400;opacity:.8">recurrente, con vencimiento</span></button>
+    </div>
+  </div>
+
+  <div id="gasto_form_wrap" style="display:none">
   <div class="card">
+    <button class="btn ghost sm" id="volver_chooser" style="margin-bottom:14px">← Volver</button>
     <h2>Registrar un gasto</h2>
     <p class="lead">Cargá cada factura con su proveedor y monto. El rubro se completa solo cuando el proveedor ya es conocido.</p>
     <div class="sectlabel">Datos de la factura</div>
@@ -260,6 +271,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div id="g_count" style="font-size:13px;color:var(--faint);margin-bottom:10px;font-family:'IBM Plex Mono',monospace"></div>
     <div style="overflow-x:auto"><table id="g_tbl"><tbody></tbody></table></div>
   </div>
+  </div><!-- /gasto_form_wrap -->
 
   <!-- Modal editar gasto -->
   <div id="ed_overlay" style="display:none;position:fixed;inset:0;background:rgba(35,32,26,.55);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px">
@@ -441,6 +453,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="row-actions" style="margin-top:14px">
       <button class="btn ghost sm" id="sv_add">+ Agregar servicio</button>
       <button class="btn ghost sm" id="sv_seed" title="Cargar la lista base de servicios para este mes">Cargar lista base</button>
+      <button class="btn ghost sm" id="sv_limpiar" title="Borra servicios repetidos del mes, dejando uno de cada uno">Limpiar duplicados</button>
     </div>
     <div class="msg" id="sv_msg"></div>
   </div>
@@ -451,7 +464,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
       <h2 style="margin-top:0">Cargar factura del servicio</h2>
       <p class="lead">Cargás una sola vez. Con la <b>fecha de emisión</b> va al balance del mes; con el <b>vencimiento</b> queda en el calendario de pagos.</p>
       <div class="grid" style="grid-template-columns:2fr 1fr">
-        <div class="f"><label>Servicio</label><input id="eds_serv"></div>
+        <div class="f"><label>Servicio</label><input id="eds_serv" list="eds_servlist" autocomplete="off"><datalist id="eds_servlist"></datalist></div>
         <div class="f"><label>Categoría</label><select id="eds_cat"></select></div>
       </div>
       <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px">
@@ -698,9 +711,9 @@ $("g_subadd").onclick=async ()=>{
 };
 
 /* ---- tabs ---- */
-$$(".tab").forEach(t=>t.onclick=()=>{
-  $$(".tab").forEach(x=>x.classList.remove("on")); t.classList.add("on");
-  const v=t.dataset.v; $$(".view").forEach(x=>x.classList.toggle("on",x.dataset.v===v));
+function irA(v){
+  $$(".tab").forEach(x=>x.classList.toggle("on",x.dataset.v===v));
+  $$(".view").forEach(x=>x.classList.toggle("on",x.dataset.v===v));
   if(v==="balance")renderBalance();
   if(v==="impuestos")renderImpuestosTab();
   if(v==="cheque")renderChequeTab();
@@ -709,7 +722,13 @@ $$(".tab").forEach(t=>t.onclick=()=>{
   if(v==="vencim")renderVencimientos();
   if(v==="informes")applyFilters();
   if(v==="datos")renderStats();
-});
+}
+$$(".tab").forEach(t=>t.onclick=()=>irA(t.dataset.v));
+
+/* ---- chooser gasto/servicio ---- */
+$("ch_gasto").onclick=()=>{ $("chooser_card").style.display="none"; $("gasto_form_wrap").style.display="block"; };
+$("volver_chooser").onclick=()=>{ $("gasto_form_wrap").style.display="none"; $("chooser_card").style.display="block"; };
+$("ch_servicio").onclick=()=>{ irA("servicios"); setTimeout(()=>{ if(typeof abrirNuevoServicio==="function")abrirNuevoServicio(); },50); };
 
 /* ---- blanco/negro: solo por código (*), sin nada visible ---- */
 function montoEsNegro(){ return $("g_monto").value.trim().startsWith("*"); }
@@ -1429,6 +1448,31 @@ $("sv_seed").onclick=async ()=>{
   showMsg("sv_msg","ok",`Agregué ${nuevos.length} servicio(s) a ${ymLabel(mes)}${existentes.length?" (los que faltaban)":""}.`);
   for(const n of nuevos){ await apiPost(Object.assign({action:"setServicio"},n)); }
 };
+
+$("sv_limpiar").onclick=async ()=>{
+  const mes=$("sv_mes").value;
+  const delMes=state.servicios.filter(s=>s.mes===mes);
+  // agrupar por nombre normalizado
+  const grupos={};
+  delMes.forEach(s=>{ const k=s.servicio.toLowerCase().trim(); (grupos[k]=grupos[k]||[]).push(s); });
+  // detectar duplicados
+  const aBorrar=[];
+  Object.values(grupos).forEach(arr=>{
+    if(arr.length<=1)return;
+    // puntaje: cuántos datos tiene cargados (para conservar el más completo)
+    const score=s=>(s.monto>0?2:0)+(s.venc?1:0)+(s.fechaEmision?1:0)+(s.enBalance?2:0)+(s.estado==="Pagado"?1:0);
+    arr.sort((a,b)=>score(b)-score(a));
+    // el primero (mejor) se queda; el resto a borrar
+    arr.slice(1).forEach(s=>aBorrar.push(s));
+  });
+  if(!aBorrar.length){ showMsg("sv_msg","ok",`No encontré duplicados en ${ymLabel(mes)}.`); return; }
+  if(!confirm(`Encontré ${aBorrar.length} servicio(s) duplicado(s) en ${ymLabel(mes)}. Voy a dejar uno de cada uno (el más completo) y borrar las copias. ¿Seguimos?`))return;
+  const ids=new Set(aBorrar.map(s=>s.id));
+  state.servicios=state.servicios.filter(s=>!ids.has(s.id));
+  drawServicios();
+  showMsg("sv_msg","ok",`Limpié ${aBorrar.length} duplicado(s) de ${ymLabel(mes)}.`);
+  for(const s of aBorrar){ await apiPost({action:"deleteServicio",id:s.id}); }
+};
 $("sv_add").onclick=()=>{
   const mes=$("sv_mes").value;
   const nuevo={id:uid(),mes,servicio:"Nuevo servicio",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"",entidad:"",fechaEmision:"",venc:"",fechaPago:"",monto:0,iva:0,piva:0,piibb:0,estado:"Pendiente",obs:"",enBalance:false,gastoId:""};
@@ -1437,21 +1481,44 @@ $("sv_add").onclick=()=>{
   abrirEditServicio(nuevo.id);
 };
 
+/* Busca los datos fijos guardados de un servicio (del más reciente con datos) */
+function plantillaServicio(nombre){
+  const n=nombre.toLowerCase().trim();
+  const previos=state.servicios
+    .filter(s=>s.servicio.toLowerCase().trim()===n && (s.rubro||s.tipoPago||s.entidad))
+    .sort((a,b)=>(b.mes||"").localeCompare(a.mes||""));
+  if(previos.length)return previos[0];
+  // si no hay previo, usar sugerencia de la lista base
+  const base=SERV_BASE.find(b=>b.servicio.toLowerCase().trim()===n);
+  return base||null;
+}
+/* Crea un servicio nuevo en el mes actual y abre el formulario */
+function abrirNuevoServicio(){
+  const mes=($("sv_mes")&&$("sv_mes").value)||curMonthISO();
+  const nuevo={id:uid(),mes,servicio:"",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"",entidad:"",fechaEmision:"",venc:"",fechaPago:"",monto:0,iva:0,piva:0,piibb:0,estado:"Pendiente",obs:"",enBalance:false,gastoId:""};
+  state.servicios.push(nuevo);
+  abrirEditServicio(nuevo.id);
+}
+
 function abrirEditServicio(id){
   const s=state.servicios.find(x=>x.id===id); if(!s)return;
   $("eds_id").value=s.id;
   $("eds_serv").value=s.servicio;
+  // datalist con nombres de servicios conocidos (base + cargados antes)
+  const nombres=[...new Set([...SERV_BASE.map(b=>b.servicio), ...state.servicios.map(x=>x.servicio)].filter(Boolean))].sort();
+  $("eds_servlist").innerHTML=nombres.map(n=>`<option value="${n}">`).join("");
   $("eds_cat").innerHTML=CAT_SERV.map(c=>`<option ${c===s.categoria?"selected":""}>${c}</option>`).join("");
-  // rubro/sub: usa lo guardado, o la sugerencia de la lista base
-  const base=SERV_BASE.find(b=>b.servicio.toLowerCase()===s.servicio.toLowerCase());
-  const rubro=s.rubro||(base&&base.rubro)||"LOCACION, ABL Y SERVICIOS";
+  // rubro/sub: usa lo guardado, o la plantilla (memoria de meses previos / lista base)
+  const pl=s.rubro?null:plantillaServicio(s.servicio);
+  const rubro=s.rubro||(pl&&pl.rubro)||"LOCACION, ABL Y SERVICIOS";
   $("eds_rubro").innerHTML=RUBROS.map(r=>`<option ${r===rubro?"selected":""}>${r}</option>`).join("");
-  edsFillSubs(s.sub||(base&&base.sub)||"");
+  edsFillSubs(s.sub||(pl&&pl.sub)||"");
   $("eds_emision").value=s.fechaEmision||"";
   $("eds_venc").value=s.venc||"";
   $("eds_fpago").value=s.fechaPago||"";
-  $("eds_tipo").innerHTML=TIPOS_PAGO.map(t=>`<option ${t===s.tipoPago?"selected":""}>${t}</option>`).join("");
-  $("eds_ent").value=s.entidad||"";
+  const tipoPago=s.tipoPago||(pl&&pl.tipoPago)||"Transferencia";
+  $("eds_tipo").innerHTML=TIPOS_PAGO.map(t=>`<option ${t===tipoPago?"selected":""}>${t}</option>`).join("");
+  $("eds_ent").value=s.entidad||(pl&&pl.entidad)||"";
   $("eds_monto").value=(s.bn==="negro"&&s.monto)?("*"+s.monto):(s.monto||"");
   // alícuota deducida
   let alic="21";
@@ -1460,11 +1527,22 @@ function abrirEditServicio(id){
   $("eds_piva").value=s.piva||"";
   $("eds_piibb").value=s.piibb||"";
   $("eds_obs").value=s.obs||"";
-  $("eds_albalance").checked = s.enBalance ? true : true; // por defecto sí
+  $("eds_albalance").checked = true;
   edsCalcIva();
   hideMsg("eds_msg");
   $("eds_overlay").style.display="flex";
 }
+/* al elegir/escribir un nombre conocido, aplica sus datos fijos guardados */
+function edsAplicarPlantilla(){
+  const nombre=$("eds_serv").value;
+  const pl=plantillaServicio(nombre);
+  if(!pl)return;
+  if(pl.categoria)$("eds_cat").value=pl.categoria;
+  if(pl.rubro){ $("eds_rubro").value=pl.rubro; edsFillSubs(pl.sub||""); }
+  if(pl.tipoPago)$("eds_tipo").value=pl.tipoPago;
+  if(pl.entidad)$("eds_ent").value=pl.entidad;
+}
+$("eds_serv").addEventListener("change",edsAplicarPlantilla);
 function edsFillSubs(sel){
   const rubro=$("eds_rubro").value;
   const lista=(state.subs[rubro]||[]).slice().sort((a,b)=>a.localeCompare(b));
