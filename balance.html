@@ -446,62 +446,42 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 
   <!-- Modal editar servicio -->
   <div id="eds_overlay" style="display:none;position:fixed;inset:0;background:rgba(35,32,26,.55);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px">
-    <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:640px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
-      <h2 style="margin-top:0">Editar servicio</h2>
+    <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:680px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+      <h2 style="margin-top:0">Cargar factura del servicio</h2>
+      <p class="lead">Cargás una sola vez. Con la <b>fecha de emisión</b> va al balance del mes; con el <b>vencimiento</b> queda en el calendario de pagos.</p>
       <div class="grid" style="grid-template-columns:2fr 1fr">
         <div class="f"><label>Servicio</label><input id="eds_serv"></div>
         <div class="f"><label>Categoría</label><select id="eds_cat"></select></div>
       </div>
       <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px">
+        <div class="f"><label>Rubro (para el balance)</label><select id="eds_rubro"></select></div>
+        <div class="f"><label>Subcategoría</label><select id="eds_sub"></select></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
+        <div class="f"><label>Fecha de emisión</label><input id="eds_emision" type="date"></div>
         <div class="f"><label>Vencimiento</label><input id="eds_venc" type="date"></div>
         <div class="f"><label>Fecha de pago</label><input id="eds_fpago" type="date"></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr;margin-top:14px;align-items:end">
+        <div class="f"><label>Monto sin IVA</label><input id="eds_monto" class="mono" inputmode="decimal"></div>
+        <div class="f"><label>Alícuota</label><select id="eds_alic"><option value="21">21%</option><option value="10.5">10,5%</option><option value="27">27%</option><option value="0">Exento</option></select></div>
+        <div class="f"><label>IVA</label><input id="eds_iva" class="mono" readonly style="background:var(--paper2)"></div>
+        <div class="f"><label>Percep. IIBB</label><input id="eds_piibb" class="mono" inputmode="decimal" placeholder="0"></div>
       </div>
       <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
         <div class="f"><label>Tipo de pago</label><select id="eds_tipo"></select></div>
         <div class="f"><label>Entidad / Medio</label><input id="eds_ent"></div>
-        <div class="f"><label>Monto</label><input id="eds_monto" class="mono" inputmode="decimal"></div>
+        <div class="f"><label>Percep. IVA</label><input id="eds_piva" class="mono" inputmode="decimal" placeholder="0"></div>
       </div>
       <div class="f" style="margin-top:14px"><label>Observaciones</label><input id="eds_obs"></div>
+      <label style="display:flex;gap:8px;align-items:center;cursor:pointer;margin-top:14px;text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-size:14px">
+        <input type="checkbox" id="eds_albalance" checked> Enviar al balance al guardar (según fecha de emisión)
+      </label>
       <input type="hidden" id="eds_id">
       <div class="msg" id="eds_msg"></div>
       <div class="row-actions" style="margin-top:18px">
         <button class="btn" id="eds_save">Guardar</button>
         <button class="btn ghost" id="eds_cancel">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal enviar al balance -->
-  <div id="evb_overlay" style="display:none;position:fixed;inset:0;background:rgba(35,32,26,.55);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px">
-    <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:640px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
-      <h2 style="margin-top:0">Enviar al balance</h2>
-      <p class="lead">Revisá los datos. El gasto entra al balance por <b>fecha de emisión</b> de la factura (no por el vencimiento).</p>
-      <div class="grid" style="grid-template-columns:2fr 1fr">
-        <div class="f"><label>Proveedor</label><input id="evb_prov"></div>
-        <div class="f"><label>Fecha de emisión</label><input id="evb_fecha" type="date"></div>
-      </div>
-      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px">
-        <div class="f"><label>Monto sin IVA</label><input id="evb_monto" class="mono" inputmode="decimal"></div>
-        <div class="f"><label>Rubro</label><select id="evb_rubro"></select></div>
-      </div>
-      <div class="grid" style="grid-template-columns:1fr;margin-top:14px">
-        <div class="f"><label>Subcategoría</label><select id="evb_sub"></select></div>
-      </div>
-      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px">
-        <div class="f"><label>Alícuota IVA</label>
-          <select id="evb_alic"><option value="21">21%</option><option value="10.5">10,5%</option><option value="27">27%</option><option value="0">Exento</option></select>
-        </div>
-        <div class="f"><label>IVA</label><input id="evb_iva" class="mono" readonly style="background:var(--paper2)"></div>
-      </div>
-      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px">
-        <div class="f"><label>Percep. IVA</label><input id="evb_piva" class="mono" inputmode="decimal" placeholder="0"></div>
-        <div class="f"><label>Percep. IIBB</label><input id="evb_piibb" class="mono" inputmode="decimal" placeholder="0"></div>
-      </div>
-      <input type="hidden" id="evb_id">
-      <div class="msg" id="evb_msg"></div>
-      <div class="row-actions" style="margin-top:18px">
-        <button class="btn" id="evb_save">Confirmar y enviar al balance</button>
-        <button class="btn ghost" id="evb_cancel">Cancelar</button>
       </div>
     </div>
   </div>
@@ -606,8 +586,7 @@ const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","S
    Pegá acá abajo, entre las comillas, la URL que termina en /exec
    que te dio "Implementar". Igual que en pedidos-eg.
    ===================================================================== */
-const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
-/* ===================================================================== */
+const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";/* ===================================================================== */
 
 let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[] };  // impuestos: {"2026-01":{...}}
 let balView="total";
@@ -1251,29 +1230,29 @@ function renderChequeTabla(){
 
 /* ===== SERVICIOS ===== */
 const SERV_BASE=[
-  {servicio:"Prosegur Cámaras",categoria:"Seguridad",tipoPago:"Débito automático"},
-  {servicio:"Aysa Añasco",categoria:"Servicios",tipoPago:"Transferencia"},
-  {servicio:"Aysa Dickman",categoria:"Servicios",tipoPago:"Transferencia"},
-  {servicio:"AySA Azzali",categoria:"Servicios",tipoPago:"Transferencia"},
-  {servicio:"Metrogas",categoria:"Servicios",tipoPago:"Transferencia"},
-  {servicio:"Aysa Terreno",categoria:"Servicios",tipoPago:"Transferencia"},
-  {servicio:"Edesur Marcelo",categoria:"Servicios",tipoPago:"Transferencia"},
-  {servicio:"Edesur Dickman",categoria:"Servicios",tipoPago:"Transferencia"},
-  {servicio:"Edesur Añasco",categoria:"Servicios",tipoPago:"Transferencia"},
-  {servicio:"Edesur Azzali",categoria:"Servicios",tipoPago:"Transferencia"},
-  {servicio:"Aysa Azzali facilidades",categoria:"Servicios",tipoPago:"Transferencia"},
-  {servicio:"Telecentro",categoria:"Servicios",tipoPago:"Transferencia"},
-  {servicio:"Movistar",categoria:"Servicios",tipoPago:"Transferencia"},
-  {servicio:"ABL Terreno",categoria:"Impuestos",tipoPago:"Transferencia"},
-  {servicio:"ABL Dickman",categoria:"Impuestos",tipoPago:"Transferencia"},
-  {servicio:"ABL Añasco",categoria:"Impuestos",tipoPago:"Transferencia"},
-  {servicio:"Bs personales",categoria:"Impuestos",tipoPago:"Transferencia"},
-  {servicio:"Prosegur (2)",categoria:"Seguridad",tipoPago:"Transferencia"},
-  {servicio:"Prosegur (3)",categoria:"Seguridad",tipoPago:"Transferencia"},
-  {servicio:"Seguro Técnico",categoria:"Seguros",tipoPago:"Transferencia"},
-  {servicio:"Seguro Comercio",categoria:"Seguros",tipoPago:"Transferencia"},
-  {servicio:"OSDE",categoria:"Salud",tipoPago:"Transferencia"},
-  {servicio:"Swiss",categoria:"Salud",tipoPago:"Transferencia"}
+  {servicio:"Prosegur Cámaras",categoria:"Seguridad",tipoPago:"Débito automático",rubro:"GASTOS VS Y MANTENIMIENTO",sub:"Alarma"},
+  {servicio:"Aysa Añasco",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"Aysa"},
+  {servicio:"Aysa Dickman",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"Aysa"},
+  {servicio:"AySA Azzali",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"Aysa"},
+  {servicio:"Metrogas",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"Metrogas"},
+  {servicio:"Aysa Terreno",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"Aysa"},
+  {servicio:"Edesur Marcelo",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"Edesur"},
+  {servicio:"Edesur Dickman",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"Edesur"},
+  {servicio:"Edesur Añasco",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"Edesur"},
+  {servicio:"Edesur Azzali",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"Edesur"},
+  {servicio:"Aysa Azzali facilidades",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"Aysa"},
+  {servicio:"Telecentro",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"Telefonía e internet"},
+  {servicio:"Movistar",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"Telefonía e internet"},
+  {servicio:"ABL Terreno",categoria:"Impuestos",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"ABL"},
+  {servicio:"ABL Dickman",categoria:"Impuestos",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"ABL"},
+  {servicio:"ABL Añasco",categoria:"Impuestos",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"ABL"},
+  {servicio:"Bs personales",categoria:"Impuestos",tipoPago:"Transferencia",rubro:"IMPOSITIVO",sub:"Bienes personales"},
+  {servicio:"Prosegur (2)",categoria:"Seguridad",tipoPago:"Transferencia",rubro:"GASTOS VS Y MANTENIMIENTO",sub:"Alarma"},
+  {servicio:"Prosegur (3)",categoria:"Seguridad",tipoPago:"Transferencia",rubro:"GASTOS VS Y MANTENIMIENTO",sub:"Alarma"},
+  {servicio:"Seguro Técnico",categoria:"Seguros",tipoPago:"Transferencia",rubro:"GASTOS VS Y MANTENIMIENTO",sub:"Seguros"},
+  {servicio:"Seguro Comercio",categoria:"Seguros",tipoPago:"Transferencia",rubro:"GASTOS VS Y MANTENIMIENTO",sub:"Seguros"},
+  {servicio:"OSDE",categoria:"Salud",tipoPago:"Transferencia",rubro:"GASTOS PERSONAL",sub:"Medicina prepaga"},
+  {servicio:"Swiss",categoria:"Salud",tipoPago:"Transferencia",rubro:"GASTOS PERSONAL",sub:"Medicina prepaga"}
 ];
 const TIPOS_PAGO=["Débito automático","Transferencia","VEP","Pago"];
 const CAT_SERV=["Servicios","Impuestos","Seguridad","Seguros","Salud","Otros"];
@@ -1324,7 +1303,7 @@ function drawServicios(){
       <td class="l"><span style="font-size:12px">${s.entidad||""}</span></td>
       <td class="num">${s.monto?money(s.monto):'<span style="color:var(--faint)">—</span>'}</td>
       <td><button class="estado-btn ${s.estado==="Pagado"?'pagado':'pend'}" data-est="${s.id}">${s.estado==="Pagado"?"Pagado":"Pendiente"}</button></td>
-      <td style="white-space:nowrap"><button class="del" data-balance="${s.id}" title="${s.enBalance?'Ya enviado al balance — reenviar':'Enviar al balance'}" style="color:${s.enBalance?'var(--green)':'var(--ink2)'}">${s.enBalance?'✓$':'→$'}</button> <button class="del" data-eds="${s.id}" title="Editar">✎</button> <button class="del" data-dels="${s.id}" title="Borrar">✕</button></td>
+      <td style="white-space:nowrap">${s.enBalance?'<span title="Ya está en el balance" style="color:var(--green);font-size:13px">✓$</span> ':''}<button class="del" data-eds="${s.id}" title="Cargar / editar factura">✎</button> <button class="del" data-dels="${s.id}" title="Borrar">✕</button></td>
     </tr>`;
   });
   tb.innerHTML=h;
@@ -1345,26 +1324,43 @@ function drawServicios(){
     await apiPost(Object.assign({action:"setServicio"},s));
   });
   tb.querySelectorAll("[data-dels]").forEach(b=>b.onclick=async ()=>{
-    if(confirm("¿Borrar este servicio del mes?")){ const id=b.dataset.dels; state.servicios=state.servicios.filter(x=>x.id!==id); drawServicios(); await apiPost({action:"deleteServicio",id}); }
+    const id=b.dataset.dels;
+    const s=state.servicios.find(x=>x.id===id); if(!s)return;
+    if(!confirm("¿Borrar este servicio del mes?"))return;
+    // si tenía gasto en el balance, ofrecer borrarlo también
+    if(s.enBalance && s.gastoId && state.gastos.some(g=>g.id===s.gastoId)){
+      if(confirm("Este servicio tiene un gasto cargado en el balance. ¿Borrar también ese gasto del balance?")){
+        state.gastos=state.gastos.filter(g=>g.id!==s.gastoId);
+        await apiPost({action:"deleteGasto",id:s.gastoId});
+      }
+    }
+    state.servicios=state.servicios.filter(x=>x.id!==id);
+    drawServicios();
+    await apiPost({action:"deleteServicio",id});
   });
   tb.querySelectorAll("[data-eds]").forEach(b=>b.onclick=()=>abrirEditServicio(b.dataset.eds));
-  tb.querySelectorAll("[data-balance]").forEach(b=>b.onclick=()=>abrirEnviarBalance(b.dataset.balance));
 }
 function curISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 
 $("sv_seed").onclick=async ()=>{
   const mes=$("sv_mes").value;
-  const yaHay=state.servicios.some(s=>s.mes===mes);
-  if(yaHay && !confirm("Ya hay servicios en "+ymLabel(mes)+". ¿Agregar igualmente la lista base?"))return;
-  const nuevos=SERV_BASE.map(b=>({id:uid(),mes,servicio:b.servicio,categoria:b.categoria,tipoPago:b.tipoPago,entidad:"",venc:"",fechaPago:"",monto:0,estado:"Pendiente",obs:""}));
+  const existentes=state.servicios.filter(s=>s.mes===mes).map(s=>s.servicio.toLowerCase().trim());
+  // solo agrega los servicios de la lista base que NO estén ya en el mes
+  const faltantes=SERV_BASE.filter(b=>!existentes.includes(b.servicio.toLowerCase().trim()));
+  if(!faltantes.length){
+    showMsg("sv_msg","learn",`${ymLabel(mes)} ya tiene toda la lista base cargada. No agregué nada para no duplicar.`);
+    return;
+  }
+  if(existentes.length && !confirm(`${ymLabel(mes)} ya tiene ${existentes.length} servicio(s). Voy a agregar los ${faltantes.length} que faltan de la lista base (sin duplicar los que ya están). ¿Seguimos?`))return;
+  const nuevos=faltantes.map(b=>({id:uid(),mes,servicio:b.servicio,categoria:b.categoria,tipoPago:b.tipoPago,rubro:b.rubro||"",sub:b.sub||"",entidad:"",fechaEmision:"",venc:"",fechaPago:"",monto:0,iva:0,piva:0,piibb:0,estado:"Pendiente",obs:"",enBalance:false,gastoId:""}));
   nuevos.forEach(n=>state.servicios.push(n));
   drawServicios();
-  showMsg("sv_msg","ok",`Cargué ${nuevos.length} servicios para ${ymLabel(mes)}.`);
+  showMsg("sv_msg","ok",`Agregué ${nuevos.length} servicio(s) a ${ymLabel(mes)}${existentes.length?" (los que faltaban)":""}.`);
   for(const n of nuevos){ await apiPost(Object.assign({action:"setServicio"},n)); }
 };
 $("sv_add").onclick=()=>{
   const mes=$("sv_mes").value;
-  const nuevo={id:uid(),mes,servicio:"Nuevo servicio",categoria:"Servicios",tipoPago:"Transferencia",entidad:"",venc:"",fechaPago:"",monto:0,estado:"Pendiente",obs:""};
+  const nuevo={id:uid(),mes,servicio:"Nuevo servicio",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"",entidad:"",fechaEmision:"",venc:"",fechaPago:"",monto:0,iva:0,piva:0,piibb:0,estado:"Pendiente",obs:"",enBalance:false,gastoId:""};
   state.servicios.push(nuevo);
   drawServicios();
   abrirEditServicio(nuevo.id);
@@ -1375,89 +1371,96 @@ function abrirEditServicio(id){
   $("eds_id").value=s.id;
   $("eds_serv").value=s.servicio;
   $("eds_cat").innerHTML=CAT_SERV.map(c=>`<option ${c===s.categoria?"selected":""}>${c}</option>`).join("");
+  // rubro/sub: usa lo guardado, o la sugerencia de la lista base
+  const base=SERV_BASE.find(b=>b.servicio.toLowerCase()===s.servicio.toLowerCase());
+  const rubro=s.rubro||(base&&base.rubro)||"LOCACION, ABL Y SERVICIOS";
+  $("eds_rubro").innerHTML=RUBROS.map(r=>`<option ${r===rubro?"selected":""}>${r}</option>`).join("");
+  edsFillSubs(s.sub||(base&&base.sub)||"");
+  $("eds_emision").value=s.fechaEmision||"";
   $("eds_venc").value=s.venc||"";
   $("eds_fpago").value=s.fechaPago||"";
   $("eds_tipo").innerHTML=TIPOS_PAGO.map(t=>`<option ${t===s.tipoPago?"selected":""}>${t}</option>`).join("");
   $("eds_ent").value=s.entidad||"";
-  $("eds_monto").value=s.monto||"";
+  $("eds_monto").value=(s.bn==="negro"&&s.monto)?("*"+s.monto):(s.monto||"");
+  // alícuota deducida
+  let alic="21";
+  if(s.monto>0&&s.iva>0){const r=Math.round(s.iva/s.monto*1000)/10; if(Math.abs(r-10.5)<1)alic="10.5"; else if(Math.abs(r-27)<1)alic="27";}
+  $("eds_alic").value=alic;
+  $("eds_piva").value=s.piva||"";
+  $("eds_piibb").value=s.piibb||"";
   $("eds_obs").value=s.obs||"";
+  $("eds_albalance").checked = s.enBalance ? true : true; // por defecto sí
+  edsCalcIva();
   hideMsg("eds_msg");
   $("eds_overlay").style.display="flex";
 }
+function edsFillSubs(sel){
+  const rubro=$("eds_rubro").value;
+  const lista=(state.subs[rubro]||[]).slice().sort((a,b)=>a.localeCompare(b));
+  // si la sub sugerida no está en la lista, la agrego igual como opción
+  if(sel && !lista.includes(sel))lista.push(sel);
+  $("eds_sub").innerHTML=`<option value="">— sin subcategoría —</option>`+lista.map(x=>`<option ${x===sel?"selected":""}>${x}</option>`).join("");
+}
+$("eds_rubro").addEventListener("change",()=>edsFillSubs(""));
+function edsMontoEsNegro(){ return $("eds_monto").value.trim().startsWith("*"); }
+function edsCalcIva(){
+  const esNegro=edsMontoEsNegro();
+  const neto=parseNum($("eds_monto").value);
+  // Si es Tipo B (asterisco), no se computa IVA
+  if(esNegro){ $("eds_iva").value="0,00"; return; }
+  const a=parseFloat($("eds_alic").value);
+  if(isNaN(neto)||neto<=0){ $("eds_iva").value=""; return; }
+  const iva=a>0?Math.round(neto*a/100*100)/100:0;
+  $("eds_iva").value=iva.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+$("eds_monto").addEventListener("input",edsCalcIva);
+$("eds_alic").addEventListener("change",edsCalcIva);
 $("eds_cancel").onclick=()=>{$("eds_overlay").style.display="none"; drawServicios();};
 $("eds_overlay").addEventListener("click",e=>{ if(e.target===$("eds_overlay")){$("eds_overlay").style.display="none";drawServicios();} });
 $("eds_save").onclick=async ()=>{
   const s=state.servicios.find(x=>x.id===$("eds_id").value); if(!s)return;
   s.servicio=$("eds_serv").value.trim()||"Servicio";
   s.categoria=$("eds_cat").value;
+  s.rubro=$("eds_rubro").value;
+  s.sub=$("eds_sub").value||"";
+  s.fechaEmision=$("eds_emision").value;
   s.venc=$("eds_venc").value;
   s.fechaPago=$("eds_fpago").value;
   s.tipoPago=$("eds_tipo").value;
   s.entidad=$("eds_ent").value.trim();
-  s.monto=parseNum($("eds_monto").value)||0;
+  const esNegro=edsMontoEsNegro();
+  s.bn=esNegro?"negro":"blanco";
+  s.monto=parseNum($("eds_monto").value)||0;  // parseNum ya saca el *
+  const a=parseFloat($("eds_alic").value);
+  s.iva=(!esNegro && a>0 && s.monto>0)?Math.round(s.monto*a/100*100)/100:0;
+  s.piva=esNegro?0:(parseNum($("eds_piva").value)||0);
+  s.piibb=parseNum($("eds_piibb").value)||0;
   s.obs=$("eds_obs").value.trim();
+  const mandarBalance=$("eds_albalance").checked;
+  const bn=s.bn;
+
+  // ¿mandar al balance? requiere fecha de emisión y monto
+  if(mandarBalance){
+    if(!s.fechaEmision){showMsg("eds_msg","learn","Para enviar al balance necesito la fecha de emisión. Cargala o destildá \"Enviar al balance\".");return;}
+    if(s.monto<=0){showMsg("eds_msg","learn","Para enviar al balance necesito el monto. Cargalo o destildá \"Enviar al balance\".");return;}
+    const prov=capProv(s.servicio);
+    if(s.enBalance && s.gastoId){
+      // actualizar el gasto existente
+      const g=state.gastos.find(x=>x.id===s.gastoId);
+      if(g){ Object.assign(g,{fecha:s.fechaEmision,prov,rubro:s.rubro,sub:s.sub,monto:s.monto,iva:s.iva,piva:s.piva,piibb:s.piibb,bn}); }
+      await apiPost({action:"updateGasto",id:s.gastoId,fecha:s.fechaEmision,prov,rubro:s.rubro,sub:s.sub,bn,monto:s.monto,iva:s.iva,piva:s.piva,piibb:s.piibb});
+    } else {
+      // crear gasto nuevo
+      const gid=uid();
+      state.gastos.push({id:gid,fecha:s.fechaEmision,prov,rubro:s.rubro,sub:s.sub,monto:s.monto,bn,iva:s.iva,piva:s.piva,piibb:s.piibb});
+      s.gastoId=gid; s.enBalance=true;
+      state.memoria[prov.toLowerCase()]=s.rubro;
+      await apiPost({action:"addGasto",id:gid,fecha:s.fechaEmision,prov,rubro:s.rubro,sub:s.sub,bn,monto:s.monto,iva:s.iva,piva:s.piva,piibb:s.piibb});
+    }
+  }
   $("eds_overlay").style.display="none";
   drawServicios();
-  await apiPost(Object.assign({action:"setServicio"},s));
-};
-
-/* ---- enviar servicio al balance ---- */
-function abrirEnviarBalance(id){
-  const s=state.servicios.find(x=>x.id===id); if(!s)return;
-  $("evb_id").value=s.id;
-  $("evb_prov").value=s.servicio;
-  // fecha de emisión: pre-cargo con vencimiento como referencia, pero la editás
-  $("evb_fecha").value=s.venc||curISO();
-  $("evb_monto").value=s.monto||"";
-  $("evb_rubro").innerHTML=RUBROS.map(r=>`<option>${r}</option>`).join("");
-  $("evb_rubro").value="LOCACION, ABL Y SERVICIOS";
-  evbFillSubs("");
-  $("evb_alic").value="21";
-  $("evb_piva").value="";
-  $("evb_piibb").value="";
-  evbCalcIva();
-  if(s.enBalance)showMsg("evb_msg","learn","Ojo: este servicio ya fue enviado al balance antes. Si confirmás, se cargará de nuevo.");
-  else hideMsg("evb_msg");
-  $("evb_overlay").style.display="flex";
-}
-function evbFillSubs(sel){
-  const rubro=$("evb_rubro").value;
-  const lista=(state.subs[rubro]||[]).slice().sort((a,b)=>a.localeCompare(b));
-  $("evb_sub").innerHTML=`<option value="">— sin subcategoría —</option>`+lista.map(x=>`<option ${x===sel?"selected":""}>${x}</option>`).join("");
-}
-$("evb_rubro").addEventListener("change",()=>evbFillSubs(""));
-function evbCalcIva(){
-  const neto=parseNum($("evb_monto").value);
-  const a=parseFloat($("evb_alic").value);
-  if(isNaN(neto)||neto<=0){ $("evb_iva").value=""; return; }
-  const iva=a>0?Math.round(neto*a/100*100)/100:0;
-  $("evb_iva").value=iva.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
-}
-$("evb_monto").addEventListener("input",evbCalcIva);
-$("evb_alic").addEventListener("change",evbCalcIva);
-$("evb_cancel").onclick=()=>{$("evb_overlay").style.display="none";};
-$("evb_overlay").addEventListener("click",e=>{ if(e.target===$("evb_overlay"))$("evb_overlay").style.display="none"; });
-$("evb_save").onclick=async ()=>{
-  const s=state.servicios.find(x=>x.id===$("evb_id").value); if(!s)return;
-  const prov=capProv($("evb_prov").value);
-  const fecha=$("evb_fecha").value;
-  const monto=parseNum($("evb_monto").value);
-  const rubro=$("evb_rubro").value;
-  const sub=$("evb_sub").value||"";
-  const a=parseFloat($("evb_alic").value);
-  if(!fecha){showMsg("evb_msg","learn","Falta la fecha de emisión.");return;}
-  if(isNaN(monto)||monto<=0){showMsg("evb_msg","learn","El monto no es válido.");return;}
-  const iva=a>0?Math.round(monto*a/100*100)/100:0;
-  const piva=parseNum($("evb_piva").value)||0;
-  const piibb=parseNum($("evb_piibb").value)||0;
-  const id=uid();
-  state.gastos.push({id,fecha,prov,rubro,sub,monto,bn:"blanco",iva,piva,piibb});
-  state.memoria[prov.toLowerCase()]=rubro;
-  s.enBalance=true;
-  $("evb_overlay").style.display="none";
-  drawServicios();
-  showMsg("sv_msg","ok",`"${prov}" enviado al balance: ${money(monto)} + IVA ${money(iva)}${piibb?" + IIBB "+money(piibb):""} (emisión ${fechaLinda(fecha)}).`);
-  await apiPost({action:"addGasto",id,fecha,prov,rubro,sub,bn:"blanco",monto,iva,piva,piibb});
+  showMsg("sv_msg","ok",`"${s.servicio}" guardado${mandarBalance?" y enviado al balance ("+fechaLinda(s.fechaEmision)+(esNegro?", Tipo B":"")+")":""}.`);
   await apiPost(Object.assign({action:"setServicio"},s));
 };
 
