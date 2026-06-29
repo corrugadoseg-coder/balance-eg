@@ -184,9 +184,10 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <button class="tab" data-v="impuestos"><span class="n">04</span>Impuestos</button>
     <button class="tab" data-v="cheque"><span class="n">05</span>Imp. Cheque</button>
     <button class="tab" data-v="servicios"><span class="n">06</span>Servicios</button>
-    <button class="tab" data-v="resumen"><span class="n">07</span>Resumen anual</button>
-    <button class="tab" data-v="informes"><span class="n">08</span>Informes</button>
-    <button class="tab" data-v="datos"><span class="n">09</span>Datos</button>
+    <button class="tab" data-v="vencim"><span class="n">07</span>Vencimientos</button>
+    <button class="tab" data-v="resumen"><span class="n">08</span>Resumen anual</button>
+    <button class="tab" data-v="informes"><span class="n">09</span>Informes</button>
+    <button class="tab" data-v="datos"><span class="n">10</span>Datos</button>
   </nav>
 </header>
 
@@ -487,7 +488,22 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   </div>
 </section>
 
-<!-- ===== 07 RESUMEN ANUAL ===== -->
+<!-- ===== 07 VENCIMIENTOS ===== -->
+<section class="view" data-v="vencim">
+  <div class="card">
+    <h2>Próximos vencimientos</h2>
+    <p class="lead">Lo que se viene a pagar, de todos los meses, ordenado por fecha. Elegí el rango de días.</p>
+    <div class="grid" style="grid-template-columns:auto auto;gap:14px;max-width:420px;align-items:end">
+      <div class="f"><label>Próximos</label>
+        <select id="vc_rango"><option value="7">7 días</option><option value="15" selected>15 días</option><option value="30">30 días</option><option value="60">60 días</option><option value="9999">Todos</option></select>
+      </div>
+    </div>
+    <div id="vc_resumen" class="ledger" style="margin:16px 0"></div>
+    <div style="overflow-x:auto"><table id="vc_tbl"><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- ===== 08 RESUMEN ANUAL ===== -->
 <section class="view" data-v="resumen">
   <div class="card">
     <h2>Resumen anual</h2>
@@ -586,7 +602,8 @@ const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","S
    Pegá acá abajo, entre las comillas, la URL que termina en /exec
    que te dio "Implementar". Igual que en pedidos-eg.
    ===================================================================== */
-const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";/* ===================================================================== */
+const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
+/* ===================================================================== */
 
 let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[] };  // impuestos: {"2026-01":{...}}
 let balView="total";
@@ -689,6 +706,7 @@ $$(".tab").forEach(t=>t.onclick=()=>{
   if(v==="cheque")renderChequeTab();
   if(v==="resumen")renderResumen();
   if(v==="servicios")renderServicios();
+  if(v==="vencim")renderVencimientos();
   if(v==="informes")applyFilters();
   if(v==="datos")renderStats();
 });
@@ -1341,6 +1359,59 @@ function drawServicios(){
   tb.querySelectorAll("[data-eds]").forEach(b=>b.onclick=()=>abrirEditServicio(b.dataset.eds));
 }
 function curISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
+/* ===== PRÓXIMOS VENCIMIENTOS ===== */
+function renderVencimientos(){
+  $("vc_rango").onchange=drawVencimientos;
+  drawVencimientos();
+}
+function drawVencimientos(){
+  const rango=parseInt($("vc_rango").value);
+  // todos los servicios con vencimiento, de cualquier mes
+  const conVenc=state.servicios.filter(s=>s.venc);
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  // calcular días y filtrar por rango (incluye vencidos impagos siempre)
+  let items=conVenc.map(s=>({s,d:diasAlVenc(s.venc)}));
+  items=items.filter(({s,d})=>{
+    if(s.estado!=="Pagado" && d<0) return true;          // vencido impago: siempre se muestra
+    return d>=0 && d<=rango;                              // dentro del rango
+  });
+  items.sort((a,b)=>a.d-b.d);
+  const tb=$("vc_tbl").querySelector("tbody");
+  if(!items.length){
+    tb.innerHTML=`<tr><td colspan="6"><div class="empty">No hay vencimientos en el rango elegido.</div></td></tr>`;
+    $("vc_resumen").innerHTML="";
+    return;
+  }
+  let h=`<tr><th class="l">Vence</th><th class="l">Servicio</th><th class="l">Mes</th><th class="l">Tipo pago</th><th class="num">Monto</th><th>Estado</th></tr>`;
+  items.forEach(({s,d})=>{
+    let etiqueta="",cls="";
+    if(s.estado!=="Pagado"){
+      if(d<0){etiqueta=`venció hace ${Math.abs(d)}d`;cls="venc-rojo";}
+      else if(d===0){etiqueta="vence hoy";cls="venc-rojo";}
+      else if(d<=3){etiqueta=`en ${d}d`;cls="venc-amar";}
+      else etiqueta=`en ${d}d`;
+    }
+    h+=`<tr class="${cls}">
+      <td class="l">${fechaLinda(s.venc)}${etiqueta?` <span style="font-size:11px;color:var(--faint)">(${etiqueta})</span>`:""}</td>
+      <td class="l">${s.servicio}</td>
+      <td class="l"><span style="font-size:12px;color:var(--faint)">${ymLabel(s.mes)}</span></td>
+      <td class="l"><span style="font-size:12px">${s.tipoPago||""}</span></td>
+      <td class="num">${s.monto?money(s.monto):'<span style="color:var(--faint)">—</span>'}</td>
+      <td>${s.estado==="Pagado"?'<span style="color:var(--green);font-size:12px">✓ Pagado</span>':'<span style="font-size:12px;color:var(--ink2)">Pendiente</span>'}</td>
+    </tr>`;
+  });
+  tb.innerHTML=h;
+  // resumen: total a pagar (pendiente) en el rango, separado por tipo de pago
+  const pend=items.filter(({s})=>s.estado!=="Pagado");
+  const totalPend=pend.reduce((acc,{s})=>acc+(s.monto||0),0);
+  const debito=pend.filter(({s})=>/d[ée]bito/i.test(s.tipoPago)).reduce((acc,{s})=>acc+(s.monto||0),0);
+  const transf=totalPend-debito;
+  $("vc_resumen").innerHTML=
+    `<div class="led"><div class="l">Total pendiente</div><div class="v ${totalPend>0?'neg':''}">${money0(totalPend)}</div><div class="sub">${pend.length} pago(s)</div></div>
+     <div class="led"><div class="l">Por débito automático</div><div class="v">${money0(debito)}</div><div class="sub">sale solo</div></div>
+     <div class="led"><div class="l">Por transferencia</div><div class="v">${money0(transf)}</div><div class="sub">lo hacés vos</div></div>`;
+}
 
 $("sv_seed").onclick=async ()=>{
   const mes=$("sv_mes").value;
