@@ -185,9 +185,10 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <button class="tab" data-v="cheque"><span class="n">05</span>Imp. Cheque</button>
     <button class="tab" data-v="servicios"><span class="n">06</span>Servicios</button>
     <button class="tab" data-v="vencim"><span class="n">07</span>Vencimientos</button>
-    <button class="tab" data-v="resumen"><span class="n">08</span>Resumen anual</button>
-    <button class="tab" data-v="informes"><span class="n">09</span>Informes</button>
-    <button class="tab" data-v="datos"><span class="n">10</span>Datos</button>
+    <button class="tab" data-v="chemit"><span class="n">08</span>Cheques emitidos</button>
+    <button class="tab" data-v="resumen"><span class="n">09</span>Resumen anual</button>
+    <button class="tab" data-v="informes"><span class="n">10</span>Informes</button>
+    <button class="tab" data-v="datos"><span class="n">11</span>Datos</button>
   </nav>
 </header>
 
@@ -516,7 +517,68 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   </div>
 </section>
 
-<!-- ===== 08 RESUMEN ANUAL ===== -->
+<!-- ===== 08 CHEQUES EMITIDOS ===== -->
+<section class="view" data-v="chemit">
+  <div class="card">
+    <h2>Cheques emitidos</h2>
+    <p class="lead">Pegá el texto del homebanking (uno o varios eCheq juntos) y la app los carga. Los físicos, con "+ Agregar a mano".</p>
+    <div class="f">
+      <label>Pegá acá los cheques del homebanking</label>
+      <textarea id="che_texto" rows="6" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Copiá desde el homebanking (Ctrl+C) y pegá acá (Ctrl+V). Podés pegar uno o varios juntos."></textarea>
+    </div>
+    <div class="row-actions">
+      <button class="btn gold" id="che_calc">Leer cheques del texto</button>
+      <button class="btn ghost sm" id="che_add">+ Agregar a mano (físico)</button>
+      <button class="btn ghost sm" id="che_clear">Limpiar texto</button>
+    </div>
+    <div class="msg" id="che_msg"></div>
+  </div>
+
+  <div class="card">
+    <h3>Aviso de caja</h3>
+    <p class="lead">Plata que puede salir de la cuenta por cheques no cobrados.</p>
+    <div class="grid" style="grid-template-columns:auto;max-width:240px;margin-bottom:14px">
+      <div class="f"><label>Mirar próximos</label>
+        <select id="che_rango"><option value="7">7 días</option><option value="15" selected>15 días</option><option value="30">30 días</option><option value="60">60 días</option></select>
+      </div>
+    </div>
+    <div id="che_aviso" class="ledger"></div>
+  </div>
+
+  <div class="card">
+    <h3>Listado de cheques</h3>
+    <div class="f" style="max-width:280px;margin-bottom:12px">
+      <label>Filtrar</label>
+      <select id="che_filtro"><option value="">Todos</option><option value="No cobrado">Solo no cobrados</option><option value="Cobrado">Solo cobrados</option><option value="electronico">Solo electrónicos</option><option value="fisico">Solo físicos</option></select>
+    </div>
+    <div style="overflow-x:auto"><table id="che_tbl"><tbody></tbody></table></div>
+  </div>
+
+  <!-- Modal editar cheque -->
+  <div id="chm_overlay" style="display:none;position:fixed;inset:0;background:rgba(35,32,26,.55);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px">
+    <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:600px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+      <h2 style="margin-top:0">Cheque</h2>
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <div class="f"><label>Tipo</label><select id="chm_tipo"><option value="electronico">Electrónico</option><option value="fisico">Físico</option></select></div>
+        <div class="f"><label>N° de cheque</label><input id="chm_nro"></div>
+      </div>
+      <div class="f" style="margin-top:14px"><label>Beneficiario (a quién le pagás)</label><input id="chm_benef"></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px">
+        <div class="f"><label>Fecha de pago</label><input id="chm_fpago" type="date"></div>
+        <div class="f"><label>Monto</label><input id="chm_monto" class="mono" inputmode="decimal"></div>
+      </div>
+      <div class="f" style="margin-top:14px"><label>Observaciones</label><input id="chm_obs"></div>
+      <input type="hidden" id="chm_id">
+      <div class="msg" id="chm_msg"></div>
+      <div class="row-actions" style="margin-top:18px">
+        <button class="btn" id="chm_save">Guardar</button>
+        <button class="btn ghost" id="chm_cancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 09 RESUMEN ANUAL ===== -->
 <section class="view" data-v="resumen">
   <div class="card">
     <h2>Resumen anual</h2>
@@ -615,10 +677,9 @@ const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","S
    Pegá acá abajo, entre las comillas, la URL que termina en /exec
    que te dio "Implementar". Igual que en pedidos-eg.
    ===================================================================== */
-const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
-/* ===================================================================== */
+const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";/* ===================================================================== */
 
-let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[] };  // impuestos: {"2026-01":{...}}
+let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[], chequesEmit:[] };  // impuestos: {"2026-01":{...}}
 let balView="total";
 const $=id=>document.getElementById(id);
 /* Normaliza proveedor: saca espacios extra y pone Mayúscula Inicial en cada palabra */
@@ -669,7 +730,7 @@ function setSync(estado,txt){ const b=$("savebox");
 /* ---- llamadas a la planilla ---- */
 async function apiGet(){
   const r=await fetch(API); const j=await r.json();
-  if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; }
+  if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; state.chequesEmit=j.data.chequesEmit||[]; }
   return j;
 }
 async function apiPost(payload){
@@ -720,6 +781,7 @@ function irA(v){
   if(v==="resumen")renderResumen();
   if(v==="servicios")renderServicios();
   if(v==="vencim")renderVencimientos();
+  if(v==="chemit")renderChequesEmit();
   if(v==="informes")applyFilters();
   if(v==="datos")renderStats();
 }
@@ -1378,6 +1440,140 @@ function drawServicios(){
   tb.querySelectorAll("[data-eds]").forEach(b=>b.onclick=()=>abrirEditServicio(b.dataset.eds));
 }
 function curISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
+/* ===== CHEQUES EMITIDOS ===== */
+function parseChequesEmit(texto){
+  const bloques=texto.split(/(?=ID:\s)/);
+  const out=[];
+  bloques.forEach(b=>{
+    if(!/ID:\s/.test(b))return;
+    const nro=(b.match(/N°:\s*(\d+)/)||b.match(/N[º°]:\s*(\d+)/)||[])[1]||"";
+    const cuit=(b.match(/CUIT\s*([\d-]+)/)||[])[1]||"";
+    const fecha=(b.match(/(\d{2}\/\d{2}\/\d{4})/)||[])[1]||"";
+    const imp=(b.match(/\$\s*([\d.]+,\d{2})/)||[])[1]||"";
+    // beneficiario: línea entre N°: y CUIT que no sea "..." ni vacía
+    let benef="";
+    const lineas=b.split("\n").map(l=>l.trim());
+    for(let i=0;i<lineas.length;i++){
+      if(/^N[º°]:/.test(lineas[i])){
+        for(let j=i+1;j<lineas.length;j++){
+          if(lineas[j] && !/^CUIT/.test(lineas[j]) && lineas[j]!=="..."){ benef=lineas[j]; break; }
+        }
+        break;
+      }
+    }
+    if(!nro && !imp)return;
+    out.push({nro,cuit,beneficiario:benef,fechaPago:fecha?isoDe(fecha):"",monto:imp?parseFloat(imp.replace(/\./g,"").replace(",",".")):0});
+  });
+  return out;
+}
+function isoDe(ddmmaaaa){ const p=ddmmaaaa.split("/"); return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:""; }
+
+function renderChequesEmit(){
+  $("che_rango").onchange=drawAvisoCaja;
+  $("che_filtro").onchange=drawChequesTabla;
+  drawAvisoCaja();
+  drawChequesTabla();
+}
+$("che_calc").onclick=async ()=>{
+  const texto=$("che_texto").value;
+  if(!texto.trim()){showMsg("che_msg","learn","Pegá primero el texto de los cheques.");return;}
+  const parsed=parseChequesEmit(texto);
+  if(!parsed.length){showMsg("che_msg","learn","No encontré cheques en el texto. Fijate de copiar desde \"ID:\".");return;}
+  let nuevos=0, repetidos=0;
+  for(const p of parsed){
+    // evitar duplicar por nro
+    if(p.nro && state.chequesEmit.some(c=>c.nro===p.nro)){ repetidos++; continue; }
+    const c={id:uid(),tipo:"electronico",nro:p.nro,beneficiario:p.beneficiario,cuit:p.cuit,fechaPago:p.fechaPago,monto:p.monto,estado:"No cobrado",obs:""};
+    state.chequesEmit.push(c); nuevos++;
+    await apiPost(Object.assign({action:"setChequeEmit"},c));
+  }
+  $("che_texto").value="";
+  drawAvisoCaja(); drawChequesTabla();
+  showMsg("che_msg","ok",`Cargué ${nuevos} cheque(s).${repetidos?" Omití "+repetidos+" que ya estaban (mismo N°).":""}`);
+};
+$("che_clear").onclick=()=>{$("che_texto").value="";hideMsg("che_msg");};
+$("che_add").onclick=()=>{
+  const c={id:uid(),tipo:"fisico",nro:"",beneficiario:"",cuit:"",fechaPago:"",monto:0,estado:"No cobrado",obs:""};
+  state.chequesEmit.push(c);
+  abrirEditCheque(c.id);
+};
+function drawChequesTabla(){
+  const f=$("che_filtro").value;
+  let list=state.chequesEmit.slice().sort((a,b)=>(a.fechaPago||"").localeCompare(b.fechaPago||""));
+  if(f==="No cobrado"||f==="Cobrado")list=list.filter(c=>c.estado===f);
+  if(f==="electronico"||f==="fisico")list=list.filter(c=>c.tipo===f);
+  const tb=$("che_tbl").querySelector("tbody");
+  if(!list.length){tb.innerHTML=`<tr><td colspan="7"><div class="empty">No hay cheques${f?" con ese filtro":" cargados"}.</div></td></tr>`;return;}
+  let h=`<tr><th class="l">Tipo</th><th class="l">N°</th><th class="l">Beneficiario</th><th class="l">Pago</th><th class="num">Monto</th><th>Estado</th><th></th></tr>`;
+  list.forEach(c=>{
+    h+=`<tr>
+      <td class="l"><span style="font-size:11px">${c.tipo==="fisico"?"Físico":"Electrónico"}</span></td>
+      <td class="l">${c.nro||"—"}</td>
+      <td class="l">${c.beneficiario||'<span style="color:var(--faint)">—</span>'}</td>
+      <td class="l">${c.fechaPago?fechaLinda(c.fechaPago):"—"}</td>
+      <td class="num">${money(c.monto)}</td>
+      <td><button class="estado-btn ${c.estado==="Cobrado"?'pagado':'pend'}" data-estch="${c.id}">${c.estado}</button></td>
+      <td style="white-space:nowrap"><button class="del" data-edch="${c.id}" title="Editar">✎</button> <button class="del" data-delche="${c.id}" title="Borrar">✕</button></td>
+    </tr>`;
+  });
+  tb.innerHTML=h;
+  tb.querySelectorAll("[data-estch]").forEach(b=>b.onclick=async ()=>{
+    const c=state.chequesEmit.find(x=>x.id===b.dataset.estch); if(!c)return;
+    c.estado=c.estado==="Cobrado"?"No cobrado":"Cobrado";
+    drawChequesTabla(); drawAvisoCaja();
+    await apiPost(Object.assign({action:"setChequeEmit"},c));
+  });
+  tb.querySelectorAll("[data-edch]").forEach(b=>b.onclick=()=>abrirEditCheque(b.dataset.edch));
+  tb.querySelectorAll("[data-delche]").forEach(b=>b.onclick=async ()=>{
+    if(confirm("¿Borrar este cheque?")){ const id=b.dataset.delche; state.chequesEmit=state.chequesEmit.filter(x=>x.id!==id); drawChequesTabla(); drawAvisoCaja(); await apiPost({action:"deleteChequeEmit",id}); }
+  });
+}
+function abrirEditCheque(id){
+  const c=state.chequesEmit.find(x=>x.id===id); if(!c)return;
+  $("chm_id").value=c.id;
+  $("chm_tipo").value=c.tipo||"electronico";
+  $("chm_nro").value=c.nro||"";
+  $("chm_benef").value=c.beneficiario||"";
+  $("chm_fpago").value=c.fechaPago||"";
+  $("chm_monto").value=c.monto||"";
+  $("chm_obs").value=c.obs||"";
+  hideMsg("chm_msg");
+  $("chm_overlay").style.display="flex";
+}
+$("chm_cancel").onclick=()=>{$("chm_overlay").style.display="none"; drawChequesTabla();};
+$("chm_overlay").addEventListener("click",e=>{ if(e.target===$("chm_overlay")){$("chm_overlay").style.display="none";drawChequesTabla();} });
+$("chm_save").onclick=async ()=>{
+  const c=state.chequesEmit.find(x=>x.id===$("chm_id").value); if(!c)return;
+  c.tipo=$("chm_tipo").value;
+  c.nro=$("chm_nro").value.trim();
+  c.beneficiario=$("chm_benef").value.trim();
+  c.fechaPago=$("chm_fpago").value;
+  c.monto=parseNum($("chm_monto").value)||0;
+  c.obs=$("chm_obs").value.trim();
+  $("chm_overlay").style.display="none";
+  drawChequesTabla(); drawAvisoCaja();
+  await apiPost(Object.assign({action:"setChequeEmit"},c));
+};
+function drawAvisoCaja(){
+  const rango=parseInt($("che_rango").value);
+  const noCob=state.chequesEmit.filter(c=>c.estado!=="Cobrado" && c.fechaPago);
+  // ya pueden salir: fecha de pago <= hoy
+  const yaSalen=noCob.filter(c=>diasAlVenc(c.fechaPago)<=0);
+  // por venir: fecha futura dentro del rango
+  const porVenir=noCob.filter(c=>{const d=diasAlVenc(c.fechaPago); return d>0 && d<=rango;});
+  const totalYa=yaSalen.reduce((s,c)=>s+c.monto,0);
+  const totalVen=porVenir.reduce((s,c)=>s+c.monto,0);
+  // servicios pendientes en el rango (para el total por separado)
+  const servPend=state.servicios.filter(s=>s.estado!=="Pagado"&&s.venc&&s.monto>0);
+  const servYa=servPend.filter(s=>diasAlVenc(s.venc)<=0).reduce((a,s)=>a+s.monto,0);
+  const servVen=servPend.filter(s=>{const d=diasAlVenc(s.venc);return d>0&&d<=rango;}).reduce((a,s)=>a+s.monto,0);
+  $("che_aviso").innerHTML=
+    `<div class="led"><div class="l">Cheques — ya pueden salir</div><div class="v ${totalYa>0?'neg':''}">${money0(totalYa)}</div><div class="sub">${yaSalen.length} cheque(s) no cobrados</div></div>
+     <div class="led"><div class="l">Cheques — por venir (${rango}d)</div><div class="v">${money0(totalVen)}</div><div class="sub">${porVenir.length} cheque(s)</div></div>
+     <div class="led"><div class="l">Servicios — ya / por venir</div><div class="v">${money0(servYa)} / ${money0(servVen)}</div><div class="sub">pendientes</div></div>
+     <div class="led" style="border-color:var(--gold)"><div class="l">Total a cubrir ya</div><div class="v ${(totalYa+servYa)>0?'neg':''}">${money0(totalYa+servYa)}</div><div class="sub">cheques + servicios que ya pueden salir</div></div>`;
+}
 
 /* ===== PRÓXIMOS VENCIMIENTOS ===== */
 function renderVencimientos(){
