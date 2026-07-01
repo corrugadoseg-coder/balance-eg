@@ -178,7 +178,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="savebox" id="savebox"><span class="dot"></span><span id="saveTxt">conectando…</span></div>
   </div>
   <nav class="tabs">
-    <button class="tab on" data-v="gasto"><span class="n">01</span>Cargar gasto</button>
+    <button class="tab on" data-v="gasto"><span class="n">01</span>Cargar</button>
     <button class="tab" data-v="venta"><span class="n">02</span>Ventas del mes</button>
     <button class="tab" data-v="balance"><span class="n">03</span>Balance mensual</button>
     <button class="tab" data-v="impuestos"><span class="n">04</span>Impuestos</button>
@@ -200,6 +200,14 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
       <button class="btn" id="ch_gasto" style="min-width:180px;padding:18px 24px;font-size:15px">📄 Gasto<br><span style="font-size:11px;font-weight:400;opacity:.8">una factura para el balance</span></button>
       <button class="btn gold" id="ch_servicio" style="min-width:180px;padding:18px 24px;font-size:15px">🔁 Servicio<br><span style="font-size:11px;font-weight:400;opacity:.8">recurrente, con vencimiento</span></button>
+    </div>
+    <div id="carga_ok" style="display:none;margin-top:22px;padding:18px;background:rgba(63,107,79,.08);border:1px solid rgba(63,107,79,.25);border-radius:12px">
+      <div id="carga_ok_msg" style="font-family:'Spectral',serif;color:#3f6b4f;margin-bottom:14px">✓ Guardado</div>
+      <div style="font-size:14px;margin-bottom:12px">¿Querés cargar otra cosa?</div>
+      <div style="display:flex;gap:12px;justify-content:center">
+        <button class="btn" id="carga_otra">Cargar otra</button>
+        <button class="btn ghost" id="carga_fin">Terminar</button>
+      </div>
     </div>
   </div>
 
@@ -790,8 +798,25 @@ $$(".tab").forEach(t=>t.onclick=()=>irA(t.dataset.v));
 
 /* ---- chooser gasto/servicio ---- */
 $("ch_gasto").onclick=()=>{ $("chooser_card").style.display="none"; $("gasto_form_wrap").style.display="block"; };
-$("volver_chooser").onclick=()=>{ $("gasto_form_wrap").style.display="none"; $("chooser_card").style.display="block"; };
-$("ch_servicio").onclick=()=>{ irA("servicios"); setTimeout(()=>{ if(typeof abrirNuevoServicio==="function")abrirNuevoServicio(); },50); };
+$("volver_chooser").onclick=()=>{ $("gasto_form_wrap").style.display="none"; $("chooser_card").style.display="block"; mostrarChooserBotones(); };
+$("ch_servicio").onclick=()=>{ if(typeof abrirNuevoServicio==="function")abrirNuevoServicio(); };
+
+/* muestra la pregunta "otra o terminar" tras guardar; vuelve al sector Cargar */
+function finCarga(msg){
+  irA("gasto");
+  $("gasto_form_wrap").style.display="none";
+  $("chooser_card").style.display="block";
+  // ocultar los botones de elección y mostrar el bloque de confirmación
+  $("ch_gasto").parentElement.style.display="none";
+  $("carga_ok_msg").textContent="✓ "+(msg||"Guardado");
+  $("carga_ok").style.display="block";
+}
+function mostrarChooserBotones(){
+  $("ch_gasto").parentElement.style.display="flex";
+  $("carga_ok").style.display="none";
+}
+$("carga_otra").onclick=()=>{ mostrarChooserBotones(); };
+$("carga_fin").onclick=()=>{ mostrarChooserBotones(); irA("balance"); };
 
 /* ---- blanco/negro: solo por código (*), sin nada visible ---- */
 function montoEsNegro(){ return $("g_monto").value.trim().startsWith("*"); }
@@ -864,6 +889,7 @@ $("g_add").onclick=async ()=>{
   updateFlag();
   renderGastos();
   await apiPost({action:"addGasto",id,fecha,prov,rubro,sub,bn,monto,iva,piva,piibb});
+  finCarga(`Gasto de "${prov}" agregado (${money(monto)}).`);
 };
 $("g_clear").onclick=()=>{$("g_prov").value="";$("g_monto").value="";$("g_fecha").value=todayISO();$("g_sub").value="";$("g_piva").value="";$("g_piibb").value="";$("g_iva").value="";$("g_alic").value="21";updateFlag();hideMsg("g_msg");};
 
@@ -1705,7 +1731,7 @@ function plantillaServicio(nombre){
 }
 /* Crea un servicio nuevo en el mes actual y abre el formulario */
 function abrirNuevoServicio(){
-  const mes=($("sv_mes")&&$("sv_mes").value)||curMonthISO();
+  const mes=curMonthISO();
   const nuevo={id:uid(),mes,servicio:"",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"",entidad:"",fechaEmision:"",venc:"",fechaPago:"",monto:0,iva:0,piva:0,piibb:0,estado:"Pendiente",obs:"",enBalance:false,gastoId:""};
   state.servicios.push(nuevo);
   abrirEditServicio(nuevo.id);
@@ -1775,8 +1801,15 @@ function edsCalcIva(){
 }
 $("eds_monto").addEventListener("input",edsCalcIva);
 $("eds_alic").addEventListener("change",edsCalcIva);
-$("eds_cancel").onclick=()=>{$("eds_overlay").style.display="none"; drawServicios();};
-$("eds_overlay").addEventListener("click",e=>{ if(e.target===$("eds_overlay")){$("eds_overlay").style.display="none";drawServicios();} });
+function edsCancelar(){
+  const s=state.servicios.find(x=>x.id===$("eds_id").value);
+  // si era un servicio nuevo sin nombre ni datos, lo saco para no dejar basura
+  if(s && !s.servicio && !s.monto && !s.venc && !s.fechaEmision){ state.servicios=state.servicios.filter(x=>x.id!==s.id); }
+  $("eds_overlay").style.display="none";
+  drawServicios();
+}
+$("eds_cancel").onclick=edsCancelar;
+$("eds_overlay").addEventListener("click",e=>{ if(e.target===$("eds_overlay"))edsCancelar(); });
 $("eds_save").onclick=async ()=>{
   const s=state.servicios.find(x=>x.id===$("eds_id").value); if(!s)return;
   s.servicio=$("eds_serv").value.trim()||"Servicio";
@@ -1796,6 +1829,8 @@ $("eds_save").onclick=async ()=>{
   s.piva=esNegro?0:(parseNum($("eds_piva").value)||0);
   s.piibb=parseNum($("eds_piibb").value)||0;
   s.obs=$("eds_obs").value.trim();
+  // el mes del servicio sale de la fecha de emisión (o vencimiento); nunca una fecha completa
+  s.mes=normMes(s.fechaEmision)||normMes(s.venc)||curMonthISO();
   const mandarBalance=$("eds_albalance").checked;
   const bn=s.bn;
 
@@ -1820,8 +1855,8 @@ $("eds_save").onclick=async ()=>{
   }
   $("eds_overlay").style.display="none";
   drawServicios();
-  showMsg("sv_msg","ok",`"${s.servicio}" guardado${mandarBalance?" y enviado al balance ("+fechaLinda(s.fechaEmision)+(esNegro?", Tipo B":"")+")":""}.`);
   await apiPost(Object.assign({action:"setServicio"},s));
+  finCarga(`Servicio "${s.servicio}" guardado${mandarBalance?" y enviado al balance":""}.`);
 };
 
 /* ===== RESUMEN ANUAL ===== */
