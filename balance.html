@@ -677,7 +677,8 @@ const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","S
    Pegá acá abajo, entre las comillas, la URL que termina en /exec
    que te dio "Implementar". Igual que en pedidos-eg.
    ===================================================================== */
-const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";/* ===================================================================== */
+const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
+/* ===================================================================== */
 
 let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[], chequesEmit:[] };  // impuestos: {"2026-01":{...}}
 let balView="total";
@@ -1356,12 +1357,26 @@ const SERV_BASE=[
 const TIPOS_PAGO=["Débito automático","Transferencia","VEP","Pago"];
 const CAT_SERV=["Servicios","Impuestos","Seguridad","Seguros","Salud","Otros"];
 
+function normMes(m){
+  if(!m)return "";
+  const s=String(m).trim();
+  // ya está en formato YYYY-MM o YYYY-MM-DD
+  let mm=s.match(/^(\d{4})-(\d{2})/);
+  if(mm)return mm[1]+"-"+mm[2];
+  // fecha tipo "Wed Jul 01 2026..." u otra que Date entienda
+  const d=new Date(s);
+  if(!isNaN(d))return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+  return "";
+}
 function renderServicios(){
   const sel=$("sv_mes");
+  // normalizar meses rotos de los servicios (corrige datos viejos guardados mal) y re-guardar
+  state.servicios.forEach(s=>{ const n=normMes(s.mes); if(n && n!==s.mes){ s.mes=n; apiPost(Object.assign({action:"setServicio"},s)); } });
   let meses=new Set(mesesConDatos());
   state.servicios.forEach(s=>{if(s.mes)meses.add(s.mes);});
   meses.add(curMonthISO());
-  const arr=[...meses].sort();
+  // solo meses válidos YYYY-MM
+  const arr=[...meses].filter(m=>/^\d{4}-\d{2}$/.test(m)).sort();
   const prev=sel.value;
   sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
   sel.value=arr.includes(prev)?prev:arr[arr.length-1];
