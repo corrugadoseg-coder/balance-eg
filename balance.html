@@ -178,7 +178,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="savebox" id="savebox"><span class="dot"></span><span id="saveTxt">conectando…</span></div>
   </div>
   <nav class="tabs">
-    <button class="tab on" data-v="gasto"><span class="n">01</span>Cargar</button>
+    <button class="tab on" data-v="gasto"><span class="n">01</span>Facturas Proveedores</button>
     <button class="tab" data-v="venta"><span class="n">02</span>Ventas del mes</button>
     <button class="tab" data-v="balance"><span class="n">03</span>Balance mensual</button>
     <button class="tab" data-v="impuestos"><span class="n">04</span>Impuestos</button>
@@ -194,26 +194,8 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 
 <!-- ===== 01 CARGAR GASTO ===== -->
 <section class="view on" data-v="gasto">
-  <div class="card" id="chooser_card" style="text-align:center">
-    <h2 style="margin-bottom:6px">¿Qué querés cargar?</h2>
-    <p class="lead" style="margin-bottom:18px">Elegí si es un gasto común (una factura) o un servicio recurrente (con vencimiento y pago).</p>
-    <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
-      <button class="btn" id="ch_gasto" style="min-width:180px;padding:18px 24px;font-size:15px">📄 Gasto<br><span style="font-size:11px;font-weight:400;opacity:.8">una factura para el balance</span></button>
-      <button class="btn gold" id="ch_servicio" style="min-width:180px;padding:18px 24px;font-size:15px">🔁 Servicio<br><span style="font-size:11px;font-weight:400;opacity:.8">recurrente, con vencimiento</span></button>
-    </div>
-    <div id="carga_ok" style="display:none;margin-top:22px;padding:18px;background:rgba(63,107,79,.08);border:1px solid rgba(63,107,79,.25);border-radius:12px">
-      <div id="carga_ok_msg" style="font-family:'Spectral',serif;color:#3f6b4f;margin-bottom:14px">✓ Guardado</div>
-      <div style="font-size:14px;margin-bottom:12px">¿Querés cargar otra cosa?</div>
-      <div style="display:flex;gap:12px;justify-content:center">
-        <button class="btn" id="carga_otra">Cargar otra</button>
-        <button class="btn ghost" id="carga_fin">Terminar</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="gasto_form_wrap" style="display:none">
+  <div id="gasto_form_wrap">
   <div class="card">
-    <button class="btn ghost sm" id="volver_chooser" style="margin-bottom:14px">← Volver</button>
     <h2>Registrar un gasto</h2>
     <p class="lead">Cargá cada factura con su proveedor y monto. El rubro se completa solo cuando el proveedor ya es conocido.</p>
     <div class="sectlabel">Datos de la factura</div>
@@ -232,6 +214,9 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
       <div class="f">
         <label>Monto sin IVA</label>
         <input id="g_monto" class="mono" inputmode="decimal" placeholder="0,00">
+        <label style="display:flex;gap:6px;align-items:center;cursor:pointer;margin-top:8px;text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-size:13px;color:var(--ink2)">
+          <input type="checkbox" id="g_nc"> Es nota de crédito (resta del balance y del IVA)
+        </label>
       </div>
       <div class="f">
         <label>Rubro</label>
@@ -796,27 +781,7 @@ function irA(v){
 }
 $$(".tab").forEach(t=>t.onclick=()=>irA(t.dataset.v));
 
-/* ---- chooser gasto/servicio ---- */
-$("ch_gasto").onclick=()=>{ $("chooser_card").style.display="none"; $("gasto_form_wrap").style.display="block"; };
-$("volver_chooser").onclick=()=>{ $("gasto_form_wrap").style.display="none"; $("chooser_card").style.display="block"; mostrarChooserBotones(); };
-$("ch_servicio").onclick=()=>{ if(typeof abrirNuevoServicio==="function")abrirNuevoServicio(); };
-
-/* muestra la pregunta "otra o terminar" tras guardar; vuelve al sector Cargar */
-function finCarga(msg){
-  irA("gasto");
-  $("gasto_form_wrap").style.display="none";
-  $("chooser_card").style.display="block";
-  // ocultar los botones de elección y mostrar el bloque de confirmación
-  $("ch_gasto").parentElement.style.display="none";
-  $("carga_ok_msg").textContent="✓ "+(msg||"Guardado");
-  $("carga_ok").style.display="block";
-}
-function mostrarChooserBotones(){
-  $("ch_gasto").parentElement.style.display="flex";
-  $("carga_ok").style.display="none";
-}
-$("carga_otra").onclick=()=>{ mostrarChooserBotones(); };
-$("carga_fin").onclick=()=>{ mostrarChooserBotones(); irA("balance"); };
+/* (el sector Cargar es solo gastos; los servicios se cargan desde la pestaña Servicios) */
 
 /* ---- blanco/negro: solo por código (*), sin nada visible ---- */
 function montoEsNegro(){ return $("g_monto").value.trim().startsWith("*"); }
@@ -833,15 +798,18 @@ $("g_prov").addEventListener("input",()=>{
 /* ---- IVA calc: del neto + alícuota, llena la casilla IVA ---- */
 function calcIvaShow(){
   const esNegro=montoEsNegro();
-  const neto=parseNum($("g_monto").value);
+  const esNC=$("g_nc").checked;
+  let neto=parseNum($("g_monto").value);
   const a=parseFloat($("g_alic").value);
   // Si es Tipo B (asterisco), no se computa IVA
   if(esNegro || isNaN(neto)||neto<=0){ $("g_iva").value=""; return; }
-  const iva=a>0 ? Math.round(neto*a/100*100)/100 : 0;
+  let iva=a>0 ? Math.round(neto*a/100*100)/100 : 0;
+  if(esNC)iva=-iva;  // nota de crédito: IVA negativo
   $("g_iva").value=iva.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 $("g_monto").addEventListener("input",calcIvaShow);
 $("g_alic").addEventListener("change",calcIvaShow);
+$("g_nc").addEventListener("change",calcIvaShow);
 
 /* ---- Enter pasa al siguiente campo (carga rápida) ---- */
 (function(){
@@ -876,22 +844,25 @@ $("g_add").onclick=async ()=>{
   state.memoria[k]=rubro;
   const sub=$("g_sub").value||"";
   const a=parseFloat($("g_alic").value);
-  const iva=(bn==="negro" || !(a>0)) ? 0 : Math.round(monto*a/100*100)/100;
+  const esNC=$("g_nc").checked;
+  let iva=(bn==="negro" || !(a>0)) ? 0 : Math.round(monto*a/100*100)/100;
   const piva=parseNum($("g_piva").value)||0;
   const piibb=parseNum($("g_piibb").value)||0;
+  // nota de crédito: monto, IVA y percepciones en negativo (restan)
+  let montoF=monto, ivaF=iva, pivaF=piva, piibbF=piibb;
+  if(esNC){ montoF=-monto; ivaF=-iva; pivaF=-piva; piibbF=-piibb; }
   const id=uid();
-  state.gastos.push({id,fecha,prov,rubro,sub,monto,bn,iva,piva,piibb});
+  state.gastos.push({id,fecha,prov,rubro,sub,monto:montoF,bn,iva:ivaF,piva:pivaF,piibb:piibbF});
   if(nuevo)showMsg("g_msg","learn",`✓ Aprendido: "<b>${prov}</b>" → ${rubro}. La próxima se completa solo.`);
-  else showMsg("g_msg","ok",`Gasto agregado: ${money(monto)} + IVA ${money(iva)} · ${rubro}${sub?" · "+sub:""} · <b>Tipo ${bn==="negro"?"B":"A"}</b>.`);
+  else showMsg("g_msg","ok",`${esNC?"Nota de crédito":"Gasto"} agregad${esNC?"a":"o"}: ${money(montoF)}${ivaF?" + IVA "+money(ivaF):""} · ${rubro}${sub?" · "+sub:""} · <b>Tipo ${bn==="negro"?"B":"A"}</b>.`);
   $("g_prov").value="";$("g_monto").value="";$("g_sub").value="";
   $("g_piva").value="";$("g_piibb").value="";$("g_iva").value="";
-  $("g_alic").value="21";
+  $("g_alic").value="21";$("g_nc").checked=false;
   updateFlag();
   renderGastos();
-  await apiPost({action:"addGasto",id,fecha,prov,rubro,sub,bn,monto,iva,piva,piibb});
-  finCarga(`Gasto de "${prov}" agregado (${money(monto)}).`);
+  await apiPost({action:"addGasto",id,fecha,prov,rubro,sub,bn,monto:montoF,iva:ivaF,piva:pivaF,piibb:piibbF});
 };
-$("g_clear").onclick=()=>{$("g_prov").value="";$("g_monto").value="";$("g_fecha").value=todayISO();$("g_sub").value="";$("g_piva").value="";$("g_piibb").value="";$("g_iva").value="";$("g_alic").value="21";updateFlag();hideMsg("g_msg");};
+$("g_clear").onclick=()=>{$("g_prov").value="";$("g_monto").value="";$("g_fecha").value=todayISO();$("g_sub").value="";$("g_piva").value="";$("g_piibb").value="";$("g_iva").value="";$("g_alic").value="21";$("g_nc").checked=false;updateFlag();hideMsg("g_msg");};
 
 
 function bnChip(bn){return bn==="negro"?'<span class="bndot ng" title="Tipo B"></span>':'<span class="bndot bl" title="Tipo A"></span>';}
@@ -1250,16 +1221,24 @@ function drawImpuestos(){
 }
 
 /* ===== PESTAÑA IMP. CHEQUE (1,2‰) ===== */
+/* Lista de meses para selectores: combina los que tienen datos con los últimos 12 meses hasta hoy */
+function mesesSelector(extra){
+  const s=new Set(mesesConDatos());
+  (extra||[]).forEach(m=>{ if(/^\d{4}-\d{2}$/.test(m))s.add(m); });
+  // agregar los últimos 12 meses hasta el actual
+  const hoy=new Date();
+  for(let i=0;i<12;i++){
+    const d=new Date(hoy.getFullYear(),hoy.getMonth()-i,1);
+    s.add(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"));
+  }
+  return [...s].filter(m=>/^\d{4}-\d{2}$/.test(m)).sort();
+}
 function renderChequeTab(){
   const sel=$("ch_mes");
-  // meses: los que tengan datos en cualquier lado + el actual
-  let meses=new Set(mesesConDatos());
-  Object.keys(state.cheque).forEach(m=>meses.add(m));
-  meses.add(curMonthISO());
-  const arr=[...meses].sort();
+  const arr=mesesSelector(Object.keys(state.cheque));
   const prev=sel.value;
   sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
-  if(arr.includes(prev))sel.value=prev; else sel.value=arr[arr.length-1];
+  if(arr.includes(prev))sel.value=prev; else sel.value=curMonthISO();
   renderChequeTabla();
 }
 /* parsea el extracto: agrupa TODOS los cargos bancarios por concepto (nombre del banco).
@@ -1290,6 +1269,38 @@ function parseCheque(texto){
   });
   return {grupos,total,ley,sircreb,ivaCom};
 }
+function imprimirDesglose(mes,grupos,total,ley,sircreb,ivaCom){
+  const fmt=n=>"$"+(Math.round((n||0)*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const filas=Object.keys(grupos).sort().map(k=>`<tr><td>${k}</td><td style="text-align:right">${fmt(grupos[k])}</td></tr>`).join("");
+  const w=window.open("","_blank");
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Desglose extracto ${ymLabel(mes)}</title>
+    <style>
+      body{font-family:Georgia,'Times New Roman',serif;color:#23201a;max-width:640px;margin:30px auto;padding:0 20px}
+      h1{font-size:22px;margin-bottom:2px} .sub{color:#666;font-size:13px;margin-bottom:20px}
+      table{width:100%;border-collapse:collapse;margin:14px 0}
+      td,th{padding:7px 10px;border-bottom:1px solid #ddd;font-size:14px}
+      th{text-align:left;background:#f5f2ec}
+      .tot td{border-top:2px solid #333;font-weight:bold}
+      .destac{margin-top:20px;display:flex;gap:20px;flex-wrap:wrap}
+      .box{border:1px solid #ccc;border-radius:8px;padding:12px 16px;min-width:150px}
+      .box .lab{font-size:11px;color:#666;text-transform:uppercase} .box .val{font-size:18px;font-weight:bold}
+      .foot{margin-top:24px;font-size:11px;color:#888;border-top:1px solid #eee;padding-top:10px}
+      @media print{button{display:none}}
+    </style></head><body>
+    <h1>Impuesto al cheque — Desglose del extracto</h1>
+    <div class="sub">EG Corrugados · ${ymLabel(mes)}</div>
+    <table><thead><tr><th>Concepto (nombre del banco)</th><th style="text-align:right">Importe</th></tr></thead>
+    <tbody>${filas}<tr class="tot"><td>Subtotal detectado</td><td style="text-align:right">${fmt(total)}</td></tr></tbody></table>
+    <div class="destac">
+      <div class="box"><div class="lab">1,2‰ (Ley 25413)</div><div class="val">${fmt(ley)}</div><div style="font-size:11px;color:#666">para Ganancias</div></div>
+      <div class="box"><div class="lab">Ret. SIRCREB</div><div class="val">${fmt(sircreb)}</div><div style="font-size:11px;color:#666">para IIBB</div></div>
+      <div class="box"><div class="lab">IVA comisiones</div><div class="val">${fmt(ivaCom)}</div><div style="font-size:11px;color:#666">crédito fiscal</div></div>
+    </div>
+    <div class="foot">Generado por Balance Interno — ${new Date().toLocaleDateString("es-AR")}. Valores estimativos para control interno.</div>
+    <button onclick="window.print()" style="margin-top:20px;padding:10px 20px;font-size:14px;cursor:pointer">Imprimir</button>
+    </body></html>`);
+  w.document.close();
+}
 $("ch_calc").onclick=()=>{
   const texto=$("ch_texto").value;
   if(!texto.trim()){showMsg("ch_msg","learn","Pegá primero el texto del extracto.");return;}
@@ -1309,8 +1320,9 @@ $("ch_calc").onclick=()=>{
       <div class="led"><div class="l">Ret. SIRCREB</div><div class="v">${money0(sircreb)}</div><div class="sub">→ IIBB</div></div>
       <div class="led"><div class="l">IVA comisiones</div><div class="v">${money0(ivaCom)}</div></div>
     </div>
-    <div class="row-actions"><button class="btn" id="ch_save">Guardar ${ymLabel($("ch_mes").value)}</button></div>
+    <div class="row-actions"><button class="btn" id="ch_save">Guardar ${ymLabel($("ch_mes").value)}</button><button class="btn ghost" id="ch_print">🖨 Imprimir desglose</button></div>
     <small class="note">Al guardar: el 1,2‰ va al registro de abajo (para Ganancias) y las retenciones SIRCREB se cargan como "Retenciones bancarias IIBB" del mes en Impuestos. El desglose completo es informativo, para que lo compares con tu planilla.</small>`;
+  $("ch_print").onclick=()=>imprimirDesglose($("ch_mes").value,grupos,total,ley,sircreb,ivaCom);
   $("ch_save").onclick=async ()=>{
     const mes=$("ch_mes").value;
     const prevComp=(state.cheque[mes]||{}).compensado||false;
@@ -1396,9 +1408,12 @@ function normMes(m){
 }
 function renderServicios(){
   const sel=$("sv_mes");
-  // normalizar meses rotos de los servicios (corrige datos viejos guardados mal) y re-guardar
-  state.servicios.forEach(s=>{ const n=normMes(s.mes); if(n && n!==s.mes){ s.mes=n; apiPost(Object.assign({action:"setServicio"},s)); } });
-  let meses=new Set(mesesConDatos());
+  // el mes de cada servicio debe reflejar su vencimiento; corregir y re-guardar los que difieran
+  state.servicios.forEach(s=>{
+    const correcto = normMes(s.venc) || normMes(s.mes) || "";
+    if(correcto && correcto!==s.mes){ s.mes=correcto; apiPost(Object.assign({action:"setServicio"},s)); }
+  });
+  let meses=new Set(mesesSelector(state.servicios.map(s=>s.mes)));
   state.servicios.forEach(s=>{if(s.mes)meses.add(s.mes);});
   meses.add(curMonthISO());
   // solo meses válidos YYYY-MM
@@ -1829,8 +1844,8 @@ $("eds_save").onclick=async ()=>{
   s.piva=esNegro?0:(parseNum($("eds_piva").value)||0);
   s.piibb=parseNum($("eds_piibb").value)||0;
   s.obs=$("eds_obs").value.trim();
-  // el mes del servicio sale de la fecha de emisión (o vencimiento); nunca una fecha completa
-  s.mes=normMes(s.fechaEmision)||normMes(s.venc)||curMonthISO();
+  // el mes del servicio sale de la fecha de VENCIMIENTO (lo que pago en julio, va en julio)
+  s.mes=normMes(s.venc)||normMes(s.fechaEmision)||curMonthISO();
   const mandarBalance=$("eds_albalance").checked;
   const bn=s.bn;
 
@@ -1856,7 +1871,7 @@ $("eds_save").onclick=async ()=>{
   $("eds_overlay").style.display="none";
   drawServicios();
   await apiPost(Object.assign({action:"setServicio"},s));
-  finCarga(`Servicio "${s.servicio}" guardado${mandarBalance?" y enviado al balance":""}.`);
+  showMsg("sv_msg","ok",`Servicio "${s.servicio}" guardado${mandarBalance?" y enviado al balance":""}.`);
 };
 
 /* ===== RESUMEN ANUAL ===== */
