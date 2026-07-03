@@ -184,11 +184,12 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <button class="tab" data-v="impuestos"><span class="n">04</span>Impuestos</button>
     <button class="tab" data-v="cheque"><span class="n">05</span>Imp. Cheque</button>
     <button class="tab" data-v="servicios"><span class="n">06</span>Servicios</button>
-    <button class="tab" data-v="vencim"><span class="n">07</span>Vencimientos</button>
-    <button class="tab" data-v="chemit"><span class="n">08</span>Cheques emitidos</button>
-    <button class="tab" data-v="resumen"><span class="n">09</span>Resumen anual</button>
-    <button class="tab" data-v="informes"><span class="n">10</span>Informes</button>
-    <button class="tab" data-v="datos"><span class="n">11</span>Datos</button>
+    <button class="tab" data-v="sueldos"><span class="n">07</span>Sueldos</button>
+    <button class="tab" data-v="vencim"><span class="n">08</span>Vencimientos</button>
+    <button class="tab" data-v="chemit"><span class="n">09</span>Cheques emitidos</button>
+    <button class="tab" data-v="resumen"><span class="n">10</span>Resumen anual</button>
+    <button class="tab" data-v="informes"><span class="n">11</span>Informes</button>
+    <button class="tab" data-v="datos"><span class="n">12</span>Datos</button>
   </nav>
 </header>
 
@@ -495,6 +496,77 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   </div>
 </section>
 
+<!-- ===== 07 SUELDOS ===== -->
+<section class="view" data-v="sueldos">
+  <div class="card">
+    <h2>Sueldos, CCSS y sindicato</h2>
+    <p class="lead">Cargá los sueldos del mes por empleado (A = blanco, B = mano/negro), con quincena, vacaciones y SAC. Abajo, CCSS (931, SIN/FED) y boletas sindicales.</p>
+    <div class="grid" style="grid-template-columns:auto auto;gap:14px;max-width:520px;align-items:end;margin-bottom:8px">
+      <div class="f"><label>Mes</label><select id="su_mes"></select></div>
+      <div class="row-actions" style="margin:0">
+        <button class="btn ghost sm" id="su_seed" title="Cargar la lista de empleados">Cargar empleados</button>
+        <button class="btn ghost sm" id="su_addemp">+ Empleado</button>
+      </div>
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;cursor:pointer;margin:10px 0;text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-size:14px">
+      <input type="checkbox" id="su_albalance" checked> Enviar sueldos al análisis de gastos del mes (A=Tipo A, B=Tipo B)
+    </label>
+    <div style="overflow-x:auto"><table id="su_tbl"><tbody></tbody></table></div>
+    <div id="su_resumen" class="ledger" style="margin-top:16px"></div>
+  </div>
+
+  <div class="card">
+    <h3>CCSS y sindicato</h3>
+    <p class="lead">Cargas sociales y boletas sindicales del mes.</p>
+    <div style="overflow-x:auto"><table id="su_ccss_tbl"><tbody></tbody></table></div>
+    <div class="row-actions"><button class="btn ghost sm" id="su_addccss">+ Agregar concepto</button></div>
+  </div>
+
+  <!-- Modal editar empleado/sueldo -->
+  <div id="sum_overlay" style="display:none;position:fixed;inset:0;background:rgba(35,32,26,.55);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px">
+    <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:620px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+      <h2 style="margin-top:0" id="sum_title">Sueldo del empleado</h2>
+      <div class="f"><label>Empleado</label><input id="sum_nombre"></div>
+      <div class="sectlabel" style="margin-top:16px">Sueldos A (blanco)</div>
+      <div class="grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="f"><label>Depositado</label><input id="sum_depA" class="mono" inputmode="decimal" placeholder="0"></div>
+        <div class="f"><label>Vacaciones</label><input id="sum_vacA" class="mono" inputmode="decimal" placeholder="0"></div>
+        <div class="f"><label>SAC</label><input id="sum_sacA" class="mono" inputmode="decimal" placeholder="0"></div>
+      </div>
+      <div class="sectlabel" style="margin-top:16px">Sueldos B (mano)</div>
+      <div class="grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="f"><label>Mano</label><input id="sum_manoB" class="mono" inputmode="decimal" placeholder="0"></div>
+        <div class="f"><label>Vacaciones</label><input id="sum_vacB" class="mono" inputmode="decimal" placeholder="0"></div>
+        <div class="f"><label>SAC</label><input id="sum_sacB" class="mono" inputmode="decimal" placeholder="0"></div>
+      </div>
+      <input type="hidden" id="sum_id">
+      <div class="msg" id="sum_msg"></div>
+      <div class="row-actions" style="margin-top:18px">
+        <button class="btn" id="sum_save">Guardar</button>
+        <button class="btn ghost" id="sum_cancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal CCSS -->
+  <div id="succ_overlay" style="display:none;position:fixed;inset:0;background:rgba(35,32,26,.55);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px">
+    <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:520px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+      <h2 style="margin-top:0">Concepto CCSS / sindicato</h2>
+      <div class="f"><label>Concepto</label><input id="succ_nombre" list="succ_list" placeholder="931, SIN/FED, Sindicato…"><datalist id="succ_list"><option value="931"><option value="SIN/FED"><option value="Sindicato"></datalist></div>
+      <div class="f" style="margin-top:14px"><label>Monto</label><input id="succ_monto" class="mono" inputmode="decimal" placeholder="0"></div>
+      <label style="display:flex;gap:8px;align-items:center;cursor:pointer;margin-top:14px;text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-size:14px">
+        <input type="checkbox" id="succ_albalance" checked> Enviar al análisis de gastos del mes
+      </label>
+      <input type="hidden" id="succ_id">
+      <div class="msg" id="succ_msg"></div>
+      <div class="row-actions" style="margin-top:18px">
+        <button class="btn" id="succ_save">Guardar</button>
+        <button class="btn ghost" id="succ_cancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ===== 07 VENCIMIENTOS ===== -->
 <section class="view" data-v="vencim">
   <div class="card">
@@ -673,7 +745,7 @@ const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","S
 const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
 /* ===================================================================== */
 
-let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[], chequesEmit:[] };  // impuestos: {"2026-01":{...}}
+let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[], chequesEmit:[], sueldos:[] };  // impuestos: {"2026-01":{...}}
 let balView="total";
 const $=id=>document.getElementById(id);
 /* Normaliza proveedor: saca espacios extra y pone Mayúscula Inicial en cada palabra */
@@ -724,7 +796,7 @@ function setSync(estado,txt){ const b=$("savebox");
 /* ---- llamadas a la planilla ---- */
 async function apiGet(){
   const r=await fetch(API); const j=await r.json();
-  if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; state.chequesEmit=j.data.chequesEmit||[]; }
+  if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; state.chequesEmit=j.data.chequesEmit||[]; state.sueldos=j.data.sueldos||[]; }
   return j;
 }
 async function apiPost(payload){
@@ -776,6 +848,7 @@ function irA(v){
   if(v==="servicios")renderServicios();
   if(v==="vencim")renderVencimientos();
   if(v==="chemit")renderChequesEmit();
+  if(v==="sueldos")renderSueldos();
   if(v==="informes")applyFilters();
   if(v==="datos")renderStats();
 }
@@ -1029,7 +1102,8 @@ function gastoVal(g,bn){ if(bn==="total")return g.monto; return g.bn===bn?g.mont
 function ventaVal(k,bn){ const v=state.ventas[k]; if(!v)return 0; if(bn==="total")return v.blanco+v.negro; return v[bn]||0; }
 function mesesConDatos(){
   const s=new Set([...state.gastos.map(g=>ym(g.fecha)),...Object.keys(state.ventas)]);
-  return [...s].sort();
+  // solo meses válidos YYYY-MM (descarta fechas rotas tipo "Mon Jun 01 2026...")
+  return [...s].map(m=>normMes(m)).filter(m=>/^\d{4}-\d{2}$/.test(m)).sort();
 }
 
 /* ---- balance mensual ---- */
@@ -1096,6 +1170,7 @@ function applyFilters(){
 /* ===== PESTAÑA IMPUESTOS ===== */
 const DEF_ALIC=3, DEF_CC=87.76, DEF_CB=12.24;
 function datosMes(mes){ // datos cargados a mano para el mes, con defaults
+  mes=normMes(mes);
   const d=state.impuestos[mes]||{};
   return {
     ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
@@ -1105,8 +1180,8 @@ function datosMes(mes){ // datos cargados a mano para el mes, con defaults
 function mesAnterior(mes){ const [y,m]=mes.split("-").map(Number); const d=new Date(y,m-2,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
 
 function renderImpuestosTab(){
-  const sel=$("t_mes"); const meses=mesesConDatos();
-  const prev=sel.value;
+  const sel=$("t_mes"); const meses=mesesSelector();
+  const prev=normMes(sel.value);
   sel.innerHTML=meses.length?meses.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join(""):`<option value="">Sin datos</option>`;
   if(meses.includes(prev))sel.value=prev; else if(meses.length)sel.value=meses[meses.length-1];
   sel.onchange=()=>{cargarFormImp();drawImpuestos();};
@@ -1114,7 +1189,7 @@ function renderImpuestosTab(){
   drawImpuestos();
 }
 function cargarFormImp(){
-  const mes=$("t_mes").value; if(!mes)return;
+  const mes=normMes($("t_mes").value); if(!mes)return;
   const d=datosMes(mes);
   const f=n=>n?n.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2}):"";
   $("t_retbanc").value=f(d.retBancIIBB);
@@ -1125,7 +1200,7 @@ function cargarFormImp(){
   $("t_cb").value=d.coefBsAs;
 }
 $("t_save").onclick=async ()=>{
-  const mes=$("t_mes").value; if(!mes){showMsg("t_msg","learn","No hay mes seleccionado.");return;}
+  const mes=normMes($("t_mes").value); if(!mes){showMsg("t_msg","learn","No hay mes seleccionado.");return;}
   const ivaExtractoPrev=(state.impuestos[mes]||{}).ivaExtracto||0;  // preservar lo que vino del extracto
   const payload={
     mes,
@@ -1144,6 +1219,7 @@ $("t_save").onclick=async ()=>{
 };
 
 function ivaMes(mes){ // calcula componentes de IVA del mes
+  mes=normMes(mes);
   const gm=state.gastos.filter(g=>ym(g.fecha)===mes);
   const ivaCompraFc=gm.reduce((s,x)=>s+(x.iva||0),0);
   const ivaBanco=(state.impuestos[mes]||{}).ivaExtracto||0;
@@ -1155,6 +1231,7 @@ function ivaMes(mes){ // calcula componentes de IVA del mes
   return {ivaVentas,ivaCompra,ivaCompraFc,ivaBanco,percIVA,retIVA,estim};
 }
 function iibbMes(mes){
+  mes=normMes(mes);
   const d=datosMes(mes);
   const v=state.ventas[mes]||{};
   const ventasNetas=(v.blanco||0)+(v.negro||0);
@@ -1170,7 +1247,7 @@ function iibbMes(mes){
 }
 
 function drawImpuestos(){
-  const mes=$("t_mes").value;
+  const mes=normMes($("t_mes").value);
   if(!mes){$("t_iva").innerHTML=`<div class="empty">No hay datos.</div>`;$("t_iibb").innerHTML="";return;}
   const d=datosMes(mes);
   // ---- IVA ----
@@ -1430,6 +1507,10 @@ function diasAlVenc(venc){
   const v=new Date(venc+"T00:00:00");
   return Math.round((v-hoy)/86400000);
 }
+function totalPagarServicio(s){
+  // lo que realmente sale de la cuenta: neto + IVA + percep. IVA + percep. IIBB
+  return (s.monto||0)+(s.iva||0)+(s.piva||0)+(s.piibb||0);
+}
 function drawServicios(){
   const mes=$("sv_mes").value;
   const items=state.servicios.filter(s=>s.mes===mes);
@@ -1441,7 +1522,7 @@ function drawServicios(){
     $("sv_resumen").innerHTML="";
     return;
   }
-  let h=`<tr><th class="l">Servicio</th><th class="l">Cat.</th><th class="l">Vence</th><th class="l">Tipo pago</th><th class="l">Entidad</th><th class="num">Monto</th><th>Estado</th><th></th></tr>`;
+  let h=`<tr><th class="l">Servicio</th><th class="l">Cat.</th><th class="l">Vence</th><th class="l">Tipo pago</th><th class="l">Entidad</th><th class="num">Total a pagar</th><th>Estado</th><th></th></tr>`;
   items.forEach(s=>{
     const d=diasAlVenc(s.venc);
     let alerta="",cls="";
@@ -1450,21 +1531,22 @@ function drawServicios(){
       else if(d===0){alerta="VENCE HOY";cls="venc-rojo";}
       else if(d<=3){alerta="vence pronto";cls="venc-amar";}
     }
+    const tot=totalPagarServicio(s);
     h+=`<tr class="${cls}">
       <td class="l">${s.servicio}</td>
       <td class="l"><span style="font-size:11px;color:var(--faint)">${s.categoria||""}</span></td>
       <td class="l">${s.venc?fechaLinda(s.venc):'<span style="color:var(--faint)">—</span>'}${alerta?` <span class="alerta-chip">${alerta}</span>`:""}</td>
       <td class="l"><span style="font-size:12px">${s.tipoPago||""}</span></td>
       <td class="l"><span style="font-size:12px">${s.entidad||""}</span></td>
-      <td class="num">${s.monto?money(s.monto):'<span style="color:var(--faint)">—</span>'}</td>
+      <td class="num">${tot?money(tot):'<span style="color:var(--faint)">—</span>'}</td>
       <td><button class="estado-btn ${s.estado==="Pagado"?'pagado':'pend'}" data-est="${s.id}">${s.estado==="Pagado"?"Pagado":"Pendiente"}</button></td>
       <td style="white-space:nowrap">${s.enBalance?'<span title="Ya está en el balance" style="color:var(--green);font-size:13px">✓$</span> ':''}<button class="del" data-eds="${s.id}" title="Cargar / editar factura">✎</button> <button class="del" data-dels="${s.id}" title="Borrar">✕</button></td>
     </tr>`;
   });
   tb.innerHTML=h;
-  // resumen
-  const total=items.reduce((s,x)=>s+(x.monto||0),0);
-  const pagado=items.filter(x=>x.estado==="Pagado").reduce((s,x)=>s+(x.monto||0),0);
+  // resumen (con total a pagar)
+  const total=items.reduce((a,x)=>a+totalPagarServicio(x),0);
+  const pagado=items.filter(x=>x.estado==="Pagado").reduce((a,x)=>a+totalPagarServicio(x),0);
   const pend=total-pagado;
   $("sv_resumen").innerHTML=
     `<div class="led"><div class="l">Total del mes</div><div class="v">${money0(total)}</div></div>
@@ -1496,6 +1578,206 @@ function drawServicios(){
   tb.querySelectorAll("[data-eds]").forEach(b=>b.onclick=()=>abrirEditServicio(b.dataset.eds));
 }
 function curISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
+/* ===== SUELDOS, CCSS Y SINDICATO ===== */
+const EMP_BASE=["Bianchini","Cacavelos","Fotini","Gutman","Escalada","Gomez","Longoni","Candia","Dittrich","Duarte"];
+function totA(s){ return (s.depA||0)+(s.vacA||0)+(s.sacA||0); }
+function totB(s){ return (s.manoB||0)+(s.vacB||0)+(s.sacB||0); }
+function renderSueldos(){
+  const sel=$("su_mes");
+  const arr=mesesSelector(state.sueldos.map(s=>s.mes));
+  const prev=normMes(sel.value);
+  sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
+  sel.value=arr.includes(prev)?prev:curMonthISO();
+  sel.onchange=renderSueldos;
+  drawSueldos();
+}
+function drawSueldos(){
+  const mes=$("su_mes").value;
+  const emps=state.sueldos.filter(s=>s.mes===mes && s.tipo==="empleado");
+  const tb=$("su_tbl").querySelector("tbody");
+  if(!emps.length){
+    tb.innerHTML=`<tr><td colspan="9"><div class="empty">No hay empleados cargados para ${ymLabel(mes)}. Usá "Cargar empleados" o "+ Empleado".</div></td></tr>`;
+  } else {
+    let h=`<tr><th class="l">Empleado</th><th class="num">Dep. A</th><th class="num">Vac. A</th><th class="num">SAC A</th><th class="num">Mano B</th><th class="num">Vac. B</th><th class="num">SAC B</th><th class="num">Total</th><th></th></tr>`;
+    emps.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    emps.forEach(s=>{
+      const ta=totA(s), tbb=totB(s);
+      h+=`<tr>
+        <td class="l">${s.nombre}</td>
+        <td class="num">${s.depA?money(s.depA):'·'}</td>
+        <td class="num">${s.vacA?money(s.vacA):'·'}</td>
+        <td class="num">${s.sacA?money(s.sacA):'·'}</td>
+        <td class="num">${s.manoB?money(s.manoB):'·'}</td>
+        <td class="num">${s.vacB?money(s.vacB):'·'}</td>
+        <td class="num">${s.sacB?money(s.sacB):'·'}</td>
+        <td class="num"><b>${money(ta+tbb)}</b></td>
+        <td style="white-space:nowrap"><button class="del" data-edsu="${s.id}" title="Editar">✎</button> <button class="del" data-delsu="${s.id}" title="Borrar">✕</button></td>
+      </tr>`;
+    });
+    tb.innerHTML=h;
+    tb.querySelectorAll("[data-edsu]").forEach(b=>b.onclick=()=>abrirEditSueldo(b.dataset.edsu));
+    tb.querySelectorAll("[data-delsu]").forEach(b=>b.onclick=async ()=>{
+      if(confirm("¿Borrar este empleado del mes?")){ const id=b.dataset.delsu; const s=state.sueldos.find(x=>x.id===id);
+        if(s){ if(s.gastoIdA){state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdA);await apiPost({action:"deleteGasto",id:s.gastoIdA});}
+               if(s.gastoIdB){state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdB);await apiPost({action:"deleteGasto",id:s.gastoIdB});} }
+        state.sueldos=state.sueldos.filter(x=>x.id!==id); drawSueldos(); await apiPost({action:"deleteSueldo",id}); }
+    });
+  }
+  const totalA=emps.reduce((a,s)=>a+totA(s),0);
+  const totalB=emps.reduce((a,s)=>a+totB(s),0);
+  $("su_resumen").innerHTML=
+    `<div class="led"><div class="l">Total A (blanco)</div><div class="v">${money0(totalA)}</div><div class="sub">depositado + vac + SAC</div></div>
+     <div class="led"><div class="l">Total B (mano)</div><div class="v">${money0(totalB)}</div><div class="sub">mano + vac + SAC</div></div>
+     <div class="led" style="border-color:var(--gold)"><div class="l">Total A+B</div><div class="v">${money0(totalA+totalB)}</div><div class="sub">sueldos del mes</div></div>`;
+  drawCCSS();
+}
+function drawCCSS(){
+  const mes=$("su_mes").value;
+  const items=state.sueldos.filter(s=>s.mes===mes && s.tipo==="ccss");
+  const tb=$("su_ccss_tbl").querySelector("tbody");
+  if(!items.length){
+    tb.innerHTML=`<tr><td colspan="3"><div class="empty">No hay conceptos de CCSS/sindicato para ${ymLabel(mes)}.</div></td></tr>`;
+    return;
+  }
+  let h=`<tr><th class="l">Concepto</th><th class="num">Monto</th><th></th></tr>`;
+  let tot=0;
+  items.forEach(s=>{ tot+=s.monto||0;
+    h+=`<tr><td class="l">${s.nombre}</td><td class="num">${money(s.monto)}</td>
+      <td style="white-space:nowrap"><button class="del" data-edcc="${s.id}" title="Editar">✎</button> <button class="del" data-delcc="${s.id}" title="Borrar">✕</button></td></tr>`;
+  });
+  h+=`<tr class="tot"><td class="l"><b>Total CCSS + sindicato</b></td><td class="num"><b>${money(tot)}</b></td><td></td></tr>`;
+  tb.innerHTML=h;
+  tb.querySelectorAll("[data-edcc]").forEach(b=>b.onclick=()=>abrirEditCCSS(b.dataset.edcc));
+  tb.querySelectorAll("[data-delcc]").forEach(b=>b.onclick=async ()=>{
+    if(confirm("¿Borrar este concepto?")){ const id=b.dataset.delcc; const s=state.sueldos.find(x=>x.id===id);
+      if(s&&s.gastoIdA){state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdA);await apiPost({action:"deleteGasto",id:s.gastoIdA});}
+      state.sueldos=state.sueldos.filter(x=>x.id!==id); drawCCSS(); await apiPost({action:"deleteSueldo",id}); }
+  });
+}
+$("su_seed").onclick=async ()=>{
+  const mes=$("su_mes").value;
+  const existentes=new Set(state.sueldos.filter(s=>s.mes===mes&&s.tipo==="empleado").map(s=>s.nombre.toLowerCase()));
+  const faltan=EMP_BASE.filter(n=>!existentes.has(n.toLowerCase()));
+  if(!faltan.length){showMsg("su_msg","ok","Ya están todos los empleados.");return;}
+  const nuevos=faltan.map(n=>({id:uid(),mes,tipo:"empleado",nombre:n,depA:0,vacA:0,sacA:0,manoB:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""}));
+  nuevos.forEach(n=>state.sueldos.push(n));
+  drawSueldos();
+  for(const n of nuevos){ await apiPost(Object.assign({action:"setSueldo"},n)); }
+};
+$("su_addemp").onclick=()=>{
+  const mes=$("su_mes").value;
+  const nuevo={id:uid(),mes,tipo:"empleado",nombre:"",depA:0,vacA:0,sacA:0,manoB:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""};
+  state.sueldos.push(nuevo);
+  abrirEditSueldo(nuevo.id);
+};
+$("su_addccss").onclick=()=>{
+  const mes=$("su_mes").value;
+  const nuevo={id:uid(),mes,tipo:"ccss",nombre:"",depA:0,vacA:0,sacA:0,manoB:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""};
+  state.sueldos.push(nuevo);
+  abrirEditCCSS(nuevo.id);
+};
+function abrirEditSueldo(id){
+  const s=state.sueldos.find(x=>x.id===id); if(!s)return;
+  $("sum_id").value=s.id;
+  $("sum_nombre").value=s.nombre||"";
+  $("sum_depA").value=s.depA||""; $("sum_vacA").value=s.vacA||""; $("sum_sacA").value=s.sacA||"";
+  $("sum_manoB").value=s.manoB||""; $("sum_vacB").value=s.vacB||""; $("sum_sacB").value=s.sacB||"";
+  hideMsg("sum_msg");
+  $("sum_overlay").style.display="flex";
+}
+function sueldoCancelar(){
+  const s=state.sueldos.find(x=>x.id===$("sum_id").value);
+  if(s && !s.nombre && !totA(s) && !totB(s)){ state.sueldos=state.sueldos.filter(x=>x.id!==s.id); }
+  $("sum_overlay").style.display="none"; drawSueldos();
+}
+$("sum_cancel").onclick=sueldoCancelar;
+$("sum_overlay").addEventListener("click",e=>{ if(e.target===$("sum_overlay"))sueldoCancelar(); });
+$("sum_save").onclick=async ()=>{
+  const s=state.sueldos.find(x=>x.id===$("sum_id").value); if(!s)return;
+  s.nombre=$("sum_nombre").value.trim()||"Empleado";
+  s.depA=parseNum($("sum_depA").value)||0; s.vacA=parseNum($("sum_vacA").value)||0; s.sacA=parseNum($("sum_sacA").value)||0;
+  s.manoB=parseNum($("sum_manoB").value)||0; s.vacB=parseNum($("sum_vacB").value)||0; s.sacB=parseNum($("sum_sacB").value)||0;
+  const alBalance=$("su_albalance").checked;
+  await sueldoAlBalance(s,alBalance);
+  $("sum_overlay").style.display="none";
+  drawSueldos();
+  await apiPost(Object.assign({action:"setSueldo"},s));
+  showMsg("su_msg","ok",`Sueldo de "${s.nombre}" guardado.`);
+};
+function abrirEditCCSS(id){
+  const s=state.sueldos.find(x=>x.id===id); if(!s)return;
+  $("succ_id").value=s.id;
+  $("succ_nombre").value=s.nombre||"";
+  $("succ_monto").value=s.monto||"";
+  $("succ_albalance").checked=true;
+  hideMsg("succ_msg");
+  $("succ_overlay").style.display="flex";
+}
+function ccssCancelar(){
+  const s=state.sueldos.find(x=>x.id===$("succ_id").value);
+  if(s && !s.nombre && !s.monto){ state.sueldos=state.sueldos.filter(x=>x.id!==s.id); }
+  $("succ_overlay").style.display="none"; drawCCSS();
+}
+$("succ_cancel").onclick=ccssCancelar;
+$("succ_overlay").addEventListener("click",e=>{ if(e.target===$("succ_overlay"))ccssCancelar(); });
+$("succ_save").onclick=async ()=>{
+  const s=state.sueldos.find(x=>x.id===$("succ_id").value); if(!s)return;
+  s.nombre=$("succ_nombre").value.trim()||"CCSS";
+  s.monto=parseNum($("succ_monto").value)||0;
+  const alBalance=$("succ_albalance").checked;
+  if(alBalance && s.monto>0){
+    const fecha=($("su_mes").value)+"-01";
+    if(s.gastoIdA && state.gastos.find(g=>g.id===s.gastoIdA)){
+      const g=state.gastos.find(x=>x.id===s.gastoIdA);
+      Object.assign(g,{fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:s.nombre,monto:s.monto,iva:0,piva:0,piibb:0,bn:"blanco"});
+      await apiPost({action:"updateGasto",id:s.gastoIdA,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:s.nombre,bn:"blanco",monto:s.monto,iva:0,piva:0,piibb:0});
+    } else {
+      const gid=uid();
+      state.gastos.push({id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:s.nombre,monto:s.monto,bn:"blanco",iva:0,piva:0,piibb:0});
+      s.gastoIdA=gid;
+      await apiPost({action:"addGasto",id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:s.nombre,bn:"blanco",monto:s.monto,iva:0,piva:0,piibb:0});
+    }
+  } else if(s.gastoIdA && state.gastos.find(g=>g.id===s.gastoIdA)){
+    state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdA); await apiPost({action:"deleteGasto",id:s.gastoIdA}); s.gastoIdA="";
+  }
+  $("succ_overlay").style.display="none";
+  drawCCSS();
+  await apiPost(Object.assign({action:"setSueldo"},s));
+  showMsg("su_msg","ok",`Concepto "${s.nombre}" guardado.`);
+};
+async function sueldoAlBalance(s,alBalance){
+  const fecha=(s.mes)+"-01";
+  const ta=totA(s), tb=totB(s);
+  if(alBalance && ta>0){
+    if(s.gastoIdA && state.gastos.find(g=>g.id===s.gastoIdA)){
+      const g=state.gastos.find(x=>x.id===s.gastoIdA);
+      Object.assign(g,{fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",monto:ta,iva:0,piva:0,piibb:0,bn:"blanco"});
+      await apiPost({action:"updateGasto",id:s.gastoIdA,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",bn:"blanco",monto:ta,iva:0,piva:0,piibb:0});
+    } else {
+      const gid=uid();
+      state.gastos.push({id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",monto:ta,bn:"blanco",iva:0,piva:0,piibb:0});
+      s.gastoIdA=gid;
+      await apiPost({action:"addGasto",id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",bn:"blanco",monto:ta,iva:0,piva:0,piibb:0});
+    }
+  } else if(s.gastoIdA && state.gastos.find(g=>g.id===s.gastoIdA)){
+    state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdA); await apiPost({action:"deleteGasto",id:s.gastoIdA}); s.gastoIdA="";
+  }
+  if(alBalance && tb>0){
+    if(s.gastoIdB && state.gastos.find(g=>g.id===s.gastoIdB)){
+      const g=state.gastos.find(x=>x.id===s.gastoIdB);
+      Object.assign(g,{fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",monto:tb,iva:0,piva:0,piibb:0,bn:"negro"});
+      await apiPost({action:"updateGasto",id:s.gastoIdB,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",bn:"negro",monto:tb,iva:0,piva:0,piibb:0});
+    } else {
+      const gid=uid();
+      state.gastos.push({id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",monto:tb,bn:"negro",iva:0,piva:0,piibb:0});
+      s.gastoIdB=gid;
+      await apiPost({action:"addGasto",id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",bn:"negro",monto:tb,iva:0,piva:0,piibb:0});
+    }
+  } else if(s.gastoIdB && state.gastos.find(g=>g.id===s.gastoIdB)){
+    state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdB); await apiPost({action:"deleteGasto",id:s.gastoIdB}); s.gastoIdB="";
+  }
+}
 
 /* ===== CHEQUES EMITIDOS ===== */
 function parseChequesEmit(texto){
@@ -1621,9 +1903,9 @@ function drawAvisoCaja(){
   const totalYa=yaSalen.reduce((s,c)=>s+c.monto,0);
   const totalVen=porVenir.reduce((s,c)=>s+c.monto,0);
   // servicios pendientes en el rango (para el total por separado)
-  const servPend=state.servicios.filter(s=>s.estado!=="Pagado"&&s.venc&&s.monto>0);
-  const servYa=servPend.filter(s=>diasAlVenc(s.venc)<=0).reduce((a,s)=>a+s.monto,0);
-  const servVen=servPend.filter(s=>{const d=diasAlVenc(s.venc);return d>0&&d<=rango;}).reduce((a,s)=>a+s.monto,0);
+  const servPend=state.servicios.filter(s=>s.estado!=="Pagado"&&s.venc&&totalPagarServicio(s)>0);
+  const servYa=servPend.filter(s=>diasAlVenc(s.venc)<=0).reduce((a,s)=>a+totalPagarServicio(s),0);
+  const servVen=servPend.filter(s=>{const d=diasAlVenc(s.venc);return d>0&&d<=rango;}).reduce((a,s)=>a+totalPagarServicio(s),0);
   $("che_aviso").innerHTML=
     `<div class="led"><div class="l">Cheques — ya pueden salir</div><div class="v ${totalYa>0?'neg':''}">${money0(totalYa)}</div><div class="sub">${yaSalen.length} cheque(s) no cobrados</div></div>
      <div class="led"><div class="l">Cheques — por venir (${rango}d)</div><div class="v">${money0(totalVen)}</div><div class="sub">${porVenir.length} cheque(s)</div></div>
@@ -1668,15 +1950,15 @@ function drawVencimientos(){
       <td class="l">${s.servicio}</td>
       <td class="l"><span style="font-size:12px;color:var(--faint)">${ymLabel(s.mes)}</span></td>
       <td class="l"><span style="font-size:12px">${s.tipoPago||""}</span></td>
-      <td class="num">${s.monto?money(s.monto):'<span style="color:var(--faint)">—</span>'}</td>
+      <td class="num">${totalPagarServicio(s)?money(totalPagarServicio(s)):'<span style="color:var(--faint)">—</span>'}</td>
       <td>${s.estado==="Pagado"?'<span style="color:var(--green);font-size:12px">✓ Pagado</span>':'<span style="font-size:12px;color:var(--ink2)">Pendiente</span>'}</td>
     </tr>`;
   });
   tb.innerHTML=h;
   // resumen: total a pagar (pendiente) en el rango, separado por tipo de pago
   const pend=items.filter(({s})=>s.estado!=="Pagado");
-  const totalPend=pend.reduce((acc,{s})=>acc+(s.monto||0),0);
-  const debito=pend.filter(({s})=>/d[ée]bito/i.test(s.tipoPago)).reduce((acc,{s})=>acc+(s.monto||0),0);
+  const totalPend=pend.reduce((acc,{s})=>acc+totalPagarServicio(s),0);
+  const debito=pend.filter(({s})=>/d[ée]bito/i.test(s.tipoPago)).reduce((acc,{s})=>acc+totalPagarServicio(s),0);
   const transf=totalPend-debito;
   $("vc_resumen").innerHTML=
     `<div class="led"><div class="l">Total pendiente</div><div class="v ${totalPend>0?'neg':''}">${money0(totalPend)}</div><div class="sub">${pend.length} pago(s)</div></div>
