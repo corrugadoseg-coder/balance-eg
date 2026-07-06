@@ -526,18 +526,37 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   <div id="sum_overlay" style="display:none;position:fixed;inset:0;background:rgba(35,32,26,.55);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px">
     <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:620px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
       <h2 style="margin-top:0" id="sum_title">Sueldo del empleado</h2>
-      <div class="f"><label>Empleado</label><input id="sum_nombre"></div>
+      <div class="grid" style="grid-template-columns:2fr 1fr">
+        <div class="f"><label>Empleado</label><input id="sum_nombre"></div>
+        <div class="f"><label>Modalidad</label><select id="sum_modalidad"><option value="mensual">Mensual</option><option value="quincenal">Quincenal</option></select></div>
+      </div>
       <div class="sectlabel" style="margin-top:16px">Sueldos A (blanco)</div>
-      <div class="grid" style="grid-template-columns:1fr 1fr 1fr">
-        <div class="f"><label>Depositado</label><input id="sum_depA" class="mono" inputmode="decimal" placeholder="0"></div>
+      <!-- mensual A -->
+      <div class="grid sum-mensual" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="f"><label>Sueldo</label><input id="sum_depA" class="mono" inputmode="decimal" placeholder="0"></div>
         <div class="f"><label>Vacaciones</label><input id="sum_vacA" class="mono" inputmode="decimal" placeholder="0"></div>
         <div class="f"><label>SAC</label><input id="sum_sacA" class="mono" inputmode="decimal" placeholder="0"></div>
       </div>
+      <!-- quincenal A -->
+      <div class="grid sum-quincenal" style="grid-template-columns:1fr 1fr 1fr 1fr;display:none">
+        <div class="f"><label>Quincena 1</label><input id="sum_q1A" class="mono" inputmode="decimal" placeholder="0"></div>
+        <div class="f"><label>Quincena 2</label><input id="sum_q2A" class="mono" inputmode="decimal" placeholder="0"></div>
+        <div class="f"><label>Vacaciones</label><input id="sum_vacA2" class="mono" inputmode="decimal" placeholder="0"></div>
+        <div class="f"><label>SAC</label><input id="sum_sacA2" class="mono" inputmode="decimal" placeholder="0"></div>
+      </div>
       <div class="sectlabel" style="margin-top:16px">Sueldos B (mano)</div>
-      <div class="grid" style="grid-template-columns:1fr 1fr 1fr">
+      <!-- mensual B -->
+      <div class="grid sum-mensual" style="grid-template-columns:1fr 1fr 1fr">
         <div class="f"><label>Mano</label><input id="sum_manoB" class="mono" inputmode="decimal" placeholder="0"></div>
         <div class="f"><label>Vacaciones</label><input id="sum_vacB" class="mono" inputmode="decimal" placeholder="0"></div>
         <div class="f"><label>SAC</label><input id="sum_sacB" class="mono" inputmode="decimal" placeholder="0"></div>
+      </div>
+      <!-- quincenal B -->
+      <div class="grid sum-quincenal" style="grid-template-columns:1fr 1fr 1fr 1fr;display:none">
+        <div class="f"><label>Quincena 1</label><input id="sum_q1B" class="mono" inputmode="decimal" placeholder="0"></div>
+        <div class="f"><label>Quincena 2</label><input id="sum_q2B" class="mono" inputmode="decimal" placeholder="0"></div>
+        <div class="f"><label>Vacaciones</label><input id="sum_vacB2" class="mono" inputmode="decimal" placeholder="0"></div>
+        <div class="f"><label>SAC</label><input id="sum_sacB2" class="mono" inputmode="decimal" placeholder="0"></div>
       </div>
       <input type="hidden" id="sum_id">
       <div class="msg" id="sum_msg"></div>
@@ -742,7 +761,8 @@ const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","S
    Pegá acá abajo, entre las comillas, la URL que termina en /exec
    que te dio "Implementar". Igual que en pedidos-eg.
    ===================================================================== */
-const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";/* ===================================================================== */
+const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
+/* ===================================================================== */
 
 let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[], chequesEmit:[], sueldos:[] };  // impuestos: {"2026-01":{...}}
 let balView="total";
@@ -1580,8 +1600,8 @@ function curISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMo
 
 /* ===== SUELDOS, CCSS Y SINDICATO ===== */
 const EMP_BASE=["Bianchini","Cacavelos","Fotini","Gutman","Escalada","Gomez","Longoni","Candia","Dittrich","Duarte"];
-function totA(s){ return (s.depA||0)+(s.vacA||0)+(s.sacA||0); }
-function totB(s){ return (s.manoB||0)+(s.vacB||0)+(s.sacB||0); }
+function totA(s){ return (s.depA||0)+(s.q1A||0)+(s.q2A||0)+(s.vacA||0)+(s.sacA||0); }
+function totB(s){ return (s.manoB||0)+(s.q1B||0)+(s.q2B||0)+(s.vacB||0)+(s.sacB||0); }
 function renderSueldos(){
   const sel=$("su_mes");
   const arr=mesesSelector(state.sueldos.map(s=>s.mes));
@@ -1596,20 +1616,17 @@ function drawSueldos(){
   const emps=state.sueldos.filter(s=>s.mes===mes && s.tipo==="empleado");
   const tb=$("su_tbl").querySelector("tbody");
   if(!emps.length){
-    tb.innerHTML=`<tr><td colspan="9"><div class="empty">No hay empleados cargados para ${ymLabel(mes)}. Usá "Cargar empleados" o "+ Empleado".</div></td></tr>`;
+    tb.innerHTML=`<tr><td colspan="5"><div class="empty">No hay empleados cargados para ${ymLabel(mes)}. Usá "Cargar empleados" o "+ Empleado".</div></td></tr>`;
   } else {
-    let h=`<tr><th class="l">Empleado</th><th class="num">Dep. A</th><th class="num">Vac. A</th><th class="num">SAC A</th><th class="num">Mano B</th><th class="num">Vac. B</th><th class="num">SAC B</th><th class="num">Total</th><th></th></tr>`;
+    let h=`<tr><th class="l">Empleado</th><th class="l">Modalidad</th><th class="num">Total A (blanco)</th><th class="num">Total B (mano)</th><th class="num">Total</th><th></th></tr>`;
     emps.sort((a,b)=>a.nombre.localeCompare(b.nombre));
     emps.forEach(s=>{
       const ta=totA(s), tbb=totB(s);
       h+=`<tr>
         <td class="l">${s.nombre}</td>
-        <td class="num">${s.depA?money(s.depA):'·'}</td>
-        <td class="num">${s.vacA?money(s.vacA):'·'}</td>
-        <td class="num">${s.sacA?money(s.sacA):'·'}</td>
-        <td class="num">${s.manoB?money(s.manoB):'·'}</td>
-        <td class="num">${s.vacB?money(s.vacB):'·'}</td>
-        <td class="num">${s.sacB?money(s.sacB):'·'}</td>
+        <td class="l"><span style="font-size:12px;color:var(--faint)">${s.modalidad==="quincenal"?"Quincenal":"Mensual"}</span></td>
+        <td class="num">${ta?money(ta):'·'}</td>
+        <td class="num">${tbb?money(tbb):'·'}</td>
         <td class="num"><b>${money(ta+tbb)}</b></td>
         <td style="white-space:nowrap"><button class="del" data-edsu="${s.id}" title="Editar">✎</button> <button class="del" data-delsu="${s.id}" title="Borrar">✕</button></td>
       </tr>`;
@@ -1656,35 +1673,48 @@ function drawCCSS(){
 }
 $("su_seed").onclick=async ()=>{
   const mes=$("su_mes").value;
+  const MENSUALES=["fotini","gutman","cacavelos","bianchini"];
   const existentes=new Set(state.sueldos.filter(s=>s.mes===mes&&s.tipo==="empleado").map(s=>s.nombre.toLowerCase()));
   const faltan=EMP_BASE.filter(n=>!existentes.has(n.toLowerCase()));
   if(!faltan.length){showMsg("su_msg","ok","Ya están todos los empleados.");return;}
-  const nuevos=faltan.map(n=>({id:uid(),mes,tipo:"empleado",nombre:n,depA:0,vacA:0,sacA:0,manoB:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""}));
+  const nuevos=faltan.map(n=>({id:uid(),mes,tipo:"empleado",modalidad:MENSUALES.includes(n.toLowerCase())?"mensual":"quincenal",nombre:n,depA:0,q1A:0,q2A:0,vacA:0,sacA:0,manoB:0,q1B:0,q2B:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""}));
   nuevos.forEach(n=>state.sueldos.push(n));
   drawSueldos();
   for(const n of nuevos){ await apiPost(Object.assign({action:"setSueldo"},n)); }
 };
 $("su_addemp").onclick=()=>{
   const mes=$("su_mes").value;
-  const nuevo={id:uid(),mes,tipo:"empleado",nombre:"",depA:0,vacA:0,sacA:0,manoB:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""};
+  const nuevo={id:uid(),mes,tipo:"empleado",modalidad:"mensual",nombre:"",depA:0,q1A:0,q2A:0,vacA:0,sacA:0,manoB:0,q1B:0,q2B:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""};
   state.sueldos.push(nuevo);
   abrirEditSueldo(nuevo.id);
 };
 $("su_addccss").onclick=()=>{
   const mes=$("su_mes").value;
-  const nuevo={id:uid(),mes,tipo:"ccss",nombre:"",depA:0,vacA:0,sacA:0,manoB:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""};
+  const nuevo={id:uid(),mes,tipo:"ccss",modalidad:"mensual",nombre:"",depA:0,q1A:0,q2A:0,vacA:0,sacA:0,manoB:0,q1B:0,q2B:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""};
   state.sueldos.push(nuevo);
   abrirEditCCSS(nuevo.id);
 };
+function sumToggleModalidad(){
+  const q=$("sum_modalidad").value==="quincenal";
+  document.querySelectorAll(".sum-quincenal").forEach(e=>e.style.display=q?"grid":"none");
+  document.querySelectorAll(".sum-mensual").forEach(e=>e.style.display=q?"none":"grid");
+}
 function abrirEditSueldo(id){
   const s=state.sueldos.find(x=>x.id===id); if(!s)return;
   $("sum_id").value=s.id;
   $("sum_nombre").value=s.nombre||"";
+  $("sum_modalidad").value=s.modalidad||"mensual";
+  // mensual
   $("sum_depA").value=s.depA||""; $("sum_vacA").value=s.vacA||""; $("sum_sacA").value=s.sacA||"";
   $("sum_manoB").value=s.manoB||""; $("sum_vacB").value=s.vacB||""; $("sum_sacB").value=s.sacB||"";
+  // quincenal
+  $("sum_q1A").value=s.q1A||""; $("sum_q2A").value=s.q2A||""; $("sum_vacA2").value=s.vacA||""; $("sum_sacA2").value=s.sacA||"";
+  $("sum_q1B").value=s.q1B||""; $("sum_q2B").value=s.q2B||""; $("sum_vacB2").value=s.vacB||""; $("sum_sacB2").value=s.sacB||"";
+  sumToggleModalidad();
   hideMsg("sum_msg");
   $("sum_overlay").style.display="flex";
 }
+$("sum_modalidad").addEventListener("change",sumToggleModalidad);
 function sueldoCancelar(){
   const s=state.sueldos.find(x=>x.id===$("sum_id").value);
   if(s && !s.nombre && !totA(s) && !totB(s)){ state.sueldos=state.sueldos.filter(x=>x.id!==s.id); }
@@ -1695,8 +1725,18 @@ $("sum_overlay").addEventListener("click",e=>{ if(e.target===$("sum_overlay"))su
 $("sum_save").onclick=async ()=>{
   const s=state.sueldos.find(x=>x.id===$("sum_id").value); if(!s)return;
   s.nombre=$("sum_nombre").value.trim()||"Empleado";
-  s.depA=parseNum($("sum_depA").value)||0; s.vacA=parseNum($("sum_vacA").value)||0; s.sacA=parseNum($("sum_sacA").value)||0;
-  s.manoB=parseNum($("sum_manoB").value)||0; s.vacB=parseNum($("sum_vacB").value)||0; s.sacB=parseNum($("sum_sacB").value)||0;
+  s.modalidad=$("sum_modalidad").value;
+  if(s.modalidad==="quincenal"){
+    s.q1A=parseNum($("sum_q1A").value)||0; s.q2A=parseNum($("sum_q2A").value)||0;
+    s.vacA=parseNum($("sum_vacA2").value)||0; s.sacA=parseNum($("sum_sacA2").value)||0;
+    s.q1B=parseNum($("sum_q1B").value)||0; s.q2B=parseNum($("sum_q2B").value)||0;
+    s.vacB=parseNum($("sum_vacB2").value)||0; s.sacB=parseNum($("sum_sacB2").value)||0;
+    s.depA=0; s.manoB=0;
+  } else {
+    s.depA=parseNum($("sum_depA").value)||0; s.vacA=parseNum($("sum_vacA").value)||0; s.sacA=parseNum($("sum_sacA").value)||0;
+    s.manoB=parseNum($("sum_manoB").value)||0; s.vacB=parseNum($("sum_vacB").value)||0; s.sacB=parseNum($("sum_sacB").value)||0;
+    s.q1A=0; s.q2A=0; s.q1B=0; s.q2B=0;
+  }
   const alBalance=$("su_albalance").checked;
   await sueldoAlBalance(s,alBalance);
   $("sum_overlay").style.display="none";
@@ -2417,4 +2457,3 @@ updateFlag();
 </script>
 </body>
 </html>
-<!-- actualizacion sueldos -->
