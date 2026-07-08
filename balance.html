@@ -865,7 +865,12 @@ function setSync(estado,txt){ const b=$("savebox");
 /* ---- llamadas a la planilla ---- */
 async function apiGet(){
   const r=await fetch(API); const j=await r.json();
-  if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; state.chequesEmit=j.data.chequesEmit||[]; state.sueldos=j.data.sueldos||[]; if(j.data.config&&j.data.config.exclusionesIVA){try{state.exclusionesIVA=JSON.parse(j.data.config.exclusionesIVA);}catch(e){}} }
+  if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; state.chequesEmit=j.data.chequesEmit||[]; state.sueldos=j.data.sueldos||[]; if(j.data.config&&j.data.config.exclusionesIVA){try{state.exclusionesIVA=JSON.parse(j.data.config.exclusionesIVA);}catch(e){}}
+    // corregir claves de mes rotas en impuestos (ej. "Mon Jun 01 2026..." -> "2026-06")
+    const impFix={};
+    for(const k in state.impuestos){ const nk=normMes(k)||k; impFix[nk]=Object.assign({},impFix[nk]||{},state.impuestos[k]); }
+    state.impuestos=impFix;
+  }
   return j;
 }
 async function apiPost(payload){
