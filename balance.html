@@ -428,6 +428,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     </div>
     <div class="row-actions"><button class="btn gold" id="di_calc_compras">Leer informe de compras</button></div>
     <div id="di_res_compras" class="ledger" style="margin:12px 0"></div>
+    <div id="di_rubros_box" style="margin:12px 0"></div>
 
     <div class="sectlabel" style="margin-top:20px">Informe de IVA VENTAS</div>
     <div class="f">
@@ -1672,6 +1673,26 @@ function curISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMo
 
 /* ===== DIARIO IVA (informes del sistema) ===== */
 function parseNumAr(s){ if(!s)return 0; return parseFloat(String(s).trim().replace(/\./g,"").replace(",","."))||0; }
+/* normaliza nombre de proveedor para comparar: sin mayúsculas, sin puntos, sin S.A./SRL, sin espacios extra */
+function normProv(nombre){
+  return String(nombre||"").toLowerCase()
+    .replace(/[.,]/g,"")
+    .replace(/\b(s\s*a|s\s*r\s*l|s\s*a\s*s|sacifi|scpa|s\s*c\s*a|e\s*hijo|e\s*hijos|sa|srl|sas)\b/g,"")
+    .replace(/\s+/g," ").trim();
+}
+/* busca el rubro de un proveedor en la memoria, con comparación flexible */
+function rubroDeProveedor(nombre){
+  const n=normProv(nombre);
+  if(!n)return "";
+  // 1) match exacto en memoria (clave lowercase directa)
+  const dir=state.memoria[nombre.trim().toLowerCase()];
+  if(dir)return dir;
+  // 2) match flexible: comparar normalizado contra todas las claves
+  for(const k in state.memoria){
+    if(normProv(k)===n)return state.memoria[k];
+  }
+  return "";
+}
 /* extrae los totales del pie del informe y el IVA de proveedores excluidos */
 function parseDiarioCompras(txt){
   const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
@@ -1679,19 +1700,24 @@ function parseDiarioCompras(txt){
   const percIVA=tot(/TOTAL PERCEPCION IVA \(P\)\.+;?\s*([\d.,-]+)/);
   const percIIBB=tot(/TOTAL PERCEPCION INGRESOS BRUTOS \(B\)\.+;?\s*([\d.,-]+)/);
   const neto=tot(/NETO\s*\.+;?\s*([\d.,-]+)/);
-  // IVA de excluidos: recorrer líneas de detalle
+  // IVA de excluidos + neto por proveedor: recorrer líneas de detalle
   const excl=(state.exclusionesIVA||[]).map(x=>x.toUpperCase());
   let ivaExcluido=0;
+  const provNeto={};  // {nombreProveedor: netoAcumulado}
   txt.split("\n").forEach(ln=>{
     const c=ln.split(";");
     if(c.length<11)return;
-    const razon=(c[5]||"").trim().toUpperCase();
-    if(!razon)return;
-    if(excl.some(ex=>razon.includes(ex))){
-      ivaExcluido+=parseNumAr(c[10]||"");
+    const razon=(c[5]||"").trim();
+    if(!razon)return;  // saltear líneas de continuación (sin razón social)
+    const razonUp=razon.toUpperCase();
+    const importe=parseNumAr(c[9]||"");
+    const ivaLinea=parseNumAr(c[10]||"");
+    if(excl.some(ex=>razonUp.includes(ex))){
+      ivaExcluido+=ivaLinea;
     }
+    if(importe){ provNeto[razon]=(provNeto[razon]||0)+importe; }
   });
-  return {ivaTotal,percIVA,percIIBB,neto,ivaExcluido,ivaCompNeto:ivaTotal-ivaExcluido};
+  return {ivaTotal,percIVA,percIIBB,neto,ivaExcluido,ivaCompNeto:ivaTotal-ivaExcluido,provNeto};
 }
 function parseDiarioVentas(txt){
   const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
@@ -1779,8 +1805,70 @@ $("di_calc_compras").onclick=()=>{
   if(!r.ivaTotal){showMsg("di_msg","learn","No encontré el TOTAL I.V.A. en el informe. Fijate de copiar hasta el final (los totales).");return;}
   diarioTmp.compras=r;
   mostrarResCompras(r);
+  drawRubrosInforme(r.provNeto||{});
   hideMsg("di_msg");
 };
+/* dibuja proveedores del informe agrupados por rubro, con los sin rubro para completar */
+let rubrosPendientes={};  // {proveedor: neto} de los que faltan rubro
+function drawRubrosInforme(provNeto){
+  const box=$("di_rubros_box");
+  const provs=Object.keys(provNeto);
+  if(!provs.length){box.innerHTML="";return;}
+  // separar conocidos de desconocidos
+  const porRubro={}; rubrosPendientes={};
+  provs.forEach(p=>{
+    const rubro=rubroDeProveedor(p);
+    if(rubro){ if(!porRubro[rubro])porRubro[rubro]=[]; porRubro[rubro].push([p,provNeto[p]]); }
+    else rubrosPendientes[p]=provNeto[p];
+  });
+  const excl=(state.exclusionesIVA||[]).map(x=>x.toUpperCase());
+  let h=`<div class="sectlabel" style="margin-top:8px">Gastos por rubro (del informe)</div>`;
+  // pendientes primero, resaltados
+  const pend=Object.keys(rubrosPendientes);
+  if(pend.length){
+    h+=`<div style="background:#fdf6e3;border:1px solid var(--gold);border-radius:8px;padding:12px;margin-bottom:12px">
+      <div style="font-weight:600;margin-bottom:8px;color:var(--ink)">⚠ ${pend.length} proveedor(es) sin rubro — asignalos una vez y quedan guardados:</div>`;
+    pend.sort((a,b)=>rubrosPendientes[b]-rubrosPendientes[a]).forEach(p=>{
+      h+=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+        <span style="flex:1;min-width:180px;font-size:13px">${p} <b>${money(rubrosPendientes[p])}</b></span>
+        <select data-provrubro="${encodeURIComponent(p)}" style="max-width:220px">
+          <option value="">— elegí rubro —</option>
+          ${RUBROS.map(r=>`<option>${r}</option>`).join("")}
+        </select>
+      </div>`;
+    });
+    h+=`</div>`;
+  }
+  // agrupados por rubro
+  const rubrosOrden=Object.keys(porRubro).sort();
+  if(rubrosOrden.length){
+    h+=`<table style="width:100%"><tbody>`;
+    let totalGeneral=0;
+    rubrosOrden.forEach(rubro=>{
+      const items=porRubro[rubro].sort((a,b)=>b[1]-a[1]);
+      const subtot=items.reduce((s,x)=>s+x[1],0);
+      totalGeneral+=subtot;
+      h+=`<tr style="background:var(--paper2)"><td class="l" colspan="2"><b>${rubro}</b></td><td class="num"><b>${money(subtot)}</b></td></tr>`;
+      items.forEach(([p,neto])=>{
+        const esExcl=excl.some(ex=>p.toUpperCase().includes(ex));
+        h+=`<tr><td class="l" style="padding-left:16px;font-size:13px">${p}${esExcl?' <span style="font-size:10px;color:var(--faint)">(sin IVA)</span>':''}</td><td></td><td class="num">${money(neto)}</td></tr>`;
+      });
+    });
+    h+=`<tr class="tot"><td class="l"><b>Total agrupado</b></td><td></td><td class="num"><b>${money(totalGeneral)}</b></td></tr>`;
+    h+=`</tbody></table>`;
+  }
+  box.innerHTML=h;
+  // handlers de asignación de rubro
+  box.querySelectorAll("[data-provrubro]").forEach(sel=>sel.onchange=async ()=>{
+    const prov=decodeURIComponent(sel.dataset.provrubro);
+    const rubro=sel.value;
+    if(!rubro)return;
+    state.memoria[prov.trim().toLowerCase()]=rubro;
+    await apiPost({action:"setProv",prov:prov.trim().toLowerCase(),rubro});
+    // redibujar con el nuevo rubro aprendido
+    drawRubrosInforme(diarioTmp.compras?diarioTmp.compras.provNeto:{});
+  });
+}
 $("di_calc_ventas").onclick=()=>{
   const txt=$("di_ventas").value;
   if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de ventas.");return;}
