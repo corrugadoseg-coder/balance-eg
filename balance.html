@@ -788,7 +788,7 @@ const money=n=>"$"+(Math.round((n||0)*100)/100).toLocaleString("es-AR",{minimumF
 const money0=n=>"$"+Math.round(n||0).toLocaleString("es-AR");
 const moneyM=n=>{const a=Math.abs(n); if(a>=1e6)return "$"+(n/1e6).toLocaleString("es-AR",{maximumFractionDigits:1})+"M"; if(a>=1e3)return "$"+(n/1e3).toLocaleString("es-AR",{maximumFractionDigits:0})+"K"; return money0(n);};
 const ym=d=>fechaCorta(d).slice(0,7);
-const ymLabel=k=>{const[y,m]=k.split("-");return MESN[+m-1]+" "+y;};
+const ymLabel=k=>{const n=normMes(k); if(!n)return "—"; const[y,m]=n.split("-");return MESN[+m-1]+" "+y;};
 const todayISO=()=>new Date().toISOString().slice(0,10);
 const curMonthISO=()=>new Date().toISOString().slice(0,7);
 /* normaliza cualquier fecha (texto raro, ISO con hora, Date) a YYYY-MM-DD */
@@ -2138,6 +2138,7 @@ function edsCalcIva(){
 $("eds_monto").addEventListener("input",edsCalcIva);
 $("eds_alic").addEventListener("change",edsCalcIva);
 function edsCancelar(){
+
   const s=state.servicios.find(x=>x.id===$("eds_id").value);
   // si era un servicio nuevo sin nombre ni datos, lo saco para no dejar basura
   if(s && !s.servicio && !s.monto && !s.venc && !s.fechaEmision){ state.servicios=state.servicios.filter(x=>x.id!==s.id); }
