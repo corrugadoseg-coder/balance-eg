@@ -182,14 +182,15 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <button class="tab" data-v="venta"><span class="n">02</span>Ventas del mes</button>
     <button class="tab" data-v="balance"><span class="n">03</span>Balance mensual</button>
     <button class="tab" data-v="impuestos"><span class="n">04</span>Impuestos</button>
-    <button class="tab" data-v="cheque"><span class="n">05</span>Imp. Cheque</button>
-    <button class="tab" data-v="servicios"><span class="n">06</span>Servicios</button>
-    <button class="tab" data-v="sueldos"><span class="n">07</span>Sueldos</button>
-    <button class="tab" data-v="vencim"><span class="n">08</span>Vencimientos</button>
-    <button class="tab" data-v="chemit"><span class="n">09</span>Cheques emitidos</button>
-    <button class="tab" data-v="resumen"><span class="n">10</span>Resumen anual</button>
-    <button class="tab" data-v="informes"><span class="n">11</span>Informes</button>
-    <button class="tab" data-v="datos"><span class="n">12</span>Datos</button>
+    <button class="tab" data-v="diarioiva"><span class="n">05</span>Diario IVA</button>
+    <button class="tab" data-v="cheque"><span class="n">06</span>Imp. Cheque</button>
+    <button class="tab" data-v="servicios"><span class="n">07</span>Servicios</button>
+    <button class="tab" data-v="sueldos"><span class="n">08</span>Sueldos</button>
+    <button class="tab" data-v="vencim"><span class="n">09</span>Vencimientos</button>
+    <button class="tab" data-v="chemit"><span class="n">10</span>Cheques emitidos</button>
+    <button class="tab" data-v="resumen"><span class="n">11</span>Resumen anual</button>
+    <button class="tab" data-v="informes"><span class="n">12</span>Informes</button>
+    <button class="tab" data-v="datos"><span class="n">13</span>Datos</button>
   </nav>
 </header>
 
@@ -383,10 +384,12 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     </div>
     <div class="sectlabel">Datos que cargás vos para este mes</div>
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="f"><label>Retenciones IVA de clientes <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">si no pegás el informe</span></label><input id="t_retcli" class="mono" inputmode="decimal" placeholder="0,00"></div>
       <div class="f"><label>Retenciones bancarias IIBB</label><input id="t_retbanc" class="mono" inputmode="decimal" placeholder="0,00"></div>
       <div class="f"><label>IVA al contador <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">cuando lo tengas</span></label><input id="t_ivacont" class="mono" inputmode="decimal" placeholder="0,00"></div>
-      <div class="f"><label>IIBB al contador <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">cuando lo tengas</span></label><input id="t_iibbcont" class="mono" inputmode="decimal" placeholder="0,00"></div>
     </div>
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
+      <div class="f"><label>IIBB al contador <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">cuando lo tengas</span></label><input id="t_iibbcont" class="mono" inputmode="decimal" placeholder="0,00"></div>
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
       <div class="f"><label>Alícuota IIBB %</label><input id="t_alic" class="mono" inputmode="decimal" placeholder="3"></div>
       <div class="f"><label>Coef. CABA %</label><input id="t_cc" class="mono" inputmode="decimal" placeholder="87.76"></div>
@@ -407,6 +410,51 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   <div class="card">
     <h2>IIBB — estimación</h2>
     <div id="t_iibb"></div>
+  </div>
+</section>
+
+<!-- ===== 05 DIARIO IVA ===== -->
+<section class="view" data-v="diarioiva">
+  <div class="card">
+    <h2>Diario de IVA (informes del sistema)</h2>
+    <p class="lead">Pegá los informes de tu sistema. La app extrae los totales y los usa para el cálculo de IVA e IIBB (pestaña Impuestos).</p>
+    <div class="grid" style="grid-template-columns:auto;max-width:260px;margin-bottom:16px">
+      <div class="f"><label>Mes del informe</label><select id="di_mes"></select></div>
+    </div>
+
+    <div class="sectlabel">Informe de IVA COMPRAS</div>
+    <div class="f">
+      <textarea id="di_compras" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el Diario de IVA de Compras completo (con los totales del final)."></textarea>
+    </div>
+    <div class="row-actions"><button class="btn gold" id="di_calc_compras">Leer informe de compras</button></div>
+    <div id="di_res_compras" class="ledger" style="margin:12px 0"></div>
+
+    <div class="sectlabel" style="margin-top:20px">Informe de IVA VENTAS</div>
+    <div class="f">
+      <textarea id="di_ventas" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el Diario de IVA de Ventas completo (con los totales del final)."></textarea>
+    </div>
+    <div class="row-actions"><button class="btn gold" id="di_calc_ventas">Leer informe de ventas</button></div>
+    <div id="di_res_ventas" class="ledger" style="margin:12px 0"></div>
+
+    <div class="sectlabel" style="margin-top:20px">Informe de RETENCIONES SUFRIDAS (clientes)</div>
+    <div class="f">
+      <textarea id="di_ret" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el listado de retenciones sufridas del mes (con los totales del final)."></textarea>
+    </div>
+    <div class="row-actions"><button class="btn gold" id="di_calc_ret">Leer retenciones</button></div>
+    <div id="di_res_ret" class="ledger" style="margin:12px 0"></div>
+
+    <div class="row-actions" style="margin-top:16px"><button class="btn" id="di_guardar">Guardar informes del mes</button></div>
+    <div class="msg" id="di_msg"></div>
+  </div>
+
+  <div class="card">
+    <h3>Servicios excluidos del IVA</h3>
+    <p class="lead">Estos proveedores suman a los gastos pero su IVA NO se computa en el crédito fiscal (por ejemplo, servicios a nombre de otra empresa).</p>
+    <div id="di_exclu_list" style="margin:12px 0;display:flex;flex-wrap:wrap;gap:8px"></div>
+    <div class="row-actions" style="align-items:center">
+      <input id="di_exclu_nuevo" placeholder="Nombre a excluir (ej. EDESUR)" style="max-width:240px">
+      <button class="btn ghost sm" id="di_exclu_add">+ Agregar</button>
+    </div>
   </div>
 </section>
 
@@ -764,7 +812,7 @@ const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","S
 const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
 /* ===================================================================== */
 
-let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[], chequesEmit:[], sueldos:[] };  // impuestos: {"2026-01":{...}}
+let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[], chequesEmit:[], sueldos:[], exclusionesIVA:["EDESUR","AYSA","METROGAS"] };  // impuestos: {"2026-01":{...}}
 let balView="total";
 const $=id=>document.getElementById(id);
 /* Normaliza proveedor: saca espacios extra y pone Mayúscula Inicial en cada palabra */
@@ -815,7 +863,7 @@ function setSync(estado,txt){ const b=$("savebox");
 /* ---- llamadas a la planilla ---- */
 async function apiGet(){
   const r=await fetch(API); const j=await r.json();
-  if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; state.chequesEmit=j.data.chequesEmit||[]; state.sueldos=j.data.sueldos||[]; }
+  if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; state.chequesEmit=j.data.chequesEmit||[]; state.sueldos=j.data.sueldos||[]; if(j.data.config&&j.data.config.exclusionesIVA){try{state.exclusionesIVA=JSON.parse(j.data.config.exclusionesIVA);}catch(e){}} }
   return j;
 }
 async function apiPost(payload){
@@ -862,6 +910,7 @@ function irA(v){
   $$(".view").forEach(x=>x.classList.toggle("on",x.dataset.v===v));
   if(v==="balance")renderBalance();
   if(v==="impuestos")renderImpuestosTab();
+  if(v==="diarioiva")renderDiarioIVA();
   if(v==="cheque")renderChequeTab();
   if(v==="resumen")renderResumen();
   if(v==="servicios")renderServicios();
@@ -1212,6 +1261,7 @@ function cargarFormImp(){
   const d=datosMes(mes);
   const f=n=>n?n.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2}):"";
   $("t_retbanc").value=f(d.retBancIIBB);
+  if($("t_retcli"))$("t_retcli").value=f((state.impuestos[mes]||{}).retIVAClientes||0);
   $("t_ivacont").value=f(d.ivaContador);
   $("t_iibbcont").value=f(d.iibbContador);
   $("t_alic").value=d.alicIIBB;
@@ -1231,23 +1281,42 @@ $("t_save").onclick=async ()=>{
     coefBsAs:parseNum($("t_cb").value)||DEF_CB,
     ivaExtracto:ivaExtractoPrev
   };
-  state.impuestos[mes]={ivaContador:payload.ivaContador,retBancIIBB:payload.retBancIIBB,iibbContador:payload.iibbContador,alicIIBB:payload.alicIIBB,coefCABA:payload.coefCABA,coefBsAs:payload.coefBsAs,ivaExtracto:ivaExtractoPrev};
+  const dPrev=state.impuestos[mes]||{};
+  const retCliManual=parseNum($("t_retcli")?$("t_retcli").value:"")||0;
+  // si ya hay retenciones del informe, no las pisamos con el campo manual
+  const yaHayInforme=(dPrev.retIVAClientes||0)>0 && (dPrev.ivaCompras>0||dPrev.ivaVentas>0);
+  const retCli=yaHayInforme? dPrev.retIVAClientes : retCliManual;
+  state.impuestos[mes]=Object.assign({},dPrev,{ivaContador:payload.ivaContador,retBancIIBB:payload.retBancIIBB,iibbContador:payload.iibbContador,alicIIBB:payload.alicIIBB,coefCABA:payload.coefCABA,coefBsAs:payload.coefBsAs,ivaExtracto:ivaExtractoPrev,retIVAClientes:retCli});
   showMsg("t_msg","ok",`Datos de impuestos de ${ymLabel(mes)} guardados.`);
   drawImpuestos();
   await apiPost({action:"setImpuestos",...payload});
+  if(!yaHayInforme)await apiPost({action:"setDiarioIVA",mes,retIVAClientes:retCli});
 };
 
 function ivaMes(mes){ // calcula componentes de IVA del mes
   mes=normMes(mes);
+  const dm=state.impuestos[mes]||{};
+  const ivaBanco=dm.ivaExtracto||0;
+  const usaInforme = (dm.ivaCompras>0 || dm.ivaVentas>0);
+  if(usaInforme){
+    // Fuente: informes del Diario IVA
+    const ivaCompraFc=dm.ivaCompNeto||0;      // ya excluye Edesur/Aysa/etc.
+    const ivaCompra=ivaCompraFc+ivaBanco;     // + IVA del banco
+    const percIVA=dm.percIVACompras||0;
+    const ivaVentas=dm.ivaVentas||0;
+    const retIVA=dm.retIVAClientes||0;        // retenciones de clientes, a mano
+    const estim=ivaVentas-ivaCompra-percIVA-retIVA;
+    return {ivaVentas,ivaCompra,ivaCompraFc,ivaBanco,percIVA,retIVA,estim,fuente:"informe",mesPago:dm.mesPagoIVA||""};
+  }
+  // Fuente: facturas cargadas a mano (modo anterior)
   const gm=state.gastos.filter(g=>ym(g.fecha)===mes);
   const ivaCompraFc=gm.reduce((s,x)=>s+(x.iva||0),0);
-  const ivaBanco=(state.impuestos[mes]||{}).ivaExtracto||0;
   const ivaCompra=ivaCompraFc+ivaBanco;
   const percIVA=gm.reduce((s,x)=>s+(x.piva||0),0);
   const v=state.ventas[mes]||{};
   const ivaVentas=v.ivaDebito||0, retIVA=v.retIVA||0;
   const estim=ivaVentas-ivaCompra-percIVA-retIVA;
-  return {ivaVentas,ivaCompra,ivaCompraFc,ivaBanco,percIVA,retIVA,estim};
+  return {ivaVentas,ivaCompra,ivaCompraFc,ivaBanco,percIVA,retIVA,estim,fuente:"facturas",mesPago:""};
 }
 function iibbMes(mes){
   mes=normMes(mes);
@@ -1257,8 +1326,10 @@ function iibbMes(mes){
   const baseBsAs=ventasNetas*(d.coefBsAs/100);   // el IIBB se calcula sobre la porción Bs As
   const iibbBruto=baseBsAs*(d.alicIIBB/100);
   const gm=state.gastos.filter(g=>ym(g.fecha)===mes);
-  const percProv=gm.reduce((s,x)=>s+(x.piibb||0),0);
-  const retCli=v.retIIBB||0;
+  const dm=state.impuestos[mes]||{};
+  const usaInforme=(dm.ivaCompras>0||dm.ivaVentas>0);
+  const percProv=usaInforme? (dm.percIIBBCompras||0) : gm.reduce((s,x)=>s+(x.piibb||0),0);
+  const retCli=usaInforme? (dm.retIIBBClientes||0) : (v.retIIBB||0);
   const retBanc=d.retBancIIBB||0;
   const deducciones=percProv+retCli+retBanc;
   const saldoAnt=(state.impuestos[mesAnterior(mes)]||{}).iibbContador||0;
@@ -1276,16 +1347,17 @@ function drawImpuestos(){
     <div class="ledger" style="margin-bottom:14px">
       <div class="led"><div class="l">IVA ventas (débito)</div><div class="v">${money0(iva.ivaVentas)}</div></div>
       <div class="led"><div class="l">IVA compras (crédito)</div><div class="v">${money0(iva.ivaCompra)}</div></div>
-      <div class="led"><div class="l">Estimado a pagar</div><div class="v ${iva.estim>=0?'neg':'pos'}">${money0(Math.abs(iva.estim))}</div><div class="sub">${iva.estim>=0?'a pagar':'a favor'}</div></div>
+      <div class="led" style="border-color:var(--gold)"><div class="l">Total a pagar</div><div class="v ${iva.estim>=0?'neg':'pos'}">${money0(Math.abs(iva.estim))}</div><div class="sub">${iva.estim>=0?'a pagar':'a favor'}${iva.mesPago?' · se paga '+ymLabel(iva.mesPago):''}</div></div>
     </div>
+    <div style="font-size:12px;color:var(--faint);margin-bottom:8px">Fuente: ${iva.fuente==="informe"?"informes del Diario IVA":"facturas cargadas a mano"}</div>
     <table style="max-width:560px"><tbody>
-      <tr><td class="l">IVA compras de facturas</td><td class="num">${money(iva.ivaCompraFc)}</td></tr>
+      <tr><td class="l">IVA compras ${iva.fuente==="informe"?"(a computar, sin excluidos)":"de facturas"}</td><td class="num">${money(iva.ivaCompraFc)}</td></tr>
       ${iva.ivaBanco?`<tr><td class="l">IVA del banco (extracto)</td><td class="num">${money(iva.ivaBanco)}</td></tr>`:""}
       <tr><td class="l">(−) Percepciones IVA (proveedores)</td><td class="num">${money(iva.percIVA)}</td></tr>
       <tr><td class="l">(−) Retenciones IVA (clientes)</td><td class="num">${money(iva.retIVA)}</td></tr>
-      <tr class="tot"><td class="l">Estimado por la app</td><td class="num">${money(iva.estim)}</td></tr>
-      <tr><td class="l">Al contador</td><td class="num">${d.ivaContador?money(d.ivaContador):"—"}</td></tr>
-      ${difIVA!==null?`<tr><td class="l">Diferencia</td><td class="num" style="color:${Math.abs(difIVA)<1?'var(--green)':'var(--red)'}">${money(difIVA)}</td></tr>`:""}
+      <tr class="tot"><td class="l">Total según la app</td><td class="num">${money(iva.estim)}</td></tr>
+      <tr><td class="l">Lo que le dio al contador</td><td class="num">${d.ivaContador?money(d.ivaContador):"—"}</td></tr>
+      ${difIVA!==null?`<tr><td class="l">Diferencia (app − contador)</td><td class="num" style="color:${Math.abs(difIVA)<1?'var(--green)':'var(--red)'}">${money(difIVA)}</td></tr>`:""}
     </tbody></table>`;
   // ---- IIBB ----
   const ii=iibbMes(mes);
@@ -1597,6 +1669,166 @@ function drawServicios(){
   tb.querySelectorAll("[data-eds]").forEach(b=>b.onclick=()=>abrirEditServicio(b.dataset.eds));
 }
 function curISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
+/* ===== DIARIO IVA (informes del sistema) ===== */
+function parseNumAr(s){ if(!s)return 0; return parseFloat(String(s).trim().replace(/\./g,"").replace(",","."))||0; }
+/* extrae los totales del pie del informe y el IVA de proveedores excluidos */
+function parseDiarioCompras(txt){
+  const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
+  const ivaTotal=tot(/TOTAL I\.V\.A\.\s*\.+;?\s*([\d.,-]+)/);
+  const percIVA=tot(/TOTAL PERCEPCION IVA \(P\)\.+;?\s*([\d.,-]+)/);
+  const percIIBB=tot(/TOTAL PERCEPCION INGRESOS BRUTOS \(B\)\.+;?\s*([\d.,-]+)/);
+  const neto=tot(/NETO\s*\.+;?\s*([\d.,-]+)/);
+  // IVA de excluidos: recorrer líneas de detalle
+  const excl=(state.exclusionesIVA||[]).map(x=>x.toUpperCase());
+  let ivaExcluido=0;
+  txt.split("\n").forEach(ln=>{
+    const c=ln.split(";");
+    if(c.length<11)return;
+    const razon=(c[5]||"").trim().toUpperCase();
+    if(!razon)return;
+    if(excl.some(ex=>razon.includes(ex))){
+      ivaExcluido+=parseNumAr(c[10]||"");
+    }
+  });
+  return {ivaTotal,percIVA,percIIBB,neto,ivaExcluido,ivaCompNeto:ivaTotal-ivaExcluido};
+}
+function parseDiarioVentas(txt){
+  const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
+  const ivaTotal=tot(/TOTAL I\.V\.A\.\s*\.+;?\s*([\d.,-]+)/);
+  const neto=tot(/NETO\s*\.+;?\s*([\d.,-]+)/);
+  return {ivaTotal,neto};
+}
+/* separa las retenciones sufridas por tipo (IVA, IIBB, Ganancias, SUSS) */
+function parseRetenciones(txt){
+  const lineas=txt.split("\n");
+  let retIVA=0, retIIBB=0, retGan=0, retSuss=0;
+  for(let i=0;i<lineas.length;i++){
+    const c=lineas[i].split(";");
+    if(c.length>=13 && /^\s*\d+\s*$/.test(c[0])){
+      const imp=parseNumAr((c[c.length-1]||"").trim());
+      const tipo=(lineas[i+1]||"").trim().toUpperCase();
+      if(tipo.includes("RETENCION IVA"))retIVA+=imp;
+      else if(tipo.includes("RETENCION IIBB"))retIIBB+=imp;
+      else if(tipo.includes("RETENCION GANANCIAS"))retGan+=imp;
+      else if(tipo.includes("S.U.S.S"))retSuss+=imp;
+    }
+  }
+  return {retIVA,retIIBB,retGan,retSuss};
+}
+function mesMasTres(mes){
+  const n=normMes(mes); if(!n)return "";
+  const [y,m]=n.split("-").map(Number);
+  const d=new Date(y,m-1+3,1);
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+}
+function renderDiarioIVA(){
+  const sel=$("di_mes");
+  const arr=mesesSelector(Object.keys(state.impuestos));
+  const prev=normMes(sel.value);
+  sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
+  sel.value=arr.includes(prev)?prev:curMonthISO();
+  sel.onchange=renderDiarioIVA;
+  drawExclusiones();
+  // mostrar lo ya guardado del mes
+  const d=state.impuestos[sel.value]||{};
+  if(d.ivaCompras)mostrarResCompras({ivaTotal:d.ivaCompras,percIVA:d.percIVACompras,percIIBB:d.percIIBBCompras,neto:d.netoCompras,ivaExcluido:d.ivaExcluido,ivaCompNeto:d.ivaCompNeto});
+  else $("di_res_compras").innerHTML="";
+  if(d.ivaVentas)mostrarResVentas({ivaTotal:d.ivaVentas,neto:d.netoVentas});
+  else $("di_res_ventas").innerHTML="";
+  if(d.retIVAClientes||d.retIIBBClientes||d.retGanancias)mostrarResRet({retIVA:d.retIVAClientes||0,retIIBB:d.retIIBBClientes||0,retGan:d.retGanancias||0});
+  else $("di_res_ret").innerHTML="";
+  hideMsg("di_msg");
+}
+function drawExclusiones(){
+  const cont=$("di_exclu_list");
+  cont.innerHTML=(state.exclusionesIVA||[]).map((x,i)=>`<span style="display:inline-flex;align-items:center;gap:6px;background:var(--paper2);border:1px solid var(--edge);border-radius:16px;padding:4px 12px;font-size:13px">${x} <button data-exdel="${i}" style="border:none;background:none;cursor:pointer;color:var(--red);font-size:15px;line-height:1">×</button></span>`).join("")||'<span style="color:var(--faint);font-size:13px">Sin exclusiones</span>';
+  cont.querySelectorAll("[data-exdel]").forEach(b=>b.onclick=async ()=>{
+    state.exclusionesIVA.splice(+b.dataset.exdel,1); drawExclusiones();
+    await apiPost({action:"setConfig",clave:"exclusionesIVA",valor:JSON.stringify(state.exclusionesIVA)});
+  });
+}
+$("di_exclu_add").onclick=async ()=>{
+  const v=$("di_exclu_nuevo").value.trim().toUpperCase();
+  if(!v)return;
+  if(!state.exclusionesIVA)state.exclusionesIVA=[];
+  if(!state.exclusionesIVA.includes(v))state.exclusionesIVA.push(v);
+  $("di_exclu_nuevo").value="";
+  drawExclusiones();
+  await apiPost({action:"setConfig",clave:"exclusionesIVA",valor:JSON.stringify(state.exclusionesIVA)});
+};
+function mostrarResCompras(r){
+  $("di_res_compras").innerHTML=
+    `<div class="led"><div class="l">IVA compras (total)</div><div class="v">${money0(r.ivaTotal)}</div><div class="sub">crédito bruto</div></div>
+     <div class="led"><div class="l">(−) IVA excluidos</div><div class="v">${money0(r.ivaExcluido)}</div><div class="sub">Edesur/Aysa/etc.</div></div>
+     <div class="led" style="border-color:var(--gold)"><div class="l">IVA compras a computar</div><div class="v">${money0(r.ivaCompNeto)}</div><div class="sub">crédito fiscal</div></div>
+     <div class="led"><div class="l">Percep. IVA</div><div class="v">${money0(r.percIVA)}</div></div>
+     <div class="led"><div class="l">Percep. IIBB</div><div class="v">${money0(r.percIIBB)}</div></div>
+     <div class="led"><div class="l">Neto compras</div><div class="v">${money0(r.neto)}</div><div class="sub">gastos del mes</div></div>`;
+}
+function mostrarResVentas(r){
+  $("di_res_ventas").innerHTML=
+    `<div class="led" style="border-color:var(--gold)"><div class="l">IVA ventas</div><div class="v">${money0(r.ivaTotal)}</div><div class="sub">débito fiscal</div></div>
+     <div class="led"><div class="l">Neto ventas</div><div class="v">${money0(r.neto)}</div></div>`;
+}
+let diarioTmp={compras:null,ventas:null,ret:null};
+$("di_calc_compras").onclick=()=>{
+  const txt=$("di_compras").value;
+  if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de compras.");return;}
+  const r=parseDiarioCompras(txt);
+  if(!r.ivaTotal){showMsg("di_msg","learn","No encontré el TOTAL I.V.A. en el informe. Fijate de copiar hasta el final (los totales).");return;}
+  diarioTmp.compras=r;
+  mostrarResCompras(r);
+  hideMsg("di_msg");
+};
+$("di_calc_ventas").onclick=()=>{
+  const txt=$("di_ventas").value;
+  if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de ventas.");return;}
+  const r=parseDiarioVentas(txt);
+  if(!r.ivaTotal){showMsg("di_msg","learn","No encontré el TOTAL I.V.A. en el informe de ventas.");return;}
+  diarioTmp.ventas=r;
+  mostrarResVentas(r);
+  hideMsg("di_msg");
+};
+function mostrarResRet(r){
+  $("di_res_ret").innerHTML=
+    `<div class="led" style="border-color:var(--gold)"><div class="l">Retención IVA</div><div class="v">${money0(r.retIVA)}</div><div class="sub">resta del IVA</div></div>
+     <div class="led"><div class="l">Retención IIBB</div><div class="v">${money0(r.retIIBB)}</div><div class="sub">resta de IIBB</div></div>
+     <div class="led"><div class="l">Retención Ganancias</div><div class="v">${money0(r.retGan)}</div><div class="sub">otro impuesto</div></div>`;
+}
+$("di_calc_ret").onclick=()=>{
+  const txt=$("di_ret").value;
+  if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de retenciones.");return;}
+  const r=parseRetenciones(txt);
+  if(!r.retIVA && !r.retIIBB && !r.retGan){showMsg("di_msg","learn","No encontré retenciones en el texto. Fijate de copiar el listado completo.");return;}
+  diarioTmp.ret=r;
+  mostrarResRet(r);
+  hideMsg("di_msg");
+};
+$("di_guardar").onclick=async ()=>{
+  const mes=normMes($("di_mes").value);
+  const c=diarioTmp.compras, v=diarioTmp.ventas, rt=diarioTmp.ret;
+  const dPrev=state.impuestos[mes]||{};
+  // usar lo recién calculado o lo que ya estaba
+  const compras=c||{ivaTotal:dPrev.ivaCompras||0,percIVA:dPrev.percIVACompras||0,percIIBB:dPrev.percIIBBCompras||0,neto:dPrev.netoCompras||0,ivaExcluido:dPrev.ivaExcluido||0,ivaCompNeto:dPrev.ivaCompNeto||0};
+  const ventas=v||{ivaTotal:dPrev.ivaVentas||0,neto:dPrev.netoVentas||0};
+  const ret=rt||{retIVA:dPrev.retIVAClientes||0,retIIBB:dPrev.retIIBBClientes||0,retGan:dPrev.retGanancias||0};
+  if(!compras.ivaTotal && !ventas.ivaTotal && !ret.retIVA){showMsg("di_msg","learn","Leé al menos un informe antes de guardar.");return;}
+  const mesPago=mesMasTres(mes);
+  state.impuestos[mes]=Object.assign({},dPrev,{
+    ivaVentas:ventas.ivaTotal, netoVentas:ventas.neto,
+    ivaCompras:compras.ivaTotal, ivaCompNeto:compras.ivaCompNeto, ivaExcluido:compras.ivaExcluido,
+    percIVACompras:compras.percIVA, percIIBBCompras:compras.percIIBB, netoCompras:compras.neto,
+    retIVAClientes:ret.retIVA, retIIBBClientes:ret.retIIBB, retGanancias:ret.retGan,
+    mesPagoIVA:mesPago
+  });
+  await apiPost({action:"setDiarioIVA",mes,ivaVentas:ventas.ivaTotal,netoVentas:ventas.neto,
+    ivaCompras:compras.ivaTotal,ivaCompNeto:compras.ivaCompNeto,ivaExcluido:compras.ivaExcluido,
+    percIVACompras:compras.percIVA,percIIBBCompras:compras.percIIBB,netoCompras:compras.neto,
+    retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,mesPagoIVA:mesPago});
+  diarioTmp={compras:null,ventas:null,ret:null};
+  showMsg("di_msg","ok",`Informes de ${ymLabel(mes)} guardados. IVA ventas ${money(ventas.ivaTotal)} · IVA compras a computar ${money(compras.ivaCompNeto)} · Ret. IVA ${money(ret.retIVA)}. Se paga en ${ymLabel(mesPago)}. Mirá el cálculo en Impuestos.`);
+};
 
 /* ===== SUELDOS, CCSS Y SINDICATO ===== */
 const EMP_BASE=["Bianchini","Cacavelos","Fotini","Gutman","Escalada","Gomez","Longoni","Candia","Dittrich","Duarte"];
@@ -2138,7 +2370,6 @@ function edsCalcIva(){
 $("eds_monto").addEventListener("input",edsCalcIva);
 $("eds_alic").addEventListener("change",edsCalcIva);
 function edsCancelar(){
-
   const s=state.servicios.find(x=>x.id===$("eds_id").value);
   // si era un servicio nuevo sin nombre ni datos, lo saco para no dejar basura
   if(s && !s.servicio && !s.monto && !s.venc && !s.fechaEmision){ state.servicios=state.servicios.filter(x=>x.id!==s.id); }
