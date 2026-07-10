@@ -371,6 +371,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="ledger" id="b_ledger"></div>
     <div class="sectlabel">Gastos por rubro</div>
     <div style="overflow-x:auto"><table id="b_tbl"><tbody></tbody></table></div>
+    <div class="row-actions" style="margin-top:14px"><button class="btn ghost" id="b_print">🖨 Imprimir balance del mes</button></div>
   </div>
 </section>
 
@@ -1209,6 +1210,45 @@ function drawBalance(){
     h+=`<tr><td class="l">${r}</td><td class="num">${money(gByR[r])}</td><td class="num">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`;});
   h+=`<tr class="tot"><td class="l">TOTAL GASTOS</td><td class="num">${money(gTot)}</td><td class="num">100%</td></tr>`;
   tb.innerHTML=h;
+  // botón imprimir
+  const btn=$("b_print");
+  if(btn)btn.onclick=()=>imprimirBalance(mes,gByR,gTot,vTot,res,bn);
+}
+function imprimirBalance(mes,gByR,gTot,vTot,res,bn){
+  const fmt=n=>"$"+(Math.round((n||0)*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const lbl=bn==="total"?"Total (A+B)":(bn==="blanco"?"Tipo A (blanco)":"Tipo B (negro)");
+  const filas=RUBROS.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a])
+    .map(r=>`<tr><td>${r}</td><td style="text-align:right">${fmt(gByR[r])}</td><td style="text-align:right">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`).join("");
+  const margen=vTot>0?(res/vTot*100).toFixed(1)+"%":"—";
+  const w=window.open("","_blank");
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Balance ${ymLabel(mes)}</title>
+    <style>
+      body{font-family:Georgia,'Times New Roman',serif;color:#23201a;max-width:640px;margin:30px auto;padding:0 20px}
+      h1{font-size:22px;margin-bottom:2px} .sub{color:#666;font-size:13px;margin-bottom:20px}
+      table{width:100%;border-collapse:collapse;margin:14px 0}
+      td,th{padding:7px 10px;border-bottom:1px solid #ddd;font-size:14px}
+      th{text-align:left;background:#f5f2ec}
+      .tot td{border-top:2px solid #333;font-weight:bold}
+      .destac{margin-top:20px;display:flex;gap:20px;flex-wrap:wrap}
+      .box{border:1px solid #ccc;border-radius:8px;padding:12px 16px;min-width:150px}
+      .box .lab{font-size:11px;color:#666;text-transform:uppercase} .box .val{font-size:18px;font-weight:bold}
+      .pos{color:#1a7a3a} .neg{color:#b02a2a}
+      .foot{margin-top:24px;font-size:11px;color:#888;border-top:1px solid #eee;padding-top:10px}
+      @media print{button{display:none}}
+    </style></head><body>
+    <h1>Balance del mes — ${lbl}</h1>
+    <div class="sub">EG Corrugados · ${ymLabel(mes)}</div>
+    <div class="destac">
+      <div class="box"><div class="lab">Ventas</div><div class="val">${fmt(vTot)}</div></div>
+      <div class="box"><div class="lab">Gastos</div><div class="val">${fmt(gTot)}</div></div>
+      <div class="box"><div class="lab">Resultado</div><div class="val ${res>=0?'pos':'neg'}">${fmt(res)}</div><div style="font-size:11px;color:#666">${margen} margen</div></div>
+    </div>
+    <table><thead><tr><th>Rubro</th><th style="text-align:right">Monto</th><th style="text-align:right">% gastos</th></tr></thead>
+    <tbody>${filas}<tr class="tot"><td>TOTAL GASTOS</td><td style="text-align:right">${fmt(gTot)}</td><td style="text-align:right">100%</td></tr></tbody></table>
+    <div class="foot">Generado por Balance Interno — ${new Date().toLocaleDateString("es-AR")}. Valores para control interno.</div>
+    <button onclick="window.print()" style="margin-top:20px;padding:10px 20px;font-size:14px;cursor:pointer">Imprimir</button>
+    </body></html>`);
+  w.document.close();
 }
 
 /* ---- informes / filtros ---- */
