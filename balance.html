@@ -14,6 +14,9 @@
   --green:#3f6b4f; --greenL:#e3ece2; --red:#a3402f; --redL:#f0ddd6;
   --gold:#b5842f; --goldL:#f1e6cc; --blue:#37536b;
   --negro:#23201a; --blanco:#c9bda4;
+  /* fondos suaves para distinguir Tipo A (marrón marca) y Tipo B (coral marca) */
+  --bgA:#f6f0e7; --bgA2:#efe6d8; --lineA:#c9a888;
+  --bgB:#fbeeee; --bgB2:#f6e2e2; --lineB:#e5a9ab;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;
@@ -36,6 +39,19 @@ header{padding:30px 0 0}
 
 /* TABS */
 nav.tabs{display:flex;gap:0;margin:22px 0 26px;border-bottom:1px solid var(--edge);flex-wrap:wrap}
+
+/* ===== Distinción visual Tipo A / Tipo B ===== */
+tr.rowA > td{background:var(--bgA)}
+tr.rowB > td{background:var(--bgB)}
+tr.rowA:hover > td{background:var(--bgA2)}
+tr.rowB:hover > td{background:var(--bgB2)}
+/* el balance cambia de tono según la vista elegida */
+.card.vistaA{background:var(--bgA);border-color:var(--lineA)}
+.card.vistaB{background:var(--bgB);border-color:var(--lineB)}
+.card.vistaA .led, .card.vistaB .led{background:rgba(255,255,255,.55)}
+.chipTipo{display:inline-block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:10px;font-weight:600}
+.chipTipo.a{background:var(--bgA2);color:#7a5c40;border:1px solid var(--lineA)}
+.chipTipo.b{background:var(--bgB2);color:#a34448;border:1px solid var(--lineB)}
 
 /* ===== Pantalla de inicio ===== */
 #home{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:72vh;text-align:center;padding:20px}
@@ -531,6 +547,15 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="row-actions"><button class="btn gold" id="di_calc_ret">Leer retenciones</button></div>
     <div id="di_res_ret" class="ledger" style="margin:12px 0"></div>
 
+    <div class="sectlabel" style="margin-top:20px">Informe de PARTE B (no oficial)</div>
+    <p class="lead" style="margin-bottom:8px">Suma a los gastos del mes como Tipo B. No calcula IVA. Las notas de crédito restan.</p>
+    <div class="f">
+      <textarea id="di_partb" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el informe de la parte B del mes."></textarea>
+    </div>
+    <div class="row-actions"><button class="btn gold" id="di_calc_partb">Leer parte B</button></div>
+    <div id="di_res_partb" class="ledger" style="margin:12px 0"></div>
+    <div id="di_rubros_b" style="margin:12px 0"></div>
+
     <div class="row-actions" style="margin-top:16px"><button class="btn" id="di_guardar">Guardar informes del mes</button></div>
     <div class="msg" id="di_msg"></div>
   </div>
@@ -680,7 +705,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
         <div class="f"><label>Empleado</label><input id="sum_nombre"></div>
         <div class="f"><label>Modalidad</label><select id="sum_modalidad"><option value="mensual">Mensual</option><option value="quincenal">Quincenal</option></select></div>
       </div>
-      <div class="sectlabel" style="margin-top:16px">Sueldos A (blanco)</div>
+      <div class="sectlabel" style="margin-top:16px;background:var(--bgA);padding:6px 10px;border-radius:6px;border-left:3px solid var(--lineA)">Sueldos A (blanco)</div>
       <!-- mensual A -->
       <div class="grid sum-mensual" style="grid-template-columns:1fr 1fr 1fr">
         <div class="f"><label>Sueldo</label><input id="sum_depA" class="mono" inputmode="decimal" placeholder="0"></div>
@@ -694,7 +719,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
         <div class="f"><label>Vacaciones</label><input id="sum_vacA2" class="mono" inputmode="decimal" placeholder="0"></div>
         <div class="f"><label>SAC</label><input id="sum_sacA2" class="mono" inputmode="decimal" placeholder="0"></div>
       </div>
-      <div class="sectlabel" style="margin-top:16px">Sueldos B (mano)</div>
+      <div class="sectlabel" style="margin-top:16px;background:var(--bgB);padding:6px 10px;border-radius:6px;border-left:3px solid var(--lineB)">Sueldos B (mano)</div>
       <!-- mensual B -->
       <div class="grid sum-mensual" style="grid-template-columns:1fr 1fr 1fr">
         <div class="f"><label>Mano</label><input id="sum_manoB" class="mono" inputmode="decimal" placeholder="0"></div>
@@ -1170,7 +1195,7 @@ function renderGastos(){
   }
   if(!list.length){tb.innerHTML=`<tr><td colspan="6"><div class="empty">${filtrando?"No hay gastos con ese filtro.":"Todavía no cargaste gastos."}</div></td></tr>`;return;}
   let h=`<tr><th class="l">Fecha</th><th class="l">Proveedor</th><th class="l">Rubro</th><th>Tipo</th><th class="num">Monto sin IVA</th><th></th></tr>`;
-  list.forEach(g=>{ h+=`<tr><td class="l">${fechaLinda(g.fecha)}</td><td class="l">${g.prov}</td>
+  list.forEach(g=>{ h+=`<tr class="${g.bn==="negro"?"rowB":"rowA"}"><td class="l">${fechaLinda(g.fecha)}</td><td class="l">${g.prov}</td>
     <td class="l"><span class="chip rubro">${g.rubro}</span>${g.sub?`<div style="font-size:11px;color:var(--faint);margin-top:3px">${g.sub}</div>`:""}</td><td>${bnChipBtn(g.bn,g.id)}</td>
     <td class="num">${money(g.monto)}</td><td style="white-space:nowrap"><button class="del" data-edit="${g.id}" title="Editar" style="color:var(--ink2)">✎</button> <button class="del" data-id="${g.id}" title="Borrar">✕</button></td></tr>`; });
   if(filtrando){const totP=list.reduce((s,x)=>s+x.monto,0);h+=`<tr class="tot"><td class="l" colspan="4"><b>Total ${list.length} gasto(s) filtrados</b></td><td class="num"><b>${money(totP)}</b></td><td></td></tr>`;}
@@ -1327,24 +1352,57 @@ function drawBalance(){
   const gByR={}; let gTot=0;
   // 1) gastos cargados a mano (facturas, sueldos, servicios, impositivos)
   state.gastos.filter(g=>ym(g.fecha)===mes).forEach(g=>{const v=gastoVal(g,bn);gByR[g.rubro]=(gByR[g.rubro]||0)+v;gTot+=v;});
-  // 2) gastos que vienen del informe de compras (siempre son blancos / Tipo A)
-  if(bn==="total"||bn==="blanco"){
-    state.gastosInforme.filter(g=>normMes(g.mes)===normMes(mes)).forEach(g=>{
+  // 2) gastos que vienen de los informes (compras = Tipo A, parte B = Tipo B)
+  state.gastosInforme.filter(g=>normMes(g.mes)===normMes(mes)).forEach(g=>{
+    const esNegro=(g.tipo==="negro");
+    if(bn==="total" || (bn==="blanco" && !esNegro) || (bn==="negro" && esNegro)){
       gByR[g.rubro]=(gByR[g.rubro]||0)+g.monto; gTot+=g.monto;
-    });
-  }
+    }
+  });
   const vTot=ventaVal(mes,bn);
   const res=vTot-gTot;
   const lbl=bn==="total"?"":(bn==="blanco"?" · Tipo A":" · Tipo B");
+  // tinte de la tarjeta según la vista (A cálido, B coral)
+  const cardBal=$("b_ledger").closest(".card");
+  if(cardBal){ cardBal.classList.remove("vistaA","vistaB");
+    if(bn==="blanco")cardBal.classList.add("vistaA");
+    if(bn==="negro")cardBal.classList.add("vistaB"); }
   $("b_ledger").innerHTML=`
     <div class="led"><div class="l">Ventas${lbl}</div><div class="v">${money0(vTot)}</div><div class="sub">${ymLabel(mes)}</div></div>
     <div class="led"><div class="l">Gastos${lbl}</div><div class="v">${money0(gTot)}</div><div class="sub">${Object.values(gByR).filter(x=>x>0).length} rubros con movimiento</div></div>
     <div class="led"><div class="l">Resultado${lbl}</div><div class="v ${res>=0?'pos':'neg'}">${money0(res)}</div><div class="sub">${vTot>0?(res/vTot*100).toFixed(1)+"% margen":"sin ventas cargadas"}</div></div>`;
   const tb=$("b_tbl").querySelector("tbody");
-  let h=`<tr><th class="l">Rubro</th><th class="num">Monto</th><th class="num">% de gastos</th></tr>`;
-  RUBROS.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a]).forEach(r=>{
-    h+=`<tr><td class="l">${r}</td><td class="num">${money(gByR[r])}</td><td class="num">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`;});
-  h+=`<tr class="tot"><td class="l">TOTAL GASTOS</td><td class="num">${money(gTot)}</td><td class="num">100%</td></tr>`;
+  let h="";
+  if(bn==="total"){
+    // en Total, mostrar el desglose A / B por rubro
+    const gA={},gB={};
+    state.gastos.filter(g=>ym(g.fecha)===mes).forEach(g=>{
+      if(g.bn==="negro")gB[g.rubro]=(gB[g.rubro]||0)+(g.monto||0);
+      else gA[g.rubro]=(gA[g.rubro]||0)+(g.monto||0);
+    });
+    state.gastosInforme.filter(g=>normMes(g.mes)===normMes(mes)).forEach(g=>{
+      if(g.tipo==="negro")gB[g.rubro]=(gB[g.rubro]||0)+g.monto;
+      else gA[g.rubro]=(gA[g.rubro]||0)+g.monto;
+    });
+    const totA=Object.values(gA).reduce((a,b)=>a+b,0);
+    const totB=Object.values(gB).reduce((a,b)=>a+b,0);
+    h=`<tr><th class="l">Rubro</th><th class="num">Tipo A</th><th class="num">Tipo B</th><th class="num">Total</th><th class="num">%</th></tr>`;
+    RUBROS.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a]).forEach(r=>{
+      h+=`<tr><td class="l">${r}</td>
+        <td class="num" style="background:var(--bgA)">${gA[r]?money(gA[r]):'·'}</td>
+        <td class="num" style="background:var(--bgB)">${gB[r]?money(gB[r]):'·'}</td>
+        <td class="num"><b>${money(gByR[r])}</b></td>
+        <td class="num">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`;});
+    h+=`<tr class="tot"><td class="l">TOTAL GASTOS</td>
+      <td class="num" style="background:var(--bgA2)"><b>${money(totA)}</b></td>
+      <td class="num" style="background:var(--bgB2)"><b>${money(totB)}</b></td>
+      <td class="num"><b>${money(gTot)}</b></td><td class="num">100%</td></tr>`;
+  } else {
+    h=`<tr><th class="l">Rubro</th><th class="num">Monto</th><th class="num">% de gastos</th></tr>`;
+    RUBROS.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a]).forEach(r=>{
+      h+=`<tr><td class="l">${r}</td><td class="num">${money(gByR[r])}</td><td class="num">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`;});
+    h+=`<tr class="tot"><td class="l">TOTAL GASTOS</td><td class="num">${money(gTot)}</td><td class="num">100%</td></tr>`;
+  }
   tb.innerHTML=h;
   // botón imprimir
   const btn=$("b_print");
@@ -1962,6 +2020,28 @@ function parseDiarioVentas(txt){
   const neto=tot(/NETO\s*\.+;?\s*([\d.,-]+)/);
   return {ivaTotal,neto};
 }
+/* Informe de PARTE B (negro): suma a los gastos, NO calcula IVA.
+   Formato: DIA Fac/NCr LETRA NUMERO Alta PROVEEDOR ... CANT NETO TOTAL
+   Las notas de crédito (NCr) vienen en negativo y restan. */
+function parseParteB(txt){
+  const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
+  const neto=tot(/NETO\s*\.+\s*([\d.,-]+)/);
+  const provNeto={};
+  txt.split("\n").forEach(ln=>{
+    const l=ln.trim();
+    if(!l || /^(Total|NETO|TOTAL)/i.test(l))return;
+    const m=l.match(/^\s*(\d+)\s+(Fac|NCr|NDb)\s+\w+\s+[\d-]+\s+\w+\s+(.+?)\s+(?:[A-Z]\s+Cons\.Final|I\s+\d{11}|\d{11})\s+\d+\s+([\d.,-]+)\s+([\d.,-]+)\s*$/);
+    if(!m)return;
+    const prov=m[3].trim();
+    const monto=parseNumAr(m[5]);
+    if(!prov)return;
+    provNeto[prov]=(provNeto[prov]||0)+monto;
+  });
+  // sacar los que quedaron en cero (facturas anuladas por nota de crédito)
+  Object.keys(provNeto).forEach(p=>{ if(Math.abs(provNeto[p])<0.01)delete provNeto[p]; });
+  const sumaProv=Object.values(provNeto).reduce((a,b)=>a+b,0);
+  return {neto:neto||sumaProv, provNeto, sumaProv};
+}
 /* separa las retenciones sufridas por tipo (IVA, IIBB, Ganancias, SUSS) */
 function parseRetenciones(txt){
   const lineas=txt.split("\n");
@@ -2001,6 +2081,11 @@ function renderDiarioIVA(){
   else $("di_res_ventas").innerHTML="";
   if(d.retIVAClientes||d.retIIBBClientes||d.retGanancias)mostrarResRet({retIVA:d.retIVAClientes||0,retIIBB:d.retIIBBClientes||0,retGan:d.retGanancias||0});
   else $("di_res_ret").innerHTML="";
+  // parte B guardada (total desde los gastos del informe tipo negro)
+  const pbTot=state.gastosInforme.filter(g=>normMes(g.mes)===sel.value && g.tipo==="negro").reduce((a,g)=>a+g.monto,0);
+  if(pbTot)$("di_res_partb").innerHTML=`<div class="led" style="border-color:var(--gold)"><div class="l">Total parte B</div><div class="v">${money0(pbTot)}</div><div class="sub">guardado · Tipo B</div></div>`;
+  else $("di_res_partb").innerHTML="";
+  $("di_rubros_b").innerHTML="";
   hideMsg("di_msg");
 }
 function drawExclusiones(){
@@ -2034,7 +2119,7 @@ function mostrarResVentas(r){
     `<div class="led" style="border-color:var(--gold)"><div class="l">IVA ventas</div><div class="v">${money0(r.ivaTotal)}</div><div class="sub">débito fiscal</div></div>
      <div class="led"><div class="l">Neto ventas</div><div class="v">${money0(r.neto)}</div></div>`;
 }
-let diarioTmp={compras:null,ventas:null,ret:null};
+let diarioTmp={compras:null,ventas:null,ret:null,partb:null};
 $("di_calc_compras").onclick=()=>{
   const txt=$("di_compras").value;
   if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de compras.");return;}
@@ -2132,6 +2217,69 @@ $("di_calc_ret").onclick=()=>{
   mostrarResRet(r);
   hideMsg("di_msg");
 };
+function mostrarResPartB(r){
+  $("di_res_partb").innerHTML=
+    `<div class="led" style="border-color:var(--gold)"><div class="l">Total parte B</div><div class="v">${money0(r.neto)}</div><div class="sub">gastos Tipo B · sin IVA</div></div>
+     <div class="led"><div class="l">Proveedores</div><div class="v">${Object.keys(r.provNeto).length}</div><div class="sub">con saldo distinto de cero</div></div>`;
+}
+$("di_calc_partb").onclick=()=>{
+  const txt=$("di_partb").value;
+  if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de parte B.");return;}
+  const r=parseParteB(txt);
+  if(!r.neto && !Object.keys(r.provNeto).length){showMsg("di_msg","learn","No pude leer el informe de parte B. Fijate de copiarlo completo.");return;}
+  diarioTmp.partb=r;
+  mostrarResPartB(r);
+  drawRubrosB(r.provNeto||{});
+  hideMsg("di_msg");
+};
+/* proveedores de parte B agrupados por rubro (usa la misma memoria) */
+function drawRubrosB(provNeto){
+  const box=$("di_rubros_b");
+  const provs=Object.keys(provNeto);
+  if(!provs.length){box.innerHTML="";return;}
+  const porRubro={}; const pend={};
+  provs.forEach(p=>{
+    const r=rubroDeProveedor(p);
+    if(r){ if(!porRubro[r])porRubro[r]=[]; porRubro[r].push([p,provNeto[p]]); }
+    else pend[p]=provNeto[p];
+  });
+  let h=`<div class="sectlabel" style="margin-top:8px">Parte B por rubro</div>`;
+  const pk=Object.keys(pend);
+  if(pk.length){
+    h+=`<div style="background:#fdf6e3;border:1px solid var(--gold);border-radius:8px;padding:12px;margin-bottom:12px">
+      <div style="font-weight:600;margin-bottom:8px">⚠ ${pk.length} proveedor(es) sin rubro:</div>`;
+    pk.sort((a,b)=>pend[b]-pend[a]).forEach(p=>{
+      h+=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+        <span style="flex:1;min-width:180px;font-size:13px">${p} <b>${money(pend[p])}</b></span>
+        <select data-provrubrob="${encodeURIComponent(p)}" style="max-width:220px">
+          <option value="">— elegí rubro —</option>${RUBROS.map(r=>`<option>${r}</option>`).join("")}
+        </select></div>`;
+    });
+    h+=`</div>`;
+  }
+  const ord=Object.keys(porRubro).sort();
+  if(ord.length){
+    h+=`<table style="width:100%"><tbody>`;
+    let tot=0;
+    ord.forEach(rubro=>{
+      const items=porRubro[rubro].sort((a,b)=>b[1]-a[1]);
+      const st=items.reduce((s,x)=>s+x[1],0);
+      const noG=RUBROS_NO_GASTO.includes(rubro);
+      if(!noG)tot+=st;
+      h+=`<tr style="background:var(--paper2)"><td class="l" colspan="2"><b>${rubro}</b>${noG?' <span style="font-size:10px;color:var(--faint)">(no suma)</span>':''}</td><td class="num"><b>${money(st)}</b></td></tr>`;
+      items.forEach(([p,n])=>{ h+=`<tr><td class="l" style="padding-left:16px;font-size:13px">${p}</td><td></td><td class="num">${money(n)}</td></tr>`; });
+    });
+    h+=`<tr class="tot"><td class="l"><b>Total parte B al balance</b></td><td></td><td class="num"><b>${money(tot)}</b></td></tr></tbody></table>`;
+  }
+  box.innerHTML=h;
+  box.querySelectorAll("[data-provrubrob]").forEach(sel=>sel.onchange=async ()=>{
+    const prov=decodeURIComponent(sel.dataset.provrubrob);
+    const rubro=sel.value; if(!rubro)return;
+    state.memoria[prov.trim().toLowerCase()]=rubro;
+    await apiPost({action:"setProv",prov:prov.trim().toLowerCase(),rubro});
+    drawRubrosB(diarioTmp.partb?diarioTmp.partb.provNeto:{});
+  });
+}
 $("di_guardar").onclick=async ()=>{
   const mes=normMes($("di_mes").value);
   const c=diarioTmp.compras, v=diarioTmp.ventas, rt=diarioTmp.ret;
@@ -2140,13 +2288,14 @@ $("di_guardar").onclick=async ()=>{
   const compras=c||{ivaTotal:dPrev.ivaCompras||0,percIVA:dPrev.percIVACompras||0,percIIBB:dPrev.percIIBBCompras||0,neto:dPrev.netoCompras||0,ivaExcluido:dPrev.ivaExcluido||0,ivaCompNeto:dPrev.ivaCompNeto||0};
   const ventas=v||{ivaTotal:dPrev.ivaVentas||0,neto:dPrev.netoVentas||0};
   const ret=rt||{retIVA:dPrev.retIVAClientes||0,retIIBB:dPrev.retIIBBClientes||0,retGan:dPrev.retGanancias||0};
-  if(!compras.ivaTotal && !ventas.ivaTotal && !ret.retIVA){showMsg("di_msg","learn","Leé al menos un informe antes de guardar.");return;}
+  if(!compras.ivaTotal && !ventas.ivaTotal && !ret.retIVA && !diarioTmp.partb){showMsg("di_msg","learn","Leé al menos un informe antes de guardar.");return;}
   // confirmación del mes: evita guardar en el mes equivocado
   const yaExiste=(dPrev.ivaCompras||dPrev.ivaVentas)?" (ya había datos en este mes; se van a actualizar)":"";
   const partes=[];
   if(compras.ivaTotal)partes.push("IVA compras "+money(compras.ivaCompNeto));
   if(ventas.ivaTotal)partes.push("IVA ventas "+money(ventas.ivaTotal));
   if(ret.retIVA)partes.push("Ret. IVA "+money(ret.retIVA));
+  if(diarioTmp.partb)partes.push("Parte B "+money(diarioTmp.partb.neto));
   if(!confirm(`Vas a guardar los informes en el mes:\n\n➡ ${ymLabel(mes).toUpperCase()}${yaExiste}\n\n${partes.join(" · ")}\n\n¿Es el mes correcto?`))return;
   const mesPago=mesMasTres(mes);
   state.impuestos[mes]=Object.assign({},dPrev,{
@@ -2161,23 +2310,38 @@ $("di_guardar").onclick=async ()=>{
     percIVACompras:compras.percIVA,percIIBBCompras:compras.percIIBB,netoCompras:compras.neto,
     retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,mesPagoIVA:mesPago});
   // guardar los gastos por rubro (para que el balance los use)
+  const items=[];
+  let sinRubro=0;
+  // A) del informe de compras -> Tipo A (blanco)
   if(compras.provNeto){
-    const porRubro={};
-    let sinRubro=0;
+    const porRubroA={};
     Object.keys(compras.provNeto).forEach(p=>{
       const r=rubroDeProveedor(p);
       if(!r){ sinRubro++; return; }
-      if(RUBROS_NO_GASTO.includes(r))return;   // personal: no suma al gasto
-      porRubro[r]=(porRubro[r]||0)+compras.provNeto[p];
+      if(RUBROS_NO_GASTO.includes(r))return;
+      porRubroA[r]=(porRubroA[r]||0)+compras.provNeto[p];
     });
-    const items=Object.keys(porRubro).map(r=>({rubro:r,monto:porRubro[r],tipo:"blanco"}));
-    // actualizar estado local
+    Object.keys(porRubroA).forEach(r=>items.push({rubro:r,monto:porRubroA[r],tipo:"blanco"}));
+  }
+  // B) del informe de parte B -> Tipo B (negro)
+  const pb=diarioTmp.partb;
+  if(pb && pb.provNeto){
+    const porRubroB={};
+    Object.keys(pb.provNeto).forEach(p=>{
+      const r=rubroDeProveedor(p);
+      if(!r){ sinRubro++; return; }
+      if(RUBROS_NO_GASTO.includes(r))return;
+      porRubroB[r]=(porRubroB[r]||0)+pb.provNeto[p];
+    });
+    Object.keys(porRubroB).forEach(r=>items.push({rubro:r,monto:porRubroB[r],tipo:"negro"}));
+  }
+  if(items.length || compras.provNeto){
     state.gastosInforme=state.gastosInforme.filter(g=>normMes(g.mes)!==mes);
-    items.forEach(it=>state.gastosInforme.push({mes,rubro:it.rubro,monto:it.monto,tipo:"blanco"}));
+    items.forEach(it=>state.gastosInforme.push({mes,rubro:it.rubro,monto:it.monto,tipo:it.tipo}));
     await apiPost({action:"setGastosInforme",mes,items:JSON.stringify(items)});
     if(sinRubro)showMsg("di_msg","learn",`Ojo: ${sinRubro} proveedor(es) quedaron sin rubro y no suman al balance. Asignales rubro y volvé a guardar.`);
   }
-  diarioTmp={compras:null,ventas:null,ret:null};
+  diarioTmp={compras:null,ventas:null,ret:null,partb:null};
   showMsg("di_msg","ok",`Informes de ${ymLabel(mes)} guardados. IVA ventas ${money(ventas.ivaTotal)} · IVA compras a computar ${money(compras.ivaCompNeto)} · Ret. IVA ${money(ret.retIVA)}. Se paga en ${ymLabel(mesPago)}. Mirá el cálculo en Impuestos.`);
 };
 
@@ -2191,8 +2355,8 @@ function drawPagosImp(){
   let h=`<tr><th class="l">Concepto</th><th class="num">Monto</th><th>Tipo</th><th></th></tr>`;
   let tot=0;
   pagos.forEach(g=>{ tot+=g.monto||0;
-    h+=`<tr><td class="l">${g.sub||g.prov||"Impuesto"}</td><td class="num">${money(g.monto)}</td>
-      <td><span class="bndot ${g.bn==="negro"?"ng":"bl"}"></span></td>
+    h+=`<tr class="${g.bn==="negro"?"rowB":"rowA"}"><td class="l">${g.sub||g.prov||"Impuesto"}</td><td class="num">${money(g.monto)}</td>
+      <td><span class="chipTipo ${g.bn==="negro"?"b":"a"}">${g.bn==="negro"?"B":"A"}</span></td>
       <td><button class="del" data-delpi="${g.id}">✕</button></td></tr>`;
   });
   h+=`<tr class="tot"><td class="l"><b>Total pagado</b></td><td class="num"><b>${money(tot)}</b></td><td colspan="2"></td></tr>`;
@@ -2250,8 +2414,8 @@ function drawSueldos(){
       h+=`<tr>
         <td class="l">${s.nombre}</td>
         <td class="l"><span style="font-size:12px;color:var(--faint)">${s.modalidad==="quincenal"?"Quincenal":"Mensual"}</span></td>
-        <td class="num">${ta?money(ta):'·'}</td>
-        <td class="num">${tbb?money(tbb):'·'}</td>
+        <td class="num" style="background:var(--bgA)">${ta?money(ta):'·'}</td>
+        <td class="num" style="background:var(--bgB)">${tbb?money(tbb):'·'}</td>
         <td class="num"><b>${money(ta+tbb)}</b></td>
         <td style="white-space:nowrap"><button class="del" data-edsu="${s.id}" title="Editar">✎</button> <button class="del" data-delsu="${s.id}" title="Borrar">✕</button></td>
       </tr>`;
@@ -2268,8 +2432,8 @@ function drawSueldos(){
   const totalA=emps.reduce((a,s)=>a+totA(s),0);
   const totalB=emps.reduce((a,s)=>a+totB(s),0);
   $("su_resumen").innerHTML=
-    `<div class="led"><div class="l">Total A (blanco)</div><div class="v">${money0(totalA)}</div><div class="sub">depositado + vac + SAC</div></div>
-     <div class="led"><div class="l">Total B (mano)</div><div class="v">${money0(totalB)}</div><div class="sub">mano + vac + SAC</div></div>
+    `<div class="led" style="background:var(--bgA);border-color:var(--lineA)"><div class="l">Total A (blanco)</div><div class="v">${money0(totalA)}</div><div class="sub">depositado + vac + SAC</div></div>
+     <div class="led" style="background:var(--bgB);border-color:var(--lineB)"><div class="l">Total B (mano)</div><div class="v">${money0(totalB)}</div><div class="sub">mano + vac + SAC</div></div>
      <div class="led" style="border-color:var(--gold)"><div class="l">Total A+B</div><div class="v">${money0(totalA+totalB)}</div><div class="sub">sueldos del mes</div></div>`;
   drawCCSS();
 }
