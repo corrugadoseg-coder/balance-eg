@@ -571,6 +571,17 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <p class="lead">Desde junio 2026 se usa hasta el 30% del impuesto al cheque del mes para compensar CCSS; el resto queda disponible para anticipos de Ganancias. Marcá "Compensado" cuando uses un mes contra Ganancias.</p>
     <div id="ch_acum" style="margin-bottom:16px"></div>
     <div style="overflow-x:auto"><table id="ch_tbl"><tbody></tbody></table></div>
+    <div class="sectlabel" style="margin-top:20px">Cargar un mes a mano</div>
+    <p class="lead" style="margin-bottom:10px">Si ya tenés el total del 1,2‰ de un mes (sin el extracto), cargalo acá.</p>
+    <div class="grid" style="grid-template-columns:1fr 1fr auto auto;gap:10px;align-items:end;max-width:640px">
+      <div class="f"><label>Mes</label><select id="chm_mes"></select></div>
+      <div class="f"><label>Total 1,2‰</label><input id="chm_total" class="mono" inputmode="decimal" placeholder="0,00"></div>
+      <label style="display:flex;gap:6px;align-items:center;cursor:pointer;text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-size:13px;padding-bottom:9px">
+        <input type="checkbox" id="chm_comp"> Ya compensado
+      </label>
+      <div class="row-actions" style="margin:0"><button class="btn sm" id="chm_add">Guardar mes</button></div>
+    </div>
+    <div class="msg" id="chm_msg"></div>
   </div>
 </section>
 
@@ -1580,6 +1591,7 @@ function renderChequeTab(){
   const prev=sel.value;
   sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
   if(arr.includes(prev))sel.value=prev; else sel.value=curMonthISO();
+  renderChmSelector();
   renderChequeTabla();
 }
 /* parsea el extracto: agrupa TODOS los cargos bancarios por concepto (nombre del banco).
@@ -1696,6 +1708,29 @@ function usadoCCSS(mes,total){
   // si hay un valor guardado lo usamos; si no, el 30% (el tope, que se usa completo)
   return c.usadoCCSS!==undefined && c.usadoCCSS!==null ? c.usadoCCSS : Math.round(total*CCSS_PCT*100)/100;
 }
+/* cargar un mes del 1,2‰ a mano (sin extracto) */
+function renderChmSelector(){
+  const sel=$("chm_mes"); if(!sel)return;
+  const arr=mesesSelector(Object.keys(state.cheque));
+  const prev=normMes(sel.value);
+  sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
+  if(arr.includes(prev))sel.value=prev;
+}
+if($("chm_add"))$("chm_add").onclick=async ()=>{
+  const mes=normMes($("chm_mes").value);
+  const total=parseNum($("chm_total").value)||0;
+  const comp=$("chm_comp").checked;
+  if(!total){showMsg("chm_msg","learn","Poné el total del 1,2‰ del mes.");return;}
+  const ccss=(mes>=CCSS_DESDE)?Math.round(total*CCSS_PCT*100)/100:0;
+  const yaEstaba=!!state.cheque[mes];
+  if(yaEstaba && !confirm(`${ymLabel(mes)} ya tenía ${money(state.cheque[mes].total)}. ¿Lo reemplazo por ${money(total)}?`))return;
+  state.cheque[mes]={total,compensado:comp,usadoCCSS:ccss};
+  $("chm_total").value=""; $("chm_comp").checked=false;
+  renderChequeTabla(); renderChmSelector();
+  showMsg("chm_msg","ok",`${ymLabel(mes)} guardado: ${money(total)}${ccss?` · 30% a CCSS ${money(ccss)}`:""}${comp?" · compensado":""}.`);
+  await apiPost({action:"setCheque",mes,total,compensado:comp,usadoCCSS:ccss});
+};
+
 function renderChequeTabla(){
   const tb=$("ch_tbl").querySelector("tbody");
   const keys=Object.keys(state.cheque).sort();
