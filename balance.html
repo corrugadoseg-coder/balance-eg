@@ -479,6 +479,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
       <div class="f"><label>IVA al contador <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">cuando lo tengas</span></label><input id="t_ivacont" class="mono" inputmode="decimal" placeholder="0,00"></div>
     </div>
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
+      <div class="f"><label>Saldo a favor anterior (IIBB) <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">positivo = a favor tuyo</span></label><input id="t_sfav" class="mono" inputmode="decimal" placeholder="0,00"></div>
       <div class="f"><label>IIBB al contador <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">cuando lo tengas</span></label><input id="t_iibbcont" class="mono" inputmode="decimal" placeholder="0,00"></div>
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
       <div class="f"><label>Alícuota IIBB %</label><input id="t_alic" class="mono" inputmode="decimal" placeholder="3"></div>
@@ -688,6 +689,11 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     </label>
     <div style="overflow-x:auto"><table id="su_tbl"><tbody></tbody></table></div>
     <div id="su_resumen" class="ledger" style="margin-top:16px"></div>
+    <div class="row-actions" style="margin-top:14px">
+      <button class="btn ghost sm" id="su_detalle">Ver detalle completo</button>
+      <button class="btn ghost sm" id="su_print">🖨 Imprimir detalle</button>
+    </div>
+    <div id="su_detalle_box" style="margin-top:14px;display:none"></div>
   </div>
 
   <div class="card">
@@ -1503,6 +1509,7 @@ function cargarFormImp(){
   const f=n=>n?n.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2}):"";
   $("t_retbanc").value=f(d.retBancIIBB);
   if($("t_retcli"))$("t_retcli").value=f((state.impuestos[mes]||{}).retIVAClientes||0);
+  if($("t_sfav"))$("t_sfav").value=f((state.impuestos[mes]||{}).saldoFavorIIBB||0);
   $("t_ivacont").value=f(d.ivaContador);
   $("t_iibbcont").value=f(d.iibbContador);
   $("t_alic").value=d.alicIIBB;
@@ -1527,11 +1534,12 @@ $("t_save").onclick=async ()=>{
   // si ya hay retenciones del informe, no las pisamos con el campo manual
   const yaHayInforme=(dPrev.retIVAClientes||0)>0 && (dPrev.ivaCompras>0||dPrev.ivaVentas>0);
   const retCli=yaHayInforme? dPrev.retIVAClientes : retCliManual;
-  state.impuestos[mes]=Object.assign({},dPrev,{ivaContador:payload.ivaContador,retBancIIBB:payload.retBancIIBB,iibbContador:payload.iibbContador,alicIIBB:payload.alicIIBB,coefCABA:payload.coefCABA,coefBsAs:payload.coefBsAs,ivaExtracto:ivaExtractoPrev,retIVAClientes:retCli});
+  const sfav=parseNum($("t_sfav")?$("t_sfav").value:"")||0;
+  state.impuestos[mes]=Object.assign({},dPrev,{ivaContador:payload.ivaContador,retBancIIBB:payload.retBancIIBB,iibbContador:payload.iibbContador,alicIIBB:payload.alicIIBB,coefCABA:payload.coefCABA,coefBsAs:payload.coefBsAs,ivaExtracto:ivaExtractoPrev,retIVAClientes:retCli,saldoFavorIIBB:sfav});
   showMsg("t_msg","ok",`Datos de impuestos de ${ymLabel(mes)} guardados.`);
   drawImpuestos();
   await apiPost({action:"setImpuestos",...payload});
-  if(!yaHayInforme)await apiPost({action:"setDiarioIVA",mes,retIVAClientes:retCli});
+  await apiPost({action:"setDiarioIVA",mes,saldoFavorIIBB:sfav,...(yaHayInforme?{}:{retIVAClientes:retCli})});
 };
 
 function ivaMes(mes){ // calcula componentes de IVA del mes
@@ -1602,9 +1610,10 @@ function drawImpuestos(){
     </tbody></table>`;
   // ---- IIBB ----
   const ii=iibbMes(mes);
+  // saldo a favor anterior: primero el campo propio; si no está, el método viejo (contador anterior negativo)
+  const sfavCampo=d.saldoFavorIIBB||0;
   const saldoAntCont=(state.impuestos[mesAnterior(mes)]||{}).iibbContador||0;
-  // estim = bruto - deducciones - (saldo a favor anterior). Saldo a favor anterior = si "al contador" anterior fue negativo.
-  const saldoFavorAnt = saldoAntCont<0 ? -saldoAntCont : 0;
+  const saldoFavorAnt = sfavCampo>0 ? sfavCampo : (saldoAntCont<0 ? -saldoAntCont : 0);
   const estimIIBB = ii.iibbBruto - ii.deducciones - saldoFavorAnt;
   const difIIBB = d.iibbContador? (estimIIBB-d.iibbContador):null;
   $("t_iibb").innerHTML=`
@@ -2436,6 +2445,10 @@ function drawSueldos(){
      <div class="led" style="background:var(--bgB);border-color:var(--lineB)"><div class="l">Total B (mano)</div><div class="v">${money0(totalB)}</div><div class="sub">mano + vac + SAC</div></div>
      <div class="led" style="border-color:var(--gold)"><div class="l">Total A+B</div><div class="v">${money0(totalA+totalB)}</div><div class="sub">sueldos del mes</div></div>`;
   drawCCSS();
+  // si el detalle está abierto, refrescarlo
+  if(typeof sueldoDetalleAbierto!=="undefined" && sueldoDetalleAbierto && $("su_detalle_box")){
+    $("su_detalle_box").innerHTML=`<div class="sectlabel">Detalle de ${ymLabel($("su_mes").value)}</div><div style="overflow-x:auto">${sueldoDetalleHTML($("su_mes").value,false)}</div>`;
+  }
 }
 function drawCCSS(){
   const mes=$("su_mes").value;
@@ -2471,6 +2484,80 @@ $("su_seed").onclick=async ()=>{
   drawSueldos();
   for(const n of nuevos){ await apiPost(Object.assign({action:"setSueldo"},n)); }
 };
+/* detalle completo de sueldos: tabla con todos los parciales */
+function sueldoDetalleHTML(mes,paraImprimir){
+  const emps=state.sueldos.filter(s=>normMes(s.mes)===normMes(mes)&&s.nombre);
+  if(!emps.length)return `<div class="empty">Sin sueldos cargados en ${ymLabel(mes)}.</div>`;
+  emps.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  const f=n=>n?money(n):(paraImprimir?'—':'·');
+  let sumField={q1A:0,q2A:0,depA:0,vacA:0,sacA:0,q1B:0,q2B:0,manoB:0,vacB:0,sacB:0};
+  let rows="";
+  emps.forEach(s=>{
+    const q=s.modalidad==="quincenal";
+    const aParts=q?`${f(s.q1A)} · ${f(s.q2A)}`:f(s.depA);
+    const bParts=q?`${f(s.q1B)} · ${f(s.q2B)}`:f(s.manoB);
+    ["q1A","q2A","depA","vacA","sacA","q1B","q2B","manoB","vacB","sacB"].forEach(k=>sumField[k]+=(s[k]||0));
+    rows+=`<tr>
+      <td class="l">${s.nombre}</td>
+      <td style="font-size:11px;color:var(--faint)">${q?"Quinc.":"Mens."}</td>
+      <td class="num" style="background:var(--bgA)">${aParts}</td>
+      <td class="num" style="background:var(--bgA)">${f(s.vacA)}</td>
+      <td class="num" style="background:var(--bgA)">${f(s.sacA)}</td>
+      <td class="num" style="background:var(--bgB)">${bParts}</td>
+      <td class="num" style="background:var(--bgB)">${f(s.vacB)}</td>
+      <td class="num" style="background:var(--bgB)">${f(s.sacB)}</td>
+      <td class="num"><b>${money(totA(s)+totB(s))}</b></td>
+    </tr>`;
+  });
+  const totalA=emps.reduce((a,s)=>a+totA(s),0), totalB=emps.reduce((a,s)=>a+totB(s),0);
+  return `<table style="width:100%;font-size:13px"><tbody>
+    <tr>
+      <th class="l">Empleado</th><th></th>
+      <th class="num" style="background:var(--bgA2)" colspan="3">TIPO A (blanco): Q1·Q2 / dep · Vac · SAC</th>
+      <th class="num" style="background:var(--bgB2)" colspan="3">TIPO B (mano): Q1·Q2 / mano · Vac · SAC</th>
+      <th class="num">Total</th>
+    </tr>
+    ${rows}
+    <tr class="tot"><td class="l"><b>Totales</b></td><td></td>
+      <td class="num" colspan="3" style="background:var(--bgA2)"><b>${money(totalA)}</b></td>
+      <td class="num" colspan="3" style="background:var(--bgB2)"><b>${money(totalB)}</b></td>
+      <td class="num"><b>${money(totalA+totalB)}</b></td></tr>
+  </tbody></table>`;
+}
+let sueldoDetalleAbierto=false;
+if($("su_detalle"))$("su_detalle").onclick=()=>{
+  const box=$("su_detalle_box");
+  sueldoDetalleAbierto=!sueldoDetalleAbierto;
+  if(sueldoDetalleAbierto){
+    box.style.display="block";
+    box.innerHTML=`<div class="sectlabel">Detalle de ${ymLabel($("su_mes").value)}</div><div style="overflow-x:auto">${sueldoDetalleHTML($("su_mes").value,false)}</div>`;
+    $("su_detalle").textContent="Ocultar detalle";
+  } else {
+    box.style.display="none"; box.innerHTML="";
+    $("su_detalle").textContent="Ver detalle completo";
+  }
+};
+if($("su_print"))$("su_print").onclick=()=>{
+  const mes=$("su_mes").value;
+  const w=window.open("","_blank");
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sueldos ${ymLabel(mes)}</title>
+    <style>
+      body{font-family:Georgia,serif;color:#23201a;max-width:900px;margin:24px auto;padding:0 16px}
+      h1{font-size:20px;margin-bottom:2px} .sub{color:#666;font-size:12px;margin-bottom:16px}
+      table{width:100%;border-collapse:collapse;margin-top:10px}
+      td,th{padding:6px 8px;border-bottom:1px solid #ddd;font-size:12px;text-align:right}
+      td.l,th.l{text-align:left} th{background:#f0ece4}
+      .tot td{border-top:2px solid #333;font-weight:bold}
+      @media print{button{display:none}}
+    </style></head><body>
+    <h1>Detalle de sueldos — ${ymLabel(mes)}</h1>
+    <div class="sub">EG Corrugados · generado ${new Date().toLocaleDateString("es-AR")}</div>
+    ${sueldoDetalleHTML(mes,true)}
+    <button onclick="window.print()" style="margin-top:18px;padding:9px 18px;cursor:pointer">Imprimir</button>
+    </body></html>`);
+  w.document.close();
+};
+
 $("su_addemp").onclick=()=>{
   const mes=$("su_mes").value;
   const nuevo={id:uid(),mes,tipo:"empleado",modalidad:"mensual",nombre:"",depA:0,q1A:0,q2A:0,vacA:0,sacA:0,manoB:0,q1B:0,q2B:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""};
