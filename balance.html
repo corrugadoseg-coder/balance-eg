@@ -2486,20 +2486,20 @@ $("su_seed").onclick=async ()=>{
 };
 /* detalle completo de sueldos: tabla con todos los parciales */
 function sueldoDetalleHTML(mes,paraImprimir){
-  const emps=state.sueldos.filter(s=>normMes(s.mes)===normMes(mes)&&s.nombre);
+  const emps=state.sueldos.filter(s=>s.mes===mes && s.tipo==="empleado" && s.nombre);
   if(!emps.length)return `<div class="empty">Sin sueldos cargados en ${ymLabel(mes)}.</div>`;
   emps.sort((a,b)=>a.nombre.localeCompare(b.nombre));
   const f=n=>n?money(n):(paraImprimir?'—':'·');
-  let sumField={q1A:0,q2A:0,depA:0,vacA:0,sacA:0,q1B:0,q2B:0,manoB:0,vacB:0,sacB:0};
   let rows="";
   emps.forEach(s=>{
-    const q=s.modalidad==="quincenal";
-    const aParts=q?`${f(s.q1A)} · ${f(s.q2A)}`:f(s.depA);
-    const bParts=q?`${f(s.q1B)} · ${f(s.q2B)}`:f(s.manoB);
-    ["q1A","q2A","depA","vacA","sacA","q1B","q2B","manoB","vacB","sacB"].forEach(k=>sumField[k]+=(s[k]||0));
+    // mostrar según lo que tenga cargado (no según la etiqueta de modalidad)
+    const tieneQuincA=(s.q1A||s.q2A), tieneQuincB=(s.q1B||s.q2B);
+    const aParts = tieneQuincA ? `${f(s.q1A)} · ${f(s.q2A)}` : f(s.depA);
+    const bParts = tieneQuincB ? `${f(s.q1B)} · ${f(s.q2B)}` : f(s.manoB);
+    const modo = (tieneQuincA||tieneQuincB) ? "Quinc." : "Mens.";
     rows+=`<tr>
       <td class="l">${s.nombre}</td>
-      <td style="font-size:11px;color:var(--faint)">${q?"Quinc.":"Mens."}</td>
+      <td style="font-size:11px;color:var(--faint)">${modo}</td>
       <td class="num" style="background:var(--bgA)">${aParts}</td>
       <td class="num" style="background:var(--bgA)">${f(s.vacA)}</td>
       <td class="num" style="background:var(--bgA)">${f(s.sacA)}</td>
@@ -2510,7 +2510,7 @@ function sueldoDetalleHTML(mes,paraImprimir){
     </tr>`;
   });
   const totalA=emps.reduce((a,s)=>a+totA(s),0), totalB=emps.reduce((a,s)=>a+totB(s),0);
-  return `<table style="width:100%;font-size:13px"><tbody>
+  let tabla=`<table style="width:100%;font-size:13px"><tbody>
     <tr>
       <th class="l">Empleado</th><th></th>
       <th class="num" style="background:var(--bgA2)" colspan="3">TIPO A (blanco): Q1·Q2 / dep · Vac · SAC</th>
@@ -2523,6 +2523,16 @@ function sueldoDetalleHTML(mes,paraImprimir){
       <td class="num" colspan="3" style="background:var(--bgB2)"><b>${money(totalB)}</b></td>
       <td class="num"><b>${money(totalA+totalB)}</b></td></tr>
   </tbody></table>`;
+  // CCSS, sindicato y federación del mes
+  const ccss=state.sueldos.filter(s=>s.mes===mes && s.tipo==="ccss");
+  if(ccss.length){
+    let ct=0;
+    const filas=ccss.map(c=>{ ct+=c.monto||0; return `<tr><td class="l">${c.nombre||"Concepto"}</td><td class="num">${money(c.monto)}</td></tr>`; }).join("");
+    tabla+=`<div class="sectlabel" style="margin-top:16px">CCSS, sindicato y federación</div>
+      <table style="width:100%;font-size:13px"><tbody>${filas}
+      <tr class="tot"><td class="l"><b>Total</b></td><td class="num"><b>${money(ct)}</b></td></tr></tbody></table>`;
+  }
+  return tabla;
 }
 let sueldoDetalleAbierto=false;
 if($("su_detalle"))$("su_detalle").onclick=()=>{
