@@ -267,7 +267,6 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
         <button class="mitem" data-v="servicios"><span class="mn">06</span>Servicios y calendario</button>
         <button class="mitem" data-v="sueldos"><span class="mn">07</span>Sueldos y CCSS</button>
         <button class="mitem" data-v="chemit"><span class="mn">08</span>Cheques emitidos</button>
-        <button class="mitem" data-v="vencim"><span class="mn">09</span>Vencimientos</button>
       </div>
       <div class="grupo">
         <div class="grupo-t">04 · Análisis</div>
@@ -747,21 +746,6 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   </div>
 </section>
 
-<!-- ===== 07 VENCIMIENTOS ===== -->
-<section class="view" data-v="vencim">
-  <div class="card">
-    <h2>Próximos vencimientos</h2>
-    <p class="lead">Lo que se viene a pagar, de todos los meses, ordenado por fecha. Elegí el rango de días.</p>
-    <div class="grid" style="grid-template-columns:auto auto;gap:14px;max-width:420px;align-items:end">
-      <div class="f"><label>Próximos</label>
-        <select id="vc_rango"><option value="7">7 días</option><option value="15" selected>15 días</option><option value="30">30 días</option><option value="60">60 días</option><option value="9999">Todos</option></select>
-      </div>
-    </div>
-    <div id="vc_resumen" class="ledger" style="margin:16px 0"></div>
-    <div style="overflow-x:auto"><table id="vc_tbl"><tbody></tbody></table></div>
-  </div>
-</section>
-
 <!-- ===== 08 CHEQUES EMITIDOS ===== -->
 <section class="view" data-v="chemit">
   <div class="card">
@@ -1037,7 +1021,7 @@ $("g_subadd").onclick=async ()=>{
 /* ---- navegación: inicio + menú lateral ---- */
 const TITULOS={gasto:"Facturas a mano",venta:"Ventas del mes",balance:"Balance mensual",impuestos:"Impuestos — IVA e IIBB",
   diarioiva:"Diario IVA",cheque:"Impuesto al cheque",servicios:"Servicios y calendario de pagos",sueldos:"Sueldos, CCSS y sindicato",
-  vencim:"Vencimientos",chemit:"Cheques emitidos",resumen:"Resumen anual",informes:"Informes",datos:"Datos"};
+  chemit:"Cheques emitidos",resumen:"Resumen anual",informes:"Informes",datos:"Datos"};
 function irA(v){
   $("home").style.display="none";
   $("layout").style.display="flex";
@@ -1053,7 +1037,6 @@ function irA(v){
   if(v==="cheque")renderChequeTab();
   if(v==="resumen")renderResumen();
   if(v==="servicios")renderServicios();
-  if(v==="vencim")renderVencimientos();
   if(v==="chemit")renderChequesEmit();
   if(v==="sueldos")renderSueldos();
   if(v==="informes")applyFilters();
@@ -1566,6 +1549,48 @@ function iibbMes(mes){
   const saldoAnt=(state.impuestos[mesAnterior(mes)]||{}).iibbContador||0;
   return {ventasNetas,baseBsAs,iibbBruto,percProv,retCli,retBanc,deducciones,saldoAnt,alic:d.alicIIBB,coefCABA:d.coefCABA,coefBsAs:d.coefBsAs};
 }
+
+/* ===== PAGOS IMPOSITIVOS (se cargan a mano y suman a gastos) ===== */
+function drawPagosImp(){
+  const mes=normMes($("t_mes").value);
+  const tb=$("pi_tbl")?$("pi_tbl").querySelector("tbody"):null;
+  if(!tb)return;
+  const pagos=state.gastos.filter(g=>ym(g.fecha)===mes && g.rubro==="IMPOSITIVO");
+  if(!pagos.length){ tb.innerHTML=`<tr><td colspan="4"><div class="empty">Sin pagos impositivos cargados en ${ymLabel(mes)}.</div></td></tr>`; return; }
+  let h=`<tr><th class="l">Concepto</th><th class="num">Monto</th><th>Tipo</th><th></th></tr>`;
+  let tot=0;
+  pagos.forEach(g=>{ tot+=g.monto||0;
+    h+=`<tr class="${g.bn==="negro"?"rowB":"rowA"}"><td class="l">${g.sub||g.prov||"Impuesto"}</td><td class="num">${money(g.monto)}</td>
+      <td><span class="chipTipo ${g.bn==="negro"?"b":"a"}">${g.bn==="negro"?"B":"A"}</span></td>
+      <td><button class="del" data-delpi="${g.id}">✕</button></td></tr>`;
+  });
+  h+=`<tr class="tot"><td class="l"><b>Total pagado</b></td><td class="num"><b>${money(tot)}</b></td><td colspan="2"></td></tr>`;
+  tb.innerHTML=h;
+  tb.querySelectorAll("[data-delpi]").forEach(b=>b.onclick=async ()=>{
+    const id=b.dataset.delpi;
+    if(confirm("¿Borrar este pago impositivo?")){
+      state.gastos=state.gastos.filter(g=>g.id!==id);
+      drawPagosImp(); drawImpuestos();
+      await apiPost({action:"deleteGasto",id});
+    }
+  });
+}
+if($("pi_add"))$("pi_add").onclick=async ()=>{
+  const mes=normMes($("t_mes").value);
+  const concepto=$("pi_concepto").value.trim();
+  const monto=parseNum($("pi_monto").value)||0;
+  const bn=$("pi_bn").value;
+  if(!concepto){showMsg("pi_msg","learn","Poné el concepto (IVA, IIBB, etc.).");return;}
+  if(!monto){showMsg("pi_msg","learn","Poné el monto pagado.");return;}
+  const gid=uid();
+  const fecha=mes+"-01";
+  const g={id:gid,fecha,prov:concepto,rubro:"IMPOSITIVO",sub:concepto,monto,bn,iva:0,piva:0,piibb:0};
+  state.gastos.push(g);
+  $("pi_concepto").value=""; $("pi_monto").value="";
+  drawPagosImp(); drawImpuestos();
+  showMsg("pi_msg","ok",`Pago de ${concepto} por ${money(monto)} agregado a los gastos de ${ymLabel(mes)}.`);
+  await apiPost({action:"addGasto",id:gid,fecha,prov:concepto,rubro:"IMPOSITIVO",sub:concepto,bn,monto,iva:0,piva:0,piibb:0});
+};
 
 function drawImpuestos(){
   const mes=normMes($("t_mes").value);
@@ -2330,6 +2355,424 @@ async function sueldoAlBalance(s,alBalance){
     state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdB); await apiPost({action:"deleteGasto",id:s.gastoIdB}); s.gastoIdB="";
   }
 }
+
+/* ===== CHEQUES EMITIDOS ===== */
+function parseChequesEmit(texto){
+  const bloques=texto.split(/(?=ID:\s)/);
+  const out=[];
+  bloques.forEach(b=>{
+    if(!/ID:\s/.test(b))return;
+    const nro=(b.match(/N°:\s*(\d+)/)||b.match(/N[º°]:\s*(\d+)/)||[])[1]||"";
+    const cuit=(b.match(/CUIT\s*([\d-]+)/)||[])[1]||"";
+    const fecha=(b.match(/(\d{2}\/\d{2}\/\d{4})/)||[])[1]||"";
+    const imp=(b.match(/\$\s*([\d.]+,\d{2})/)||[])[1]||"";
+    // beneficiario: línea entre N°: y CUIT que no sea "..." ni vacía
+    let benef="";
+    const lineas=b.split("\n").map(l=>l.trim());
+    for(let i=0;i<lineas.length;i++){
+      if(/^N[º°]:/.test(lineas[i])){
+        for(let j=i+1;j<lineas.length;j++){
+          if(lineas[j] && !/^CUIT/.test(lineas[j]) && lineas[j]!=="..."){ benef=lineas[j]; break; }
+        }
+        break;
+      }
+    }
+    if(!nro && !imp)return;
+    out.push({nro,cuit,beneficiario:benef,fechaPago:fecha?isoDe(fecha):"",monto:imp?parseFloat(imp.replace(/\./g,"").replace(",",".")):0});
+  });
+  return out;
+}
+function isoDe(ddmmaaaa){ const p=ddmmaaaa.split("/"); return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:""; }
+
+function renderChequesEmit(){
+  $("che_rango").onchange=drawAvisoCaja;
+  $("che_filtro").onchange=drawChequesTabla;
+  drawAvisoCaja();
+  drawChequesTabla();
+}
+$("che_calc").onclick=async ()=>{
+  const texto=$("che_texto").value;
+  if(!texto.trim()){showMsg("che_msg","learn","Pegá primero el texto de los cheques.");return;}
+  const parsed=parseChequesEmit(texto);
+  if(!parsed.length){showMsg("che_msg","learn","No encontré cheques en el texto. Fijate de copiar desde \"ID:\".");return;}
+  let nuevos=0, repetidos=0;
+  for(const p of parsed){
+    // evitar duplicar por nro
+    if(p.nro && state.chequesEmit.some(c=>c.nro===p.nro)){ repetidos++; continue; }
+    const c={id:uid(),tipo:"electronico",nro:p.nro,beneficiario:p.beneficiario,cuit:p.cuit,fechaPago:p.fechaPago,monto:p.monto,estado:"No cobrado",obs:""};
+    state.chequesEmit.push(c); nuevos++;
+    await apiPost(Object.assign({action:"setChequeEmit"},c));
+  }
+  $("che_texto").value="";
+  drawAvisoCaja(); drawChequesTabla();
+  showMsg("che_msg","ok",`Cargué ${nuevos} cheque(s).${repetidos?" Omití "+repetidos+" que ya estaban (mismo N°).":""}`);
+};
+$("che_clear").onclick=()=>{$("che_texto").value="";hideMsg("che_msg");};
+$("che_add").onclick=()=>{
+  const c={id:uid(),tipo:"fisico",nro:"",beneficiario:"",cuit:"",fechaPago:"",monto:0,estado:"No cobrado",obs:""};
+  state.chequesEmit.push(c);
+  abrirEditCheque(c.id);
+};
+function drawChequesTabla(){
+  const f=$("che_filtro").value;
+  let list=state.chequesEmit.slice().sort((a,b)=>(a.fechaPago||"").localeCompare(b.fechaPago||""));
+  if(f==="No cobrado"||f==="Cobrado")list=list.filter(c=>c.estado===f);
+  if(f==="electronico"||f==="fisico")list=list.filter(c=>c.tipo===f);
+  const tb=$("che_tbl").querySelector("tbody");
+  if(!list.length){tb.innerHTML=`<tr><td colspan="7"><div class="empty">No hay cheques${f?" con ese filtro":" cargados"}.</div></td></tr>`;return;}
+  let h=`<tr><th class="l">Tipo</th><th class="l">N°</th><th class="l">Beneficiario</th><th class="l">Pago</th><th class="num">Monto</th><th>Estado</th><th></th></tr>`;
+  list.forEach(c=>{
+    h+=`<tr>
+      <td class="l"><span style="font-size:11px">${c.tipo==="fisico"?"Físico":"Electrónico"}</span></td>
+      <td class="l">${c.nro||"—"}</td>
+      <td class="l">${c.beneficiario||'<span style="color:var(--faint)">—</span>'}</td>
+      <td class="l">${c.fechaPago?fechaLinda(c.fechaPago):"—"}</td>
+      <td class="num">${money(c.monto)}</td>
+      <td><button class="estado-btn ${c.estado==="Cobrado"?'pagado':'pend'}" data-estch="${c.id}">${c.estado}</button></td>
+      <td style="white-space:nowrap"><button class="del" data-edch="${c.id}" title="Editar">✎</button> <button class="del" data-delche="${c.id}" title="Borrar">✕</button></td>
+    </tr>`;
+  });
+  tb.innerHTML=h;
+  tb.querySelectorAll("[data-estch]").forEach(b=>b.onclick=async ()=>{
+    const c=state.chequesEmit.find(x=>x.id===b.dataset.estch); if(!c)return;
+    c.estado=c.estado==="Cobrado"?"No cobrado":"Cobrado";
+    drawChequesTabla(); drawAvisoCaja();
+    await apiPost(Object.assign({action:"setChequeEmit"},c));
+  });
+  tb.querySelectorAll("[data-edch]").forEach(b=>b.onclick=()=>abrirEditCheque(b.dataset.edch));
+  tb.querySelectorAll("[data-delche]").forEach(b=>b.onclick=async ()=>{
+    if(confirm("¿Borrar este cheque?")){ const id=b.dataset.delche; state.chequesEmit=state.chequesEmit.filter(x=>x.id!==id); drawChequesTabla(); drawAvisoCaja(); await apiPost({action:"deleteChequeEmit",id}); }
+  });
+}
+function abrirEditCheque(id){
+  const c=state.chequesEmit.find(x=>x.id===id); if(!c)return;
+  $("chm_id").value=c.id;
+  $("chm_tipo").value=c.tipo||"electronico";
+  $("chm_nro").value=c.nro||"";
+  $("chm_benef").value=c.beneficiario||"";
+  $("chm_fpago").value=c.fechaPago||"";
+  $("chm_monto").value=c.monto||"";
+  $("chm_obs").value=c.obs||"";
+  hideMsg("chm_msg");
+  $("chm_overlay").style.display="flex";
+}
+$("chm_cancel").onclick=()=>{$("chm_overlay").style.display="none"; drawChequesTabla();};
+$("chm_overlay").addEventListener("click",e=>{ if(e.target===$("chm_overlay")){$("chm_overlay").style.display="none";drawChequesTabla();} });
+$("chm_save").onclick=async ()=>{
+  const c=state.chequesEmit.find(x=>x.id===$("chm_id").value); if(!c)return;
+  c.tipo=$("chm_tipo").value;
+  c.nro=$("chm_nro").value.trim();
+  c.beneficiario=$("chm_benef").value.trim();
+  c.fechaPago=$("chm_fpago").value;
+  c.monto=parseNum($("chm_monto").value)||0;
+  c.obs=$("chm_obs").value.trim();
+  $("chm_overlay").style.display="none";
+  drawChequesTabla(); drawAvisoCaja();
+  await apiPost(Object.assign({action:"setChequeEmit"},c));
+};
+function drawAvisoCaja(){
+  const rango=parseInt($("che_rango").value);
+  const noCob=state.chequesEmit.filter(c=>c.estado!=="Cobrado" && c.fechaPago);
+  // ya pueden salir: fecha de pago <= hoy
+  const yaSalen=noCob.filter(c=>diasAlVenc(c.fechaPago)<=0);
+  // por venir: fecha futura dentro del rango
+  const porVenir=noCob.filter(c=>{const d=diasAlVenc(c.fechaPago); return d>0 && d<=rango;});
+  const totalYa=yaSalen.reduce((s,c)=>s+c.monto,0);
+  const totalVen=porVenir.reduce((s,c)=>s+c.monto,0);
+  // servicios pendientes en el rango (para el total por separado)
+  const servPend=state.servicios.filter(s=>!s.pagado&&s.venc&&s.monto>0);
+  const servYa=servPend.filter(s=>diasAlVenc(s.venc)<=0).reduce((a,s)=>a+s.monto,0);
+  const servVen=servPend.filter(s=>{const d=diasAlVenc(s.venc);return d>0&&d<=rango;}).reduce((a,s)=>a+s.monto,0);
+  $("che_aviso").innerHTML=
+    `<div class="led"><div class="l">Cheques — ya pueden salir</div><div class="v ${totalYa>0?'neg':''}">${money0(totalYa)}</div><div class="sub">${yaSalen.length} cheque(s) no cobrados</div></div>
+     <div class="led"><div class="l">Cheques — por venir (${rango}d)</div><div class="v">${money0(totalVen)}</div><div class="sub">${porVenir.length} cheque(s)</div></div>
+     <div class="led"><div class="l">Servicios — ya / por venir</div><div class="v">${money0(servYa)} / ${money0(servVen)}</div><div class="sub">pendientes</div></div>
+     <div class="led" style="border-color:var(--gold)"><div class="l">Total a cubrir ya</div><div class="v ${(totalYa+servYa)>0?'neg':''}">${money0(totalYa+servYa)}</div><div class="sub">cheques + servicios que ya pueden salir</div></div>`;
+}
+
+
+/* ===== DIARIO IVA (informes del sistema) ===== */
+function parseNumAr(s){ if(!s)return 0; return parseFloat(String(s).trim().replace(/\./g,"").replace(",","."))||0; }
+/* normaliza nombre de proveedor para comparar flexible */
+function normProv(nombre){
+  return String(nombre||"").toLowerCase()
+    .replace(/[.,]/g,"")
+    .replace(/\b(s\s*a|s\s*r\s*l|s\s*a\s*s|sacifi|scpa|s\s*c\s*a|e\s*hijo|e\s*hijos|sa|srl|sas)\b/g,"")
+    .replace(/\s+/g," ").trim();
+}
+function rubroDeProveedor(nombre){
+  const n=normProv(nombre);
+  if(!n)return "";
+  const dir=state.memoria[nombre.trim().toLowerCase()];
+  if(dir)return dir;
+  for(const k in state.memoria){ if(normProv(k)===n)return state.memoria[k]; }
+  return "";
+}
+/* extrae totales del pie del informe de compras + neto por proveedor */
+function parseDiarioCompras(txt){
+  const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
+  const ivaTotal=tot(/TOTAL I\.V\.A\.\s*\.+;?\s*([\d.,-]+)/);
+  const percIVA=tot(/PERCEP[^\n]*I\.V\.A\.\s*\.+;?\s*([\d.,-]+)/i);
+  const percIIBB=tot(/PERCEP[^\n]*I\.I\.B\.B\.\s*\.+;?\s*([\d.,-]+)/i);
+  const neto=tot(/NETO\s*\.+;?\s*([\d.,-]+)/);
+  const excl=(state.exclusionesIVA||[]).map(x=>x.toUpperCase());
+  let ivaExcluido=0;
+  const provNeto={};
+  txt.split("\n").forEach(ln=>{
+    const c=ln.split(";");
+    if(c.length<11)return;
+    const razon=(c[5]||"").trim();
+    if(!razon)return;
+    const razonUp=razon.toUpperCase();
+    const importe=parseNumAr(c[9]||"");
+    const ivaLinea=parseNumAr(c[10]||"");
+    if(excl.some(ex=>razonUp.includes(ex))){ ivaExcluido+=ivaLinea; }
+    if(importe){ provNeto[razon]=(provNeto[razon]||0)+importe; }
+  });
+  return {ivaTotal,percIVA,percIIBB,neto,ivaExcluido,ivaCompNeto:ivaTotal-ivaExcluido,provNeto};
+}
+function parseDiarioVentas(txt){
+  const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
+  const ivaTotal=tot(/TOTAL I\.V\.A\.\s*\.+;?\s*([\d.,-]+)/);
+  const neto=tot(/NETO\s*\.+;?\s*([\d.,-]+)/);
+  return {ivaTotal,neto};
+}
+/* retenciones sufridas por tipo */
+function parseRetenciones(txt){
+  const lines=txt.split("\n");
+  let retIVA=0,retIIBB=0,retGan=0,suss=0;
+  lines.forEach((ln,i)=>{
+    const m=ln.match(/([\d.]+,\d{2})\s*$/);
+    if(!m)return;
+    const val=parseNumAr(m[1]);
+    const ctx=(ln+" "+(lines[i+1]||"")).toUpperCase();
+    if(/I\.?V\.?A/.test(ctx))retIVA+=val;
+    else if(/I\.?I\.?B\.?B|INGRESOS BRUTOS|IIBB/.test(ctx))retIIBB+=val;
+    else if(/GANANC/.test(ctx))retGan+=val;
+    else if(/SUSS|SEG/.test(ctx))suss+=val;
+  });
+  return {retIVA,retIIBB,retGan,suss};
+}
+/* PARTE B: suma a gastos como negro, sin IVA. NCr resta. */
+function parseParteB(txt){
+  const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
+  const neto=tot(/NETO\s*\.+\s*([\d.,-]+)/);
+  const provNeto={};
+  txt.split("\n").forEach(ln=>{
+    const l=ln.trim();
+    if(!l || /^(Total|NETO|TOTAL)/i.test(l))return;
+    const m=l.match(/^\s*(\d+)\s+(Fac|NCr|NDb)\s+\w+\s+[\d-]+\s+\w+\s+(.+?)\s+(?:[A-Z]\s+Cons\.Final|I\s+\d{11}|\d{11})\s+\d+\s+([\d.,-]+)\s+([\d.,-]+)\s*$/);
+    if(!m)return;
+    const prov=m[3].trim();
+    const monto=parseNumAr(m[5]);
+    if(!prov)return;
+    provNeto[prov]=(provNeto[prov]||0)+monto;
+  });
+  Object.keys(provNeto).forEach(p=>{ if(Math.abs(provNeto[p])<0.01)delete provNeto[p]; });
+  const sumaProv=Object.values(provNeto).reduce((a,b)=>a+b,0);
+  return {neto:neto||sumaProv, provNeto, sumaProv};
+}
+function mesMasTres(mes){ const [y,m]=normMes(mes).split("-").map(Number); const d=new Date(y,m-1+3,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+let diarioTmp={compras:null,ventas:null,ret:null,partb:null};
+function renderDiarioIVA(){
+  const sel=$("di_mes");
+  const arr=mesesSelector(Object.keys(state.impuestos));
+  const prev=normMes(sel.value);
+  sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
+  sel.value=arr.includes(prev)?prev:(arr.length?arr[arr.length-1]:curMonthISO());
+  sel.onchange=renderDiarioIVA;
+  // mostrar lo guardado del mes
+  const d=state.impuestos[sel.value]||{};
+  if(d.ivaCompras)$("di_res_compras").innerHTML=`<div class="led" style="border-color:var(--gold)"><div class="l">IVA compras (crédito)</div><div class="v">${money0(d.ivaCompNeto||d.ivaCompras)}</div><div class="sub">guardado</div></div>`;
+  else $("di_res_compras").innerHTML="";
+  if(d.ivaVentas)$("di_res_ventas").innerHTML=`<div class="led" style="border-color:var(--gold)"><div class="l">IVA ventas (débito)</div><div class="v">${money0(d.ivaVentas)}</div><div class="sub">guardado</div></div>`;
+  else $("di_res_ventas").innerHTML="";
+  if(d.retIVAClientes||d.retIIBBClientes||d.retGanancias)mostrarResRet({retIVA:d.retIVAClientes||0,retIIBB:d.retIIBBClientes||0,retGan:d.retGanancias||0});
+  else $("di_res_ret").innerHTML="";
+  const pbTot=state.gastosInforme.filter(g=>normMes(g.mes)===sel.value && g.tipo==="negro").reduce((a,g)=>a+g.monto,0);
+  if(pbTot)$("di_res_partb").innerHTML=`<div class="led" style="border-color:var(--gold)"><div class="l">Total parte B</div><div class="v">${money0(pbTot)}</div><div class="sub">guardado · Tipo B</div></div>`;
+  else $("di_res_partb").innerHTML="";
+  $("di_rubros_box").innerHTML=""; $("di_rubros_b").innerHTML="";
+  hideMsg("di_msg");
+}
+function mostrarResCompras(r){
+  $("di_res_compras").innerHTML=
+    `<div class="led" style="border-color:var(--gold)"><div class="l">IVA compras (crédito)</div><div class="v">${money0(r.ivaCompNeto)}</div><div class="sub">total ${money0(r.ivaTotal)} − excluidos ${money0(r.ivaExcluido)}</div></div>
+     <div class="led"><div class="l">Percep. IVA</div><div class="v">${money0(r.percIVA)}</div></div>
+     <div class="led"><div class="l">Percep. IIBB</div><div class="v">${money0(r.percIIBB)}</div></div>`;
+}
+function mostrarResVentas(r){
+  $("di_res_ventas").innerHTML=
+    `<div class="led" style="border-color:var(--gold)"><div class="l">IVA ventas (débito)</div><div class="v">${money0(r.ivaTotal)}</div></div>
+     <div class="led"><div class="l">Neto ventas</div><div class="v">${money0(r.neto)}</div></div>`;
+}
+function mostrarResRet(r){
+  $("di_res_ret").innerHTML=
+    `<div class="led"><div class="l">Ret. IVA</div><div class="v">${money0(r.retIVA)}</div></div>
+     <div class="led"><div class="l">Ret. IIBB</div><div class="v">${money0(r.retIIBB)}</div></div>
+     <div class="led"><div class="l">Ret. Ganancias</div><div class="v">${money0(r.retGan)}</div><div class="sub">informativo</div></div>`;
+}
+function mostrarResPartB(r){
+  $("di_res_partb").innerHTML=
+    `<div class="led" style="border-color:var(--gold)"><div class="l">Total parte B</div><div class="v">${money0(r.neto)}</div><div class="sub">gastos Tipo B · sin IVA</div></div>
+     <div class="led"><div class="l">Proveedores</div><div class="v">${Object.keys(r.provNeto).length}</div><div class="sub">con saldo</div></div>`;
+}
+function drawRubrosInforme(provNeto){
+  const box=$("di_rubros_box");
+  const provs=Object.keys(provNeto);
+  if(!provs.length){box.innerHTML="";return;}
+  const porRubro={}; const pend={};
+  provs.forEach(p=>{ const r=rubroDeProveedor(p); if(r){ if(!porRubro[r])porRubro[r]=[]; porRubro[r].push([p,provNeto[p]]); } else pend[p]=provNeto[p]; });
+  const excl=(state.exclusionesIVA||[]).map(x=>x.toUpperCase());
+  let h=`<div class="sectlabel" style="margin-top:8px">Gastos por rubro (del informe)</div>`;
+  const pk=Object.keys(pend);
+  if(pk.length){
+    h+=`<div style="background:#fdf6e3;border:1px solid var(--gold);border-radius:8px;padding:12px;margin-bottom:12px"><div style="font-weight:600;margin-bottom:8px">⚠ ${pk.length} proveedor(es) sin rubro:</div>`;
+    pk.sort((a,b)=>pend[b]-pend[a]).forEach(p=>{
+      h+=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap"><span style="flex:1;min-width:180px;font-size:13px">${p} <b>${money(pend[p])}</b></span><select data-provrubro="${encodeURIComponent(p)}" style="max-width:220px"><option value="">— elegí rubro —</option>${RUBROS.map(r=>`<option>${r}</option>`).join("")}</select></div>`;
+    });
+    h+=`</div>`;
+  }
+  const ord=Object.keys(porRubro).sort();
+  if(ord.length){
+    h+=`<table style="width:100%"><tbody>`;
+    let totGasto=0,totNoGasto=0;
+    ord.forEach(rubro=>{
+      const items=porRubro[rubro].sort((a,b)=>b[1]-a[1]);
+      const st=items.reduce((s,x)=>s+x[1],0);
+      const noG=RUBROS_NO_GASTO.includes(rubro);
+      if(noG)totNoGasto+=st; else totGasto+=st;
+      h+=`<tr style="background:var(--paper2)"><td class="l" colspan="2"><b>${rubro}</b>${noG?' <span style="font-size:10px;color:var(--faint)">(no suma al gasto)</span>':''}</td><td class="num"><b>${money(st)}</b></td></tr>`;
+      items.forEach(([p,n])=>{ const ex=excl.some(e=>p.toUpperCase().includes(e)); h+=`<tr><td class="l" style="padding-left:16px;font-size:13px">${p}${ex?' <span style="font-size:10px;color:var(--faint)">(sin IVA)</span>':''}</td><td></td><td class="num">${money(n)}</td></tr>`; });
+    });
+    h+=`<tr class="tot"><td class="l"><b>Total gastos del mes</b></td><td></td><td class="num"><b>${money(totGasto)}</b></td></tr>`;
+    if(totNoGasto)h+=`<tr><td class="l" style="font-size:12px;color:var(--faint)">Personal / no gasto (aparte)</td><td></td><td class="num" style="font-size:12px;color:var(--faint)">${money(totNoGasto)}</td></tr>`;
+    h+=`</tbody></table>`;
+  }
+  box.innerHTML=h;
+  box.querySelectorAll("[data-provrubro]").forEach(sel=>sel.onchange=async ()=>{
+    const prov=decodeURIComponent(sel.dataset.provrubro); const rubro=sel.value; if(!rubro)return;
+    state.memoria[prov.trim().toLowerCase()]=rubro;
+    await apiPost({action:"setProv",prov:prov.trim().toLowerCase(),rubro});
+    drawRubrosInforme(diarioTmp.compras?diarioTmp.compras.provNeto:{});
+  });
+}
+function drawRubrosB(provNeto){
+  const box=$("di_rubros_b");
+  const provs=Object.keys(provNeto);
+  if(!provs.length){box.innerHTML="";return;}
+  const porRubro={}; const pend={};
+  provs.forEach(p=>{ const r=rubroDeProveedor(p); if(r){ if(!porRubro[r])porRubro[r]=[]; porRubro[r].push([p,provNeto[p]]); } else pend[p]=provNeto[p]; });
+  let h=`<div class="sectlabel" style="margin-top:8px">Parte B por rubro</div>`;
+  const pk=Object.keys(pend);
+  if(pk.length){
+    h+=`<div style="background:#fdf6e3;border:1px solid var(--gold);border-radius:8px;padding:12px;margin-bottom:12px"><div style="font-weight:600;margin-bottom:8px">⚠ ${pk.length} proveedor(es) sin rubro:</div>`;
+    pk.sort((a,b)=>pend[b]-pend[a]).forEach(p=>{
+      h+=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap"><span style="flex:1;min-width:180px;font-size:13px">${p} <b>${money(pend[p])}</b></span><select data-provrubrob="${encodeURIComponent(p)}" style="max-width:220px"><option value="">— elegí rubro —</option>${RUBROS.map(r=>`<option>${r}</option>`).join("")}</select></div>`;
+    });
+    h+=`</div>`;
+  }
+  const ord=Object.keys(porRubro).sort();
+  if(ord.length){
+    h+=`<table style="width:100%"><tbody>`;
+    let tot=0;
+    ord.forEach(rubro=>{
+      const items=porRubro[rubro].sort((a,b)=>b[1]-a[1]);
+      const st=items.reduce((s,x)=>s+x[1],0);
+      const noG=RUBROS_NO_GASTO.includes(rubro);
+      if(!noG)tot+=st;
+      h+=`<tr style="background:var(--paper2)"><td class="l" colspan="2"><b>${rubro}</b>${noG?' <span style="font-size:10px;color:var(--faint)">(no suma)</span>':''}</td><td class="num"><b>${money(st)}</b></td></tr>`;
+      items.forEach(([p,n])=>{ h+=`<tr><td class="l" style="padding-left:16px;font-size:13px">${p}</td><td></td><td class="num">${money(n)}</td></tr>`; });
+    });
+    h+=`<tr class="tot"><td class="l"><b>Total parte B al balance</b></td><td></td><td class="num"><b>${money(tot)}</b></td></tr></tbody></table>`;
+  }
+  box.innerHTML=h;
+  box.querySelectorAll("[data-provrubrob]").forEach(sel=>sel.onchange=async ()=>{
+    const prov=decodeURIComponent(sel.dataset.provrubrob); const rubro=sel.value; if(!rubro)return;
+    state.memoria[prov.trim().toLowerCase()]=rubro;
+    await apiPost({action:"setProv",prov:prov.trim().toLowerCase(),rubro});
+    drawRubrosB(diarioTmp.partb?diarioTmp.partb.provNeto:{});
+  });
+}
+$("di_calc_compras").onclick=()=>{
+  const txt=$("di_compras").value;
+  if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de compras.");return;}
+  const r=parseDiarioCompras(txt);
+  if(!r.ivaTotal){showMsg("di_msg","learn","No encontré el TOTAL I.V.A. Copiá hasta el final (los totales).");return;}
+  diarioTmp.compras=r; mostrarResCompras(r); drawRubrosInforme(r.provNeto||{}); hideMsg("di_msg");
+};
+$("di_calc_ventas").onclick=()=>{
+  const txt=$("di_ventas").value;
+  if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de ventas.");return;}
+  const r=parseDiarioVentas(txt);
+  if(!r.ivaTotal){showMsg("di_msg","learn","No encontré el TOTAL I.V.A. de ventas.");return;}
+  diarioTmp.ventas=r; mostrarResVentas(r); hideMsg("di_msg");
+};
+$("di_calc_ret").onclick=()=>{
+  const txt=$("di_ret").value;
+  if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de retenciones.");return;}
+  const r=parseRetenciones(txt);
+  if(!r.retIVA && !r.retIIBB && !r.retGan){showMsg("di_msg","learn","No encontré retenciones. Copiá el listado completo.");return;}
+  diarioTmp.ret=r; mostrarResRet(r); hideMsg("di_msg");
+};
+$("di_calc_partb").onclick=()=>{
+  const txt=$("di_partb").value;
+  if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de parte B.");return;}
+  const r=parseParteB(txt);
+  if(!r.neto && !Object.keys(r.provNeto).length){showMsg("di_msg","learn","No pude leer el informe de parte B.");return;}
+  diarioTmp.partb=r; mostrarResPartB(r); drawRubrosB(r.provNeto||{}); hideMsg("di_msg");
+};
+$("di_guardar").onclick=async ()=>{
+  const mes=normMes($("di_mes").value);
+  const c=diarioTmp.compras, v=diarioTmp.ventas, rt=diarioTmp.ret;
+  const dPrev=state.impuestos[mes]||{};
+  const compras=c||{ivaTotal:dPrev.ivaCompras||0,percIVA:dPrev.percIVACompras||0,percIIBB:dPrev.percIIBBCompras||0,neto:dPrev.netoCompras||0,ivaExcluido:dPrev.ivaExcluido||0,ivaCompNeto:dPrev.ivaCompNeto||0};
+  const ventas=v||{ivaTotal:dPrev.ivaVentas||0,neto:dPrev.netoVentas||0};
+  const ret=rt||{retIVA:dPrev.retIVAClientes||0,retIIBB:dPrev.retIIBBClientes||0,retGan:dPrev.retGanancias||0};
+  if(!compras.ivaTotal && !ventas.ivaTotal && !ret.retIVA && !diarioTmp.partb){showMsg("di_msg","learn","Leé al menos un informe antes de guardar.");return;}
+  const yaExiste=(dPrev.ivaCompras||dPrev.ivaVentas)?" (ya había datos en este mes; se van a actualizar)":"";
+  const partes=[];
+  if(compras.ivaTotal)partes.push("IVA compras "+money(compras.ivaCompNeto));
+  if(ventas.ivaTotal)partes.push("IVA ventas "+money(ventas.ivaTotal));
+  if(ret.retIVA)partes.push("Ret. IVA "+money(ret.retIVA));
+  if(diarioTmp.partb)partes.push("Parte B "+money(diarioTmp.partb.neto));
+  if(!confirm(`Vas a guardar los informes en el mes:\n\n➡ ${ymLabel(mes).toUpperCase()}${yaExiste}\n\n${partes.join(" · ")}\n\n¿Es el mes correcto?`))return;
+  const mesPago=mesMasTres(mes);
+  const imp=Object.assign({},dPrev,{
+    ivaVentas:ventas.ivaTotal,netoVentas:ventas.neto,
+    ivaCompras:compras.ivaTotal,ivaCompNeto:compras.ivaCompNeto,ivaExcluido:compras.ivaExcluido,
+    percIVACompras:compras.percIVA,percIIBBCompras:compras.percIIBB,netoCompras:compras.neto,
+    retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,mesPagoIVA:mesPago});
+  state.impuestos[mes]=imp;
+  await apiPost({action:"setDiarioIVA",mes,ivaVentas:ventas.ivaTotal,netoVentas:ventas.neto,
+    ivaCompras:compras.ivaTotal,ivaCompNeto:compras.ivaCompNeto,ivaExcluido:compras.ivaExcluido,
+    percIVACompras:compras.percIVA,percIIBBCompras:compras.percIIBB,netoCompras:compras.neto,
+    retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,mesPagoIVA:mesPago});
+  // gastos por rubro al balance
+  const items=[]; let sinRubro=0;
+  if(compras.provNeto){
+    const porRubroA={};
+    Object.keys(compras.provNeto).forEach(p=>{ const r=rubroDeProveedor(p); if(!r){sinRubro++;return;} if(RUBROS_NO_GASTO.includes(r))return; porRubroA[r]=(porRubroA[r]||0)+compras.provNeto[p]; });
+    Object.keys(porRubroA).forEach(r=>items.push({rubro:r,monto:porRubroA[r],tipo:"blanco"}));
+  }
+  const pb=diarioTmp.partb;
+  if(pb && pb.provNeto){
+    const porRubroB={};
+    Object.keys(pb.provNeto).forEach(p=>{ const r=rubroDeProveedor(p); if(!r){sinRubro++;return;} if(RUBROS_NO_GASTO.includes(r))return; porRubroB[r]=(porRubroB[r]||0)+pb.provNeto[p]; });
+    Object.keys(porRubroB).forEach(r=>items.push({rubro:r,monto:porRubroB[r],tipo:"negro"}));
+  }
+  if(items.length || compras.provNeto){
+    state.gastosInforme=state.gastosInforme.filter(g=>normMes(g.mes)!==mes);
+    items.forEach(it=>state.gastosInforme.push({mes,rubro:it.rubro,monto:it.monto,tipo:it.tipo}));
+    await apiPost({action:"setGastosInforme",mes,items:JSON.stringify(items)});
+  }
+  diarioTmp={compras:null,ventas:null,ret:null,partb:null};
+  renderDiarioIVA();
+  let msg=`Informes de ${ymLabel(mes)} guardados. El IVA se paga en ${ymLabel(mesPago)}.`;
+  if(sinRubro)msg+=` Ojo: ${sinRubro} proveedor(es) sin rubro no suman al balance.`;
+  showMsg("di_msg","ok",msg);
+};
+
 
 /* ===== RESUMEN ANUAL ===== */
 function aniosConDatos(){
