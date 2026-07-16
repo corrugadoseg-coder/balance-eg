@@ -1999,6 +1999,338 @@ $("eds_save").onclick=async ()=>{
   showMsg("sv_msg","ok",`Servicio "${s.servicio}" guardado en el calendario.`);
 };
 
+/* ===== SUELDOS, CCSS Y SINDICATO ===== */
+const EMP_BASE=["Bianchini","Cacavelos","Fotini","Gutman","Escalada","Gomez","Longoni","Candia","Dittrich","Duarte"];
+function totA(s){ return (s.depA||0)+(s.q1A||0)+(s.q2A||0)+(s.vacA||0)+(s.sacA||0); }
+function totB(s){ return (s.manoB||0)+(s.q1B||0)+(s.q2B||0)+(s.vacB||0)+(s.sacB||0); }
+function renderSueldos(){
+  const sel=$("su_mes");
+  const arr=mesesSelector(state.sueldos.map(s=>s.mes));
+  const prev=normMes(sel.value);
+  sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
+  sel.value=arr.includes(prev)?prev:(arr.length?arr[arr.length-1]:curMonthISO());
+  sel.onchange=renderSueldos;
+  drawSueldos();
+}
+function drawSueldos(){
+  const mes=$("su_mes").value;
+  const emps=state.sueldos.filter(s=>s.mes===mes && s.tipo==="empleado");
+  const tb=$("su_tbl").querySelector("tbody");
+  if(!emps.length){
+    tb.innerHTML=`<tr><td colspan="6"><div class="empty">No hay empleados cargados para ${ymLabel(mes)}. Usá "Cargar empleados" o "+ Empleado".</div></td></tr>`;
+  } else {
+    let h=`<tr><th class="l">Empleado</th><th class="l">Modalidad</th><th class="num">Total A (blanco)</th><th class="num">Total B (mano)</th><th class="num">Total</th><th></th></tr>`;
+    emps.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    emps.forEach(s=>{
+      const ta=totA(s), tbb=totB(s);
+      h+=`<tr>
+        <td class="l">${s.nombre}</td>
+        <td class="l"><span style="font-size:12px;color:var(--faint)">${s.modalidad==="quincenal"?"Quincenal":"Mensual"}</span></td>
+        <td class="num" style="background:var(--bgA)">${ta?money(ta):'·'}</td>
+        <td class="num" style="background:var(--bgB)">${tbb?money(tbb):'·'}</td>
+        <td class="num"><b>${money(ta+tbb)}</b></td>
+        <td style="white-space:nowrap"><button class="del" data-edsu="${s.id}" title="Editar">✎</button> <button class="del" data-delsu="${s.id}" title="Borrar">✕</button></td>
+      </tr>`;
+    });
+    tb.innerHTML=h;
+    tb.querySelectorAll("[data-edsu]").forEach(b=>b.onclick=()=>abrirEditSueldo(b.dataset.edsu));
+    tb.querySelectorAll("[data-delsu]").forEach(b=>b.onclick=async ()=>{
+      if(confirm("¿Borrar este empleado del mes?")){ const id=b.dataset.delsu; const s=state.sueldos.find(x=>x.id===id);
+        if(s){ if(s.gastoIdA){state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdA);await apiPost({action:"deleteGasto",id:s.gastoIdA});}
+               if(s.gastoIdB){state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdB);await apiPost({action:"deleteGasto",id:s.gastoIdB});} }
+        state.sueldos=state.sueldos.filter(x=>x.id!==id); drawSueldos(); await apiPost({action:"deleteSueldo",id}); }
+    });
+  }
+  const totalA=emps.reduce((a,s)=>a+totA(s),0);
+  const totalB=emps.reduce((a,s)=>a+totB(s),0);
+  $("su_resumen").innerHTML=
+    `<div class="led" style="background:var(--bgA);border-color:var(--lineA)"><div class="l">Total A (blanco)</div><div class="v">${money0(totalA)}</div><div class="sub">depositado + vac + SAC</div></div>
+     <div class="led" style="background:var(--bgB);border-color:var(--lineB)"><div class="l">Total B (mano)</div><div class="v">${money0(totalB)}</div><div class="sub">mano + vac + SAC</div></div>
+     <div class="led" style="border-color:var(--gold)"><div class="l">Total A+B</div><div class="v">${money0(totalA+totalB)}</div><div class="sub">sueldos del mes</div></div>`;
+  drawCCSS();
+  if(typeof sueldoDetalleAbierto!=="undefined" && sueldoDetalleAbierto && $("su_detalle_box")){
+    $("su_detalle_box").innerHTML=`<div class="sectlabel">Detalle de ${ymLabel($("su_mes").value)}</div><div style="overflow-x:auto">${sueldoDetalleHTML($("su_mes").value,false)}</div>`;
+  }
+}
+function drawCCSS(){
+  const mes=$("su_mes").value;
+  const items=state.sueldos.filter(s=>s.mes===mes && s.tipo==="ccss");
+  const tb=$("su_ccss_tbl").querySelector("tbody");
+  if(!items.length){
+    tb.innerHTML=`<tr><td colspan="3"><div class="empty">No hay conceptos de CCSS/sindicato para ${ymLabel(mes)}.</div></td></tr>`;
+    return;
+  }
+  let h=`<tr><th class="l">Concepto</th><th class="num">Monto</th><th></th></tr>`;
+  let tot=0;
+  items.forEach(s=>{ tot+=s.monto||0;
+    h+=`<tr><td class="l">${s.nombre}</td><td class="num">${money(s.monto)}</td>
+      <td style="white-space:nowrap"><button class="del" data-edcc="${s.id}" title="Editar">✎</button> <button class="del" data-delcc="${s.id}" title="Borrar">✕</button></td></tr>`;
+  });
+  h+=`<tr class="tot"><td class="l"><b>Total CCSS + sindicato</b></td><td class="num"><b>${money(tot)}</b></td><td></td></tr>`;
+  tb.innerHTML=h;
+  tb.querySelectorAll("[data-edcc]").forEach(b=>b.onclick=()=>abrirEditCCSS(b.dataset.edcc));
+  tb.querySelectorAll("[data-delcc]").forEach(b=>b.onclick=async ()=>{
+    if(confirm("¿Borrar este concepto?")){ const id=b.dataset.delcc; const s=state.sueldos.find(x=>x.id===id);
+      if(s&&s.gastoIdA){state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdA);await apiPost({action:"deleteGasto",id:s.gastoIdA});}
+      state.sueldos=state.sueldos.filter(x=>x.id!==id); drawCCSS(); await apiPost({action:"deleteSueldo",id}); }
+  });
+}
+/* detalle completo de sueldos */
+function sueldoDetalleHTML(mes,paraImprimir){
+  const emps=state.sueldos.filter(s=>s.mes===mes && s.tipo==="empleado" && s.nombre);
+  if(!emps.length)return `<div class="empty">Sin sueldos cargados en ${ymLabel(mes)}.</div>`;
+  emps.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  const f=n=>n?money(n):(paraImprimir?'—':'·');
+  let rows="";
+  emps.forEach(s=>{
+    const tieneQuincA=(s.q1A||s.q2A), tieneQuincB=(s.q1B||s.q2B);
+    const modo = (tieneQuincA||tieneQuincB) ? "Quinc." : "Mens.";
+    const q1a = tieneQuincA ? f(s.q1A) : f(s.depA);
+    const q2a = tieneQuincA ? f(s.q2A) : (paraImprimir?'—':'·');
+    const q1b = tieneQuincB ? f(s.q1B) : f(s.manoB);
+    const q2b = tieneQuincB ? f(s.q2B) : (paraImprimir?'—':'·');
+    rows+=`<tr>
+      <td class="l">${s.nombre}</td>
+      <td style="font-size:11px;color:var(--faint)">${modo}</td>
+      <td class="num" style="background:var(--bgA)">${q1a}</td>
+      <td class="num" style="background:var(--bgA)">${q2a}</td>
+      <td class="num" style="background:var(--bgA)">${f(s.vacA)}</td>
+      <td class="num" style="background:var(--bgA)">${f(s.sacA)}</td>
+      <td class="num" style="background:var(--bgB)">${q1b}</td>
+      <td class="num" style="background:var(--bgB)">${q2b}</td>
+      <td class="num" style="background:var(--bgB)">${f(s.vacB)}</td>
+      <td class="num" style="background:var(--bgB)">${f(s.sacB)}</td>
+      <td class="num"><b>${money(totA(s)+totB(s))}</b></td>
+    </tr>`;
+  });
+  const totalA=emps.reduce((a,s)=>a+totA(s),0), totalB=emps.reduce((a,s)=>a+totB(s),0);
+  let tabla=`<table style="width:100%;font-size:13px"><tbody>
+    <tr>
+      <th class="l">Empleado</th><th></th>
+      <th class="num" style="background:var(--bgA2)">Q1 / Dep A</th>
+      <th class="num" style="background:var(--bgA2)">Q2 A</th>
+      <th class="num" style="background:var(--bgA2)">Vac A</th>
+      <th class="num" style="background:var(--bgA2)">SAC A</th>
+      <th class="num" style="background:var(--bgB2)">Q1 / Mano B</th>
+      <th class="num" style="background:var(--bgB2)">Q2 B</th>
+      <th class="num" style="background:var(--bgB2)">Vac B</th>
+      <th class="num" style="background:var(--bgB2)">SAC B</th>
+      <th class="num">Total</th>
+    </tr>
+    ${rows}
+    <tr class="tot"><td class="l"><b>Totales</b></td><td></td>
+      <td class="num" colspan="4" style="background:var(--bgA2)"><b>${money(totalA)}</b></td>
+      <td class="num" colspan="4" style="background:var(--bgB2)"><b>${money(totalB)}</b></td>
+      <td class="num"><b>${money(totalA+totalB)}</b></td></tr>
+  </tbody></table>`;
+  const ccss=state.sueldos.filter(s=>s.mes===mes && s.tipo==="ccss");
+  if(ccss.length){
+    let ct=0;
+    const filas=ccss.map(c=>{ ct+=c.monto||0; return `<tr><td class="l">${c.nombre||"Concepto"}</td><td class="num">${money(c.monto)}</td></tr>`; }).join("");
+    tabla+=`<div class="sectlabel" style="margin-top:16px">CCSS, sindicato y federación</div>
+      <table style="width:100%;font-size:13px"><tbody>${filas}
+      <tr class="tot"><td class="l"><b>Total</b></td><td class="num"><b>${money(ct)}</b></td></tr></tbody></table>`;
+  }
+  return tabla;
+}
+let sueldoDetalleAbierto=false;
+if($("su_detalle"))$("su_detalle").onclick=()=>{
+  const box=$("su_detalle_box");
+  sueldoDetalleAbierto=!sueldoDetalleAbierto;
+  if(sueldoDetalleAbierto){
+    box.style.display="block";
+    box.innerHTML=`<div class="sectlabel">Detalle de ${ymLabel($("su_mes").value)}</div><div style="overflow-x:auto">${sueldoDetalleHTML($("su_mes").value,false)}</div>`;
+    $("su_detalle").textContent="Ocultar detalle";
+  } else {
+    box.style.display="none"; box.innerHTML="";
+    $("su_detalle").textContent="Ver detalle completo";
+  }
+};
+if($("su_print"))$("su_print").onclick=()=>{
+  const mes=$("su_mes").value;
+  const w=window.open("","_blank");
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sueldos ${ymLabel(mes)}</title>
+    <style>
+      body{font-family:Georgia,serif;color:#23201a;max-width:900px;margin:24px auto;padding:0 16px}
+      h1{font-size:20px;margin-bottom:2px} .sub{color:#666;font-size:12px;margin-bottom:16px}
+      table{width:100%;border-collapse:collapse;margin-top:10px}
+      td,th{padding:6px 8px;border-bottom:1px solid #ddd;font-size:12px;text-align:right}
+      td.l,th.l{text-align:left} th{background:#f0ece4}
+      .tot td{border-top:2px solid #333;font-weight:bold}
+      .sectlabel{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-top:16px}
+      @media print{button{display:none}}
+    </style></head><body>
+    <h1>Detalle de sueldos — ${ymLabel(mes)}</h1>
+    <div class="sub">EG Corrugados · generado ${new Date().toLocaleDateString("es-AR")}</div>
+    ${sueldoDetalleHTML(mes,true)}
+    <button onclick="window.print()" style="margin-top:18px;padding:9px 18px;cursor:pointer">Imprimir</button>
+    </body></html>`);
+  w.document.close();
+};
+if($("su_limpiar"))$("su_limpiar").onclick=async ()=>{
+  const mes=$("su_mes").value;
+  const emps=state.sueldos.filter(s=>s.mes===mes && s.tipo==="empleado");
+  const aBorrar=[]; const vistos={};
+  emps.forEach(s=>{
+    const total=totA(s)+totB(s);
+    const key=(s.nombre||"").trim().toLowerCase();
+    if(total===0){ aBorrar.push(s); return; }
+    if(vistos[key]){ aBorrar.push(s); return; }
+    vistos[key]=s;
+  });
+  if(!aBorrar.length){ showMsg("su_msg","ok","No hay filas vacías ni duplicadas para limpiar."); return; }
+  if(!confirm(`Voy a borrar ${aBorrar.length} fila(s) vacía(s) o duplicada(s) de ${ymLabel(mes)}. ¿Confirmás?`))return;
+  const ids=new Set(aBorrar.map(s=>s.id));
+  state.sueldos=state.sueldos.filter(s=>!ids.has(s.id));
+  drawSueldos();
+  for(const s of aBorrar){ try{ await apiPost({action:"deleteSueldo",id:s.id}); }catch(e){} }
+  showMsg("su_msg","ok",`Listo: borré ${aBorrar.length} fila(s).`);
+};
+$("su_seed").onclick=async ()=>{
+  const mes=$("su_mes").value;
+  const MENSUALES=["fotini","gutman","cacavelos","bianchini"];
+  const existentes=new Set(state.sueldos.filter(s=>s.mes===mes&&s.tipo==="empleado").map(s=>s.nombre.toLowerCase()));
+  const faltan=EMP_BASE.filter(n=>!existentes.has(n.toLowerCase()));
+  if(!faltan.length){showMsg("su_msg","ok","Ya están todos los empleados.");return;}
+  const nuevos=faltan.map(n=>({id:uid(),mes,tipo:"empleado",modalidad:MENSUALES.includes(n.toLowerCase())?"mensual":"quincenal",nombre:n,depA:0,q1A:0,q2A:0,vacA:0,sacA:0,manoB:0,q1B:0,q2B:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""}));
+  nuevos.forEach(n=>state.sueldos.push(n));
+  drawSueldos();
+  for(const n of nuevos){ await apiPost(Object.assign({action:"setSueldo"},n)); }
+};
+$("su_addemp").onclick=()=>{
+  const mes=$("su_mes").value;
+  const nuevo={id:uid(),mes,tipo:"empleado",modalidad:"mensual",nombre:"",depA:0,q1A:0,q2A:0,vacA:0,sacA:0,manoB:0,q1B:0,q2B:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""};
+  state.sueldos.push(nuevo);
+  abrirEditSueldo(nuevo.id);
+};
+$("su_addccss").onclick=()=>{
+  const mes=$("su_mes").value;
+  const nuevo={id:uid(),mes,tipo:"ccss",modalidad:"mensual",nombre:"",depA:0,q1A:0,q2A:0,vacA:0,sacA:0,manoB:0,q1B:0,q2B:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""};
+  state.sueldos.push(nuevo);
+  abrirEditCCSS(nuevo.id);
+};
+function sumToggleModalidad(){
+  const q=$("sum_modalidad").value==="quincenal";
+  document.querySelectorAll(".sum-quincenal").forEach(e=>e.style.display=q?"grid":"none");
+  document.querySelectorAll(".sum-mensual").forEach(e=>e.style.display=q?"none":"grid");
+}
+function abrirEditSueldo(id){
+  const s=state.sueldos.find(x=>x.id===id); if(!s)return;
+  $("sum_id").value=s.id;
+  $("sum_nombre").value=s.nombre||"";
+  $("sum_modalidad").value=s.modalidad||"mensual";
+  $("sum_depA").value=s.depA||""; $("sum_vacA").value=s.vacA||""; $("sum_sacA").value=s.sacA||"";
+  $("sum_manoB").value=s.manoB||""; $("sum_vacB").value=s.vacB||""; $("sum_sacB").value=s.sacB||"";
+  $("sum_q1A").value=s.q1A||""; $("sum_q2A").value=s.q2A||""; $("sum_vacA2").value=s.vacA||""; $("sum_sacA2").value=s.sacA||"";
+  $("sum_q1B").value=s.q1B||""; $("sum_q2B").value=s.q2B||""; $("sum_vacB2").value=s.vacB||""; $("sum_sacB2").value=s.sacB||"";
+  sumToggleModalidad();
+  hideMsg("sum_msg");
+  $("sum_overlay").style.display="flex";
+}
+$("sum_modalidad").addEventListener("change",sumToggleModalidad);
+function sueldoCancelar(){
+  const s=state.sueldos.find(x=>x.id===$("sum_id").value);
+  if(s && !s.nombre && !totA(s) && !totB(s)){ state.sueldos=state.sueldos.filter(x=>x.id!==s.id); }
+  $("sum_overlay").style.display="none"; drawSueldos();
+}
+$("sum_cancel").onclick=sueldoCancelar;
+$("sum_overlay").addEventListener("click",e=>{ if(e.target===$("sum_overlay"))sueldoCancelar(); });
+$("sum_save").onclick=async ()=>{
+  const s=state.sueldos.find(x=>x.id===$("sum_id").value); if(!s)return;
+  s.nombre=$("sum_nombre").value.trim()||"Empleado";
+  s.modalidad=$("sum_modalidad").value;
+  if(s.modalidad==="quincenal"){
+    s.q1A=parseNum($("sum_q1A").value)||0; s.q2A=parseNum($("sum_q2A").value)||0;
+    s.vacA=parseNum($("sum_vacA2").value)||0; s.sacA=parseNum($("sum_sacA2").value)||0;
+    s.q1B=parseNum($("sum_q1B").value)||0; s.q2B=parseNum($("sum_q2B").value)||0;
+    s.vacB=parseNum($("sum_vacB2").value)||0; s.sacB=parseNum($("sum_sacB2").value)||0;
+    s.depA=0; s.manoB=0;
+  } else {
+    s.depA=parseNum($("sum_depA").value)||0; s.vacA=parseNum($("sum_vacA").value)||0; s.sacA=parseNum($("sum_sacA").value)||0;
+    s.manoB=parseNum($("sum_manoB").value)||0; s.vacB=parseNum($("sum_vacB").value)||0; s.sacB=parseNum($("sum_sacB").value)||0;
+    s.q1A=0; s.q2A=0; s.q1B=0; s.q2B=0;
+  }
+  const alBalance=$("su_albalance").checked;
+  await sueldoAlBalance(s,alBalance);
+  $("sum_overlay").style.display="none";
+  drawSueldos();
+  await apiPost(Object.assign({action:"setSueldo"},s));
+  showMsg("su_msg","ok",`Sueldo de "${s.nombre}" guardado.`);
+};
+function abrirEditCCSS(id){
+  const s=state.sueldos.find(x=>x.id===id); if(!s)return;
+  $("succ_id").value=s.id;
+  $("succ_nombre").value=s.nombre||"";
+  $("succ_monto").value=s.monto||"";
+  $("succ_albalance").checked=true;
+  hideMsg("succ_msg");
+  $("succ_overlay").style.display="flex";
+}
+function ccssCancelar(){
+  const s=state.sueldos.find(x=>x.id===$("succ_id").value);
+  if(s && !s.nombre && !s.monto){ state.sueldos=state.sueldos.filter(x=>x.id!==s.id); }
+  $("succ_overlay").style.display="none"; drawCCSS();
+}
+$("succ_cancel").onclick=ccssCancelar;
+$("succ_overlay").addEventListener("click",e=>{ if(e.target===$("succ_overlay"))ccssCancelar(); });
+$("succ_save").onclick=async ()=>{
+  const s=state.sueldos.find(x=>x.id===$("succ_id").value); if(!s)return;
+  s.nombre=$("succ_nombre").value.trim()||"CCSS";
+  s.monto=parseNum($("succ_monto").value)||0;
+  const alBalance=$("succ_albalance").checked;
+  if(alBalance && s.monto>0){
+    const fecha=($("su_mes").value)+"-01";
+    if(s.gastoIdA && state.gastos.find(g=>g.id===s.gastoIdA)){
+      const g=state.gastos.find(x=>x.id===s.gastoIdA);
+      Object.assign(g,{fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:s.nombre,monto:s.monto,iva:0,piva:0,piibb:0,bn:"blanco"});
+      await apiPost({action:"updateGasto",id:s.gastoIdA,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:s.nombre,bn:"blanco",monto:s.monto,iva:0,piva:0,piibb:0});
+    } else {
+      const gid=uid();
+      state.gastos.push({id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:s.nombre,monto:s.monto,bn:"blanco",iva:0,piva:0,piibb:0});
+      s.gastoIdA=gid;
+      await apiPost({action:"addGasto",id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:s.nombre,bn:"blanco",monto:s.monto,iva:0,piva:0,piibb:0});
+    }
+  } else if(s.gastoIdA && state.gastos.find(g=>g.id===s.gastoIdA)){
+    state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdA); await apiPost({action:"deleteGasto",id:s.gastoIdA}); s.gastoIdA="";
+  }
+  $("succ_overlay").style.display="none";
+  drawCCSS();
+  await apiPost(Object.assign({action:"setSueldo"},s));
+  showMsg("su_msg","ok",`Concepto "${s.nombre}" guardado.`);
+};
+async function sueldoAlBalance(s,alBalance){
+  const fecha=(s.mes)+"-01";
+  const ta=totA(s), tb=totB(s);
+  if(alBalance && ta>0){
+    if(s.gastoIdA && state.gastos.find(g=>g.id===s.gastoIdA)){
+      const g=state.gastos.find(x=>x.id===s.gastoIdA);
+      Object.assign(g,{fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",monto:ta,iva:0,piva:0,piibb:0,bn:"blanco"});
+      await apiPost({action:"updateGasto",id:s.gastoIdA,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",bn:"blanco",monto:ta,iva:0,piva:0,piibb:0});
+    } else {
+      const gid=uid();
+      state.gastos.push({id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",monto:ta,bn:"blanco",iva:0,piva:0,piibb:0});
+      s.gastoIdA=gid;
+      await apiPost({action:"addGasto",id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",bn:"blanco",monto:ta,iva:0,piva:0,piibb:0});
+    }
+  } else if(s.gastoIdA && state.gastos.find(g=>g.id===s.gastoIdA)){
+    state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdA); await apiPost({action:"deleteGasto",id:s.gastoIdA}); s.gastoIdA="";
+  }
+  if(alBalance && tb>0){
+    if(s.gastoIdB && state.gastos.find(g=>g.id===s.gastoIdB)){
+      const g=state.gastos.find(x=>x.id===s.gastoIdB);
+      Object.assign(g,{fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",monto:tb,iva:0,piva:0,piibb:0,bn:"negro"});
+      await apiPost({action:"updateGasto",id:s.gastoIdB,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",bn:"negro",monto:tb,iva:0,piva:0,piibb:0});
+    } else {
+      const gid=uid();
+      state.gastos.push({id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",monto:tb,bn:"negro",iva:0,piva:0,piibb:0});
+      s.gastoIdB=gid;
+      await apiPost({action:"addGasto",id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",bn:"negro",monto:tb,iva:0,piva:0,piibb:0});
+    }
+  } else if(s.gastoIdB && state.gastos.find(g=>g.id===s.gastoIdB)){
+    state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdB); await apiPost({action:"deleteGasto",id:s.gastoIdB}); s.gastoIdB="";
+  }
+}
+
 /* ===== RESUMEN ANUAL ===== */
 function aniosConDatos(){
   const s=new Set();
