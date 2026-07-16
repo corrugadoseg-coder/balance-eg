@@ -676,7 +676,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 <section class="view" data-v="sueldos">
   <div class="card">
     <h2>Sueldos, CCSS y sindicato</h2>
-    <p class="lead">Cargá los sueldos del mes por empleado (A = blanco, B = mano/negro), con quincena, vacaciones y SAC. Abajo, CCSS, Federación y Sindicato.</p>
+    <p class="lead">Cargá los sueldos del mes por empleado (A = blanco, B = mano/negro), con quincena, vacaciones y SAC. Abajo, CCSS (931, SIN/FED) y boletas sindicales.</p>
     <div class="grid" style="grid-template-columns:auto auto;gap:14px;max-width:520px;align-items:end;margin-bottom:8px">
       <div class="f"><label>Mes</label><select id="su_mes"></select></div>
       <div class="row-actions" style="margin:0">
@@ -692,7 +692,6 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="row-actions" style="margin-top:14px">
       <button class="btn ghost sm" id="su_detalle">Ver detalle completo</button>
       <button class="btn ghost sm" id="su_print">🖨 Imprimir detalle</button>
-      <button class="btn ghost sm" id="su_limpiar" title="Borra filas de empleados vacías o duplicadas del mes">Limpiar duplicados</button>
     </div>
     <div id="su_detalle_box" style="margin-top:14px;display:none"></div>
   </div>
@@ -753,7 +752,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   <div id="succ_overlay" style="display:none;position:fixed;inset:0;background:rgba(35,32,26,.55);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px">
     <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:520px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
       <h2 style="margin-top:0">Concepto CCSS / sindicato</h2>
-      <div class="f"><label>Concepto</label><input id="succ_nombre" list="succ_list" placeholder="CCSS, Federación, Sindicato…"><datalist id="succ_list"><option value="CCSS"><option value="Federación"><option value="Sindicato"></datalist></div>
+      <div class="f"><label>Concepto</label><input id="succ_nombre" list="succ_list" placeholder="931, SIN/FED, Sindicato…"><datalist id="succ_list"><option value="931"><option value="SIN/FED"><option value="Sindicato"></datalist></div>
       <div class="f" style="margin-top:14px"><label>Monto</label><input id="succ_monto" class="mono" inputmode="decimal" placeholder="0"></div>
       <label style="display:flex;gap:8px;align-items:center;cursor:pointer;margin-top:14px;text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-size:14px">
         <input type="checkbox" id="succ_albalance" checked> Enviar al análisis de gastos del mes
@@ -1012,8 +1011,13 @@ async function apiGet(){
     const chFix={};
     for(const k in state.cheque){ const nk=normMes(k)||k; chFix[nk]=Object.assign({},chFix[nk]||{},state.cheque[k]); }
     state.cheque=chFix;
-    // normalizar mes de sueldos en memoria (claves rotas "Mon Jun 01 2026..." -> "2026-06")
-    state.sueldos.forEach(s=>{ const nk=normMes(s.mes); if(nk)s.mes=nk; });
+    // normalizar mes de sueldos (claves rotas "Mon Jun 01 2026..." -> "2026-06")
+    const sueldosRotos=[];
+    state.sueldos.forEach(s=>{ const nk=normMes(s.mes); if(nk && nk!==s.mes){ s.mes=nk; sueldosRotos.push(s); } });
+    // reguardar en la planilla los que tenían la clave rota (una sola vez)
+    if(sueldosRotos.length){
+      for(const s of sueldosRotos){ try{ await apiPost(Object.assign({action:"setSueldo"},s)); }catch(e){} }
+    }
   }
   return j;
 }
@@ -2495,22 +2499,18 @@ function sueldoDetalleHTML(mes,paraImprimir){
   const f=n=>n?money(n):(paraImprimir?'—':'·');
   let rows="";
   emps.forEach(s=>{
+    // mostrar según lo que tenga cargado (no según la etiqueta de modalidad)
     const tieneQuincA=(s.q1A||s.q2A), tieneQuincB=(s.q1B||s.q2B);
+    const aParts = tieneQuincA ? `${f(s.q1A)} · ${f(s.q2A)}` : f(s.depA);
+    const bParts = tieneQuincB ? `${f(s.q1B)} · ${f(s.q2B)}` : f(s.manoB);
     const modo = (tieneQuincA||tieneQuincB) ? "Quinc." : "Mens.";
-    // A: si es quincenal muestro Q1 y Q2; si es mensual, el depósito va en la columna Q1 y Q2 queda vacía
-    const q1a = tieneQuincA ? f(s.q1A) : f(s.depA);
-    const q2a = tieneQuincA ? f(s.q2A) : (paraImprimir?'—':'·');
-    const q1b = tieneQuincB ? f(s.q1B) : f(s.manoB);
-    const q2b = tieneQuincB ? f(s.q2B) : (paraImprimir?'—':'·');
     rows+=`<tr>
       <td class="l">${s.nombre}</td>
       <td style="font-size:11px;color:var(--faint)">${modo}</td>
-      <td class="num" style="background:var(--bgA)">${q1a}</td>
-      <td class="num" style="background:var(--bgA)">${q2a}</td>
+      <td class="num" style="background:var(--bgA)">${aParts}</td>
       <td class="num" style="background:var(--bgA)">${f(s.vacA)}</td>
       <td class="num" style="background:var(--bgA)">${f(s.sacA)}</td>
-      <td class="num" style="background:var(--bgB)">${q1b}</td>
-      <td class="num" style="background:var(--bgB)">${q2b}</td>
+      <td class="num" style="background:var(--bgB)">${bParts}</td>
       <td class="num" style="background:var(--bgB)">${f(s.vacB)}</td>
       <td class="num" style="background:var(--bgB)">${f(s.sacB)}</td>
       <td class="num"><b>${money(totA(s)+totB(s))}</b></td>
@@ -2520,20 +2520,14 @@ function sueldoDetalleHTML(mes,paraImprimir){
   let tabla=`<table style="width:100%;font-size:13px"><tbody>
     <tr>
       <th class="l">Empleado</th><th></th>
-      <th class="num" style="background:var(--bgA2)">Q1 / Dep A</th>
-      <th class="num" style="background:var(--bgA2)">Q2 A</th>
-      <th class="num" style="background:var(--bgA2)">Vac A</th>
-      <th class="num" style="background:var(--bgA2)">SAC A</th>
-      <th class="num" style="background:var(--bgB2)">Q1 / Mano B</th>
-      <th class="num" style="background:var(--bgB2)">Q2 B</th>
-      <th class="num" style="background:var(--bgB2)">Vac B</th>
-      <th class="num" style="background:var(--bgB2)">SAC B</th>
+      <th class="num" style="background:var(--bgA2)" colspan="3">TIPO A (blanco): Q1·Q2 / dep · Vac · SAC</th>
+      <th class="num" style="background:var(--bgB2)" colspan="3">TIPO B (mano): Q1·Q2 / mano · Vac · SAC</th>
       <th class="num">Total</th>
     </tr>
     ${rows}
     <tr class="tot"><td class="l"><b>Totales</b></td><td></td>
-      <td class="num" colspan="4" style="background:var(--bgA2)"><b>${money(totalA)}</b></td>
-      <td class="num" colspan="4" style="background:var(--bgB2)"><b>${money(totalB)}</b></td>
+      <td class="num" colspan="3" style="background:var(--bgA2)"><b>${money(totalA)}</b></td>
+      <td class="num" colspan="3" style="background:var(--bgB2)"><b>${money(totalB)}</b></td>
       <td class="num"><b>${money(totalA+totalB)}</b></td></tr>
   </tbody></table>`;
   // CCSS, sindicato y federación del mes
@@ -2579,28 +2573,6 @@ if($("su_print"))$("su_print").onclick=()=>{
     <button onclick="window.print()" style="margin-top:18px;padding:9px 18px;cursor:pointer">Imprimir</button>
     </body></html>`);
   w.document.close();
-};
-
-if($("su_limpiar"))$("su_limpiar").onclick=async ()=>{
-  const mes=$("su_mes").value;
-  const emps=state.sueldos.filter(s=>s.mes===mes && s.tipo==="empleado");
-  // detectar vacíos (sin ningún importe) y duplicados por nombre
-  const aBorrar=[];
-  const vistos={};
-  emps.forEach(s=>{
-    const total=totA(s)+totB(s);
-    const key=(s.nombre||"").trim().toLowerCase();
-    if(total===0){ aBorrar.push(s); return; }        // fila vacía → borrar
-    if(vistos[key]){ aBorrar.push(s); return; }       // duplicado con datos → borrar el segundo
-    vistos[key]=s;
-  });
-  if(!aBorrar.length){ showMsg("su_msg","ok","No hay filas vacías ni duplicadas para limpiar."); return; }
-  if(!confirm(`Voy a borrar ${aBorrar.length} fila(s) vacía(s) o duplicada(s) de ${ymLabel(mes)}. ¿Confirmás?`))return;
-  const ids=new Set(aBorrar.map(s=>s.id));
-  state.sueldos=state.sueldos.filter(s=>!ids.has(s.id));
-  drawSueldos();
-  for(const s of aBorrar){ try{ await apiPost({action:"deleteSueldo",id:s.id}); }catch(e){} }
-  showMsg("su_msg","ok",`Listo: borré ${aBorrar.length} fila(s). Quedaron los empleados con datos.`);
 };
 
 $("su_addemp").onclick=()=>{
