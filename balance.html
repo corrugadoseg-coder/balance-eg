@@ -676,7 +676,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 <section class="view" data-v="sueldos">
   <div class="card">
     <h2>Sueldos, CCSS y sindicato</h2>
-    <p class="lead">Cargá los sueldos del mes por empleado (A = blanco, B = mano/negro), con quincena, vacaciones y SAC. Abajo, CCSS (931, SIN/FED) y boletas sindicales.</p>
+    <p class="lead">Cargá los sueldos del mes por empleado (A = blanco, B = mano/negro), con quincena, vacaciones y SAC. Abajo, CCSS, Federación y Sindicato.</p>
     <div class="grid" style="grid-template-columns:auto auto;gap:14px;max-width:520px;align-items:end;margin-bottom:8px">
       <div class="f"><label>Mes</label><select id="su_mes"></select></div>
       <div class="row-actions" style="margin:0">
@@ -752,7 +752,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   <div id="succ_overlay" style="display:none;position:fixed;inset:0;background:rgba(35,32,26,.55);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px">
     <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:520px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
       <h2 style="margin-top:0">Concepto CCSS / sindicato</h2>
-      <div class="f"><label>Concepto</label><input id="succ_nombre" list="succ_list" placeholder="931, SIN/FED, Sindicato…"><datalist id="succ_list"><option value="931"><option value="SIN/FED"><option value="Sindicato"></datalist></div>
+      <div class="f"><label>Concepto</label><input id="succ_nombre" list="succ_list" placeholder="CCSS, Federación, Sindicato…"><datalist id="succ_list"><option value="CCSS"><option value="Federación"><option value="Sindicato"></datalist></div>
       <div class="f" style="margin-top:14px"><label>Monto</label><input id="succ_monto" class="mono" inputmode="decimal" placeholder="0"></div>
       <label style="display:flex;gap:8px;align-items:center;cursor:pointer;margin-top:14px;text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-size:14px">
         <input type="checkbox" id="succ_albalance" checked> Enviar al análisis de gastos del mes
