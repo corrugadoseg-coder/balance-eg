@@ -1011,6 +1011,13 @@ async function apiGet(){
     const chFix={};
     for(const k in state.cheque){ const nk=normMes(k)||k; chFix[nk]=Object.assign({},chFix[nk]||{},state.cheque[k]); }
     state.cheque=chFix;
+    // normalizar mes de sueldos (claves rotas "Mon Jun 01 2026..." -> "2026-06")
+    const sueldosRotos=[];
+    state.sueldos.forEach(s=>{ const nk=normMes(s.mes); if(nk && nk!==s.mes){ s.mes=nk; sueldosRotos.push(s); } });
+    // reguardar en la planilla los que tenían la clave rota (una sola vez)
+    if(sueldosRotos.length){
+      for(const s of sueldosRotos){ try{ await apiPost(Object.assign({action:"setSueldo"},s)); }catch(e){} }
+    }
   }
   return j;
 }
