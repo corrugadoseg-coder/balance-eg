@@ -614,54 +614,33 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 <!-- ===== 06 SERVICIOS ===== -->
 <section class="view" data-v="servicios">
   <div class="card">
-    <h2>Servicios e impuestos — calendario de pagos</h2>
-    <p class="lead">Calendario de vencimientos de todos tus servicios e impuestos. Los que <b>ya vienen en el informe de IVA compras</b> (Edesur, Metrogas, AySA…) van solo al calendario: su gasto entra por el informe. Los que <b>no están en el informe</b> se cargan acá y <b>sí suman al balance</b> del mes.</p>
+    <h2>Servicios — calendario de pagos</h2>
+    <p class="lead">Agenda informativa de qué pagar y cuándo. No suma al balance (los gastos salen del informe y del cierre de mes). Cargá importe, vencimiento y si es débito automático.</p>
     <div class="monthpick" style="margin-bottom:14px"><select id="sv_mes"></select></div>
     <div id="sv_resumen" class="ledger" style="margin-bottom:16px"></div>
+    <div id="sv_calendario" style="margin-bottom:16px"></div>
     <div style="overflow-x:auto"><table id="sv_tbl"><tbody></tbody></table></div>
     <div class="row-actions" style="margin-top:14px">
       <button class="btn ghost sm" id="sv_add">+ Agregar servicio</button>
-      <button class="btn ghost sm" id="sv_seed" title="Cargar la lista base de servicios para este mes">Cargar lista base</button>
-      <button class="btn ghost sm" id="sv_limpiar" title="Borra servicios repetidos del mes, dejando uno de cada uno">Limpiar duplicados</button>
+      <button class="btn ghost sm" id="sv_limpiar" title="Borra servicios repetidos del mes">Limpiar duplicados</button>
     </div>
     <div class="msg" id="sv_msg"></div>
   </div>
 
   <!-- Modal editar servicio -->
   <div id="eds_overlay" style="display:none;position:fixed;inset:0;background:rgba(35,32,26,.55);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px">
-    <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:680px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
-      <h2 style="margin-top:0">Cargar factura del servicio</h2>
-      <p class="lead">Cargás una sola vez. Con la <b>fecha de emisión</b> va al balance del mes; con el <b>vencimiento</b> queda en el calendario de pagos.</p>
-      <div class="grid" style="grid-template-columns:2fr 1fr">
-        <div class="f"><label>Servicio</label><input id="eds_serv" list="eds_servlist" autocomplete="off"><datalist id="eds_servlist"></datalist></div>
-        <div class="f"><label>Categoría</label><select id="eds_cat"></select></div>
-      </div>
-      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px">
-        <div class="f"><label>Rubro (para el balance)</label><select id="eds_rubro"></select></div>
-        <div class="f"><label>Subcategoría</label><select id="eds_sub"></select></div>
-      </div>
-      <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
-        <div class="f"><label>Fecha de emisión</label><input id="eds_emision" type="date"></div>
+    <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:520px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+      <h2 style="margin-top:0">Servicio a pagar</h2>
+      <p class="lead">Solo informativo, para tu calendario de pagos.</p>
+      <div class="f"><label>Servicio</label><input id="eds_nombre" list="eds_lista" placeholder="Edesur, Metrogas, AySA, Teléfono…"><datalist id="eds_lista"></datalist></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:12px">
+        <div class="f"><label>Importe</label><input id="eds_monto" class="mono" inputmode="decimal" placeholder="0,00"></div>
         <div class="f"><label>Vencimiento</label><input id="eds_venc" type="date"></div>
-        <div class="f"><label>Fecha de pago</label><input id="eds_fpago" type="date"></div>
       </div>
-      <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr;margin-top:14px;align-items:end">
-        <div class="f"><label>Monto sin IVA</label><input id="eds_monto" class="mono" inputmode="decimal"></div>
-        <div class="f"><label>Alícuota</label><select id="eds_alic"><option value="21">21%</option><option value="10.5">10,5%</option><option value="27">27%</option><option value="0">Exento</option></select></div>
-        <div class="f"><label>IVA</label><input id="eds_iva" class="mono" readonly style="background:var(--paper2)"></div>
-        <div class="f"><label>Percep. IIBB</label><input id="eds_piibb" class="mono" inputmode="decimal" placeholder="0"></div>
-      </div>
-      <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
-        <div class="f"><label>Tipo de pago</label><select id="eds_tipo"></select></div>
-        <div class="f"><label>Entidad / Medio</label><input id="eds_ent"></div>
-        <div class="f"><label>Percep. IVA</label><input id="eds_piva" class="mono" inputmode="decimal" placeholder="0"></div>
-      </div>
-      <div class="f" style="margin-top:14px"><label>Observaciones</label><input id="eds_obs"></div>
-      <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;margin-top:14px;text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-size:14px;background:#fdf6e3;border:1px solid var(--gold);border-radius:8px;padding:10px 12px">
-        <input type="checkbox" id="eds_eninforme" style="margin-top:3px">
-        <span><b>Ya viene en el informe de IVA compras</b><br>
-        <span style="font-size:12px;color:var(--faint)">Marcalo para Edesur, Metrogas, AySA y demás que aparecen en el informe: van solo al calendario, no suman al balance (el gasto ya entra por el informe). Dejalo sin marcar si el servicio NO está en el informe: entonces sí suma al balance.</span></span>
+      <label style="display:flex;gap:8px;align-items:center;cursor:pointer;margin-top:14px;text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-size:14px">
+        <input type="checkbox" id="eds_debito"> Débito automático
       </label>
+      <div class="f" style="margin-top:12px"><label>Observaciones</label><input id="eds_obs"></div>
       <input type="hidden" id="eds_id">
       <div class="msg" id="eds_msg"></div>
       <div class="row-actions" style="margin-top:18px">
@@ -676,7 +655,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 <section class="view" data-v="sueldos">
   <div class="card">
     <h2>Sueldos, CCSS y sindicato</h2>
-    <p class="lead">Cargá los sueldos del mes por empleado (A = blanco, B = mano/negro), con quincena, vacaciones y SAC. Abajo, CCSS (931, SIN/FED) y boletas sindicales.</p>
+    <p class="lead">Cargá los sueldos del mes por empleado (A = blanco, B = mano/negro), con quincena, vacaciones y SAC. Abajo, CCSS, Federación y Sindicato.</p>
     <div class="grid" style="grid-template-columns:auto auto;gap:14px;max-width:520px;align-items:end;margin-bottom:8px">
       <div class="f"><label>Mes</label><select id="su_mes"></select></div>
       <div class="row-actions" style="margin:0">
@@ -692,6 +671,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="row-actions" style="margin-top:14px">
       <button class="btn ghost sm" id="su_detalle">Ver detalle completo</button>
       <button class="btn ghost sm" id="su_print">🖨 Imprimir detalle</button>
+      <button class="btn ghost sm" id="su_limpiar" title="Borra filas de empleados vacías o duplicadas del mes">Limpiar duplicados</button>
     </div>
     <div id="su_detalle_box" style="margin-top:14px;display:none"></div>
   </div>
@@ -752,7 +732,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   <div id="succ_overlay" style="display:none;position:fixed;inset:0;background:rgba(35,32,26,.55);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px">
     <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:520px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
       <h2 style="margin-top:0">Concepto CCSS / sindicato</h2>
-      <div class="f"><label>Concepto</label><input id="succ_nombre" list="succ_list" placeholder="931, SIN/FED, Sindicato…"><datalist id="succ_list"><option value="931"><option value="SIN/FED"><option value="Sindicato"></datalist></div>
+      <div class="f"><label>Concepto</label><input id="succ_nombre" list="succ_list" placeholder="CCSS, Federación, Sindicato…"><datalist id="succ_list"><option value="CCSS"><option value="Federación"><option value="Sindicato"></datalist></div>
       <div class="f" style="margin-top:14px"><label>Monto</label><input id="succ_monto" class="mono" inputmode="decimal" placeholder="0"></div>
       <label style="display:flex;gap:8px;align-items:center;cursor:pointer;margin-top:14px;text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-size:14px">
         <input type="checkbox" id="succ_albalance" checked> Enviar al análisis de gastos del mes
@@ -1011,13 +991,8 @@ async function apiGet(){
     const chFix={};
     for(const k in state.cheque){ const nk=normMes(k)||k; chFix[nk]=Object.assign({},chFix[nk]||{},state.cheque[k]); }
     state.cheque=chFix;
-    // normalizar mes de sueldos (claves rotas "Mon Jun 01 2026..." -> "2026-06")
-    const sueldosRotos=[];
-    state.sueldos.forEach(s=>{ const nk=normMes(s.mes); if(nk && nk!==s.mes){ s.mes=nk; sueldosRotos.push(s); } });
-    // reguardar en la planilla los que tenían la clave rota (una sola vez)
-    if(sueldosRotos.length){
-      for(const s of sueldosRotos){ try{ await apiPost(Object.assign({action:"setSueldo"},s)); }catch(e){} }
-    }
+    // normalizar mes de sueldos en memoria (claves rotas "Mon Jun 01 2026..." -> "2026-06")
+    state.sueldos.forEach(s=>{ const nk=normMes(s.mes); if(nk)s.mes=nk; });
   }
   return j;
 }
@@ -1888,20 +1863,17 @@ function normMes(m){
 }
 function renderServicios(){
   const sel=$("sv_mes");
-  // el mes de cada servicio debe reflejar su vencimiento; corregir y re-guardar los que difieran
-  state.servicios.forEach(s=>{
-    const correcto = normMes(s.venc) || normMes(s.mes) || "";
-    if(correcto && correcto!==s.mes){ s.mes=correcto; apiPost(Object.assign({action:"setServicio"},s)); }
-  });
-  let meses=new Set(mesesSelector(state.servicios.map(s=>s.mes)));
-  state.servicios.forEach(s=>{if(s.mes)meses.add(s.mes);});
+  // el mes de cada servicio sale de su vencimiento
+  state.servicios.forEach(s=>{ const c=normMes(s.venc)||normMes(s.mes)||""; if(c && c!==s.mes){ s.mes=c; apiPost(Object.assign({action:"setServicio"},s)); } });
+  let meses=new Set(state.servicios.map(s=>s.mes).filter(Boolean));
   meses.add(curMonthISO());
-  // solo meses válidos YYYY-MM
   const arr=[...meses].filter(m=>/^\d{4}-\d{2}$/.test(m)).sort();
   const prev=sel.value;
   sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
   sel.value=arr.includes(prev)?prev:arr[arr.length-1];
   sel.onchange=renderServicios;
+  // lista de nombres ya usados, para el autocompletar
+  const dl=$("eds_lista"); if(dl){ const nombres=[...new Set(state.servicios.map(s=>s.servicio).filter(Boolean))].sort(); dl.innerHTML=nombres.map(n=>`<option value="${n}">`).join(""); }
   drawServicios();
 }
 function diasAlVenc(venc){
@@ -1910,1194 +1882,121 @@ function diasAlVenc(venc){
   const v=new Date(venc+"T00:00:00");
   return Math.round((v-hoy)/86400000);
 }
-function totalPagarServicio(s){
-  // lo que realmente sale de la cuenta: neto + IVA + percep. IVA + percep. IIBB
-  return (s.monto||0)+(s.iva||0)+(s.piva||0)+(s.piibb||0);
-}
 function drawServicios(){
   const mes=$("sv_mes").value;
   const items=state.servicios.filter(s=>s.mes===mes);
-  // ordenar por vencimiento (los sin fecha al final)
-  items.sort((a,b)=>{ if(!a.venc&&!b.venc)return a.servicio.localeCompare(b.servicio); if(!a.venc)return 1; if(!b.venc)return -1; return a.venc.localeCompare(b.venc); });
+  items.sort((a,b)=>{ if(!a.venc&&!b.venc)return (a.servicio||"").localeCompare(b.servicio||""); if(!a.venc)return 1; if(!b.venc)return -1; return a.venc.localeCompare(b.venc); });
   const tb=$("sv_tbl").querySelector("tbody");
   if(!items.length){
-    tb.innerHTML=`<tr><td colspan="8"><div class="empty">No hay servicios cargados para ${ymLabel(mes)}. Usá "Cargar lista base" para traer tu lista, o "+ Agregar servicio".</div></td></tr>`;
-    $("sv_resumen").innerHTML="";
+    tb.innerHTML=`<tr><td colspan="6"><div class="empty">No hay servicios cargados para ${ymLabel(mes)}. Tocá "+ Agregar servicio".</div></td></tr>`;
+    $("sv_resumen").innerHTML=""; $("sv_calendario").innerHTML="";
     return;
   }
-  let h=`<tr><th class="l">Servicio</th><th class="l">Cat.</th><th class="l">Vence</th><th class="l">Tipo pago</th><th class="l">Entidad</th><th class="num">Total a pagar</th><th>Estado</th><th></th></tr>`;
+  let h=`<tr><th class="l">Servicio</th><th class="l">Vencimiento</th><th class="num">Importe</th><th>Débito</th><th>Pagado</th><th></th></tr>`;
+  let total=0, pendiente=0;
   items.forEach(s=>{
-    const d=diasAlVenc(s.venc);
-    let alerta="",cls="";
-    if(s.estado!=="Pagado" && d!==null){
-      if(d<0){alerta="VENCIÓ";cls="venc-rojo";}
-      else if(d===0){alerta="VENCE HOY";cls="venc-rojo";}
-      else if(d<=3){alerta="vence pronto";cls="venc-amar";}
+    total+=(s.monto||0);
+    if(!s.pagado)pendiente+=(s.monto||0);
+    const dias=diasAlVenc(s.venc);
+    let vencTxt=s.venc?fechaLinda(s.venc):"—";
+    let color="";
+    if(s.venc && !s.pagado){
+      if(dias<0){color="color:var(--red);font-weight:600";vencTxt+=" (vencido)";}
+      else if(dias===0){color="color:var(--red);font-weight:600";vencTxt+=" (hoy)";}
+      else if(dias<=3){color="color:var(--gold);font-weight:600";vencTxt+=` (en ${dias}d)`;}
     }
-    const tot=totalPagarServicio(s);
-    h+=`<tr class="${cls}">
-      <td class="l">${s.servicio}</td>
-      <td class="l"><span style="font-size:11px;color:var(--faint)">${s.categoria||""}</span></td>
-      <td class="l">${s.venc?fechaLinda(s.venc):'<span style="color:var(--faint)">—</span>'}${alerta?` <span class="alerta-chip">${alerta}</span>`:""}</td>
-      <td class="l"><span style="font-size:12px">${s.tipoPago||""}</span></td>
-      <td class="l"><span style="font-size:12px">${s.entidad||""}</span></td>
-      <td class="num">${tot?money(tot):'<span style="color:var(--faint)">—</span>'}</td>
-      <td><button class="estado-btn ${s.estado==="Pagado"?'pagado':'pend'}" data-est="${s.id}">${s.estado==="Pagado"?"Pagado":"Pendiente"}</button></td>
-      <td style="white-space:nowrap">${s.enInforme?'<span title="Viene en el informe: solo calendario, no suma al balance" style="color:var(--gold);font-size:11px">📄inf</span> ':(s.enBalance?'<span title="Suma al balance" style="color:var(--green);font-size:13px">✓$</span> ':'')}<button class="del" data-eds="${s.id}" title="Cargar / editar factura">✎</button> <button class="del" data-dels="${s.id}" title="Borrar">✕</button></td>
+    h+=`<tr${s.pagado?' style="opacity:.5"':''}>
+      <td class="l">${s.servicio}${s.obs?`<div style="font-size:11px;color:var(--faint)">${s.obs}</div>`:""}</td>
+      <td class="l" style="${color}">${vencTxt}</td>
+      <td class="num">${money(s.monto)}</td>
+      <td style="text-align:center">${s.debito?'<span title="Débito automático" style="color:var(--blue)">⇄ auto</span>':'—'}</td>
+      <td style="text-align:center"><button class="bndot btn-dot ${s.pagado?'ng':'bl'}" data-pag="${s.id}" title="${s.pagado?'Pagado':'Pendiente'}"></button></td>
+      <td style="white-space:nowrap"><button class="del" data-eds="${s.id}" title="Editar">✎</button> <button class="del" data-dels="${s.id}" title="Borrar">✕</button></td>
     </tr>`;
   });
+  h+=`<tr class="tot"><td class="l"><b>Total del mes</b></td><td></td><td class="num"><b>${money(total)}</b></td><td colspan="3"></td></tr>`;
   tb.innerHTML=h;
-  // resumen (con total a pagar)
-  const total=items.reduce((a,x)=>a+totalPagarServicio(x),0);
-  const pagado=items.filter(x=>x.estado==="Pagado").reduce((a,x)=>a+totalPagarServicio(x),0);
-  const pend=total-pagado;
+  // resumen: total mes + pendiente
   $("sv_resumen").innerHTML=
-    `<div class="led"><div class="l">Total del mes</div><div class="v">${money0(total)}</div></div>
-     <div class="led"><div class="l">Pagado</div><div class="v pos">${money0(pagado)}</div></div>
-     <div class="led"><div class="l">Pendiente</div><div class="v ${pend>0?'neg':''}">${money0(pend)}</div></div>`;
+    `<div class="led" style="border-color:var(--gold)"><div class="l">Total del mes</div><div class="v">${money0(total)}</div><div class="sub">todos los servicios</div></div>
+     <div class="led"><div class="l">Falta pagar</div><div class="v">${money0(pendiente)}</div><div class="sub">pendientes</div></div>`;
+  // calendario: total por día de vencimiento
+  const porDia={};
+  items.forEach(s=>{ if(!s.venc)return; if(!porDia[s.venc])porDia[s.venc]={total:0,items:[],pend:0}; porDia[s.venc].total+=(s.monto||0); if(!s.pagado)porDia[s.venc].pend+=(s.monto||0); porDia[s.venc].items.push(s); });
+  const dias=Object.keys(porDia).sort();
+  if(dias.length){
+    let c=`<div class="sectlabel">Qué pagar cada día</div><table style="width:100%"><tbody>`;
+    dias.forEach(d=>{
+      const info=porDia[d];
+      c+=`<tr style="background:var(--paper2)"><td class="l"><b>${fechaLinda(d)}</b> <span style="font-size:11px;color:var(--faint)">(${info.items.length})</span></td><td class="num"><b>${money(info.total)}</b>${info.pend<info.total?`<div style="font-size:11px;color:var(--faint)">falta ${money(info.pend)}</div>`:""}</td></tr>`;
+      info.items.forEach(s=>{ c+=`<tr><td class="l" style="padding-left:16px;font-size:13px">${s.servicio}${s.debito?' <span style="font-size:10px;color:var(--blue)">⇄auto</span>':''}${s.pagado?' <span style="font-size:10px;color:var(--green)">✓pagado</span>':''}</td><td class="num" style="font-size:13px">${money(s.monto)}</td></tr>`; });
+    });
+    c+=`</tbody></table>`;
+    $("sv_calendario").innerHTML=c;
+  } else $("sv_calendario").innerHTML="";
   // handlers
-  tb.querySelectorAll("[data-est]").forEach(b=>b.onclick=async ()=>{
-    const s=state.servicios.find(x=>x.id===b.dataset.est); if(!s)return;
-    s.estado=s.estado==="Pagado"?"Pendiente":"Pagado";
-    if(s.estado==="Pagado"&&!s.fechaPago)s.fechaPago=curISO();
-    drawServicios();
+  tb.querySelectorAll("[data-pag]").forEach(b=>b.onclick=async ()=>{
+    const s=state.servicios.find(x=>x.id===b.dataset.pag); if(!s)return;
+    s.pagado=!s.pagado; drawServicios();
     await apiPost(Object.assign({action:"setServicio"},s));
   });
+  tb.querySelectorAll("[data-eds]").forEach(b=>b.onclick=()=>abrirEdServicio(b.dataset.eds));
   tb.querySelectorAll("[data-dels]").forEach(b=>b.onclick=async ()=>{
-    const id=b.dataset.dels;
-    const s=state.servicios.find(x=>x.id===id); if(!s)return;
-    if(!confirm("¿Borrar este servicio del mes?"))return;
-    // si tenía gasto en el balance, ofrecer borrarlo también
-    if(s.enBalance && s.gastoId && state.gastos.some(g=>g.id===s.gastoId)){
-      if(confirm("Este servicio tiene un gasto cargado en el balance. ¿Borrar también ese gasto del balance?")){
-        state.gastos=state.gastos.filter(g=>g.id!==s.gastoId);
-        await apiPost({action:"deleteGasto",id:s.gastoId});
-      }
-    }
-    state.servicios=state.servicios.filter(x=>x.id!==id);
-    drawServicios();
-    await apiPost({action:"deleteServicio",id});
-  });
-  tb.querySelectorAll("[data-eds]").forEach(b=>b.onclick=()=>abrirEditServicio(b.dataset.eds));
-}
-function curISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
-
-/* ===== DIARIO IVA (informes del sistema) ===== */
-function parseNumAr(s){ if(!s)return 0; return parseFloat(String(s).trim().replace(/\./g,"").replace(",","."))||0; }
-/* normaliza nombre de proveedor para comparar: sin mayúsculas, sin puntos, sin S.A./SRL, sin espacios extra */
-function normProv(nombre){
-  return String(nombre||"").toLowerCase()
-    .replace(/[.,]/g,"")
-    .replace(/\b(s\s*a|s\s*r\s*l|s\s*a\s*s|sacifi|scpa|s\s*c\s*a|e\s*hijo|e\s*hijos|sa|srl|sas)\b/g,"")
-    .replace(/\s+/g," ").trim();
-}
-/* busca el rubro de un proveedor en la memoria, con comparación flexible */
-function rubroDeProveedor(nombre){
-  const n=normProv(nombre);
-  if(!n)return "";
-  // 1) match exacto en memoria (clave lowercase directa)
-  const dir=state.memoria[nombre.trim().toLowerCase()];
-  if(dir)return dir;
-  // 2) match flexible: comparar normalizado contra todas las claves
-  for(const k in state.memoria){
-    if(normProv(k)===n)return state.memoria[k];
-  }
-  return "";
-}
-/* extrae los totales del pie del informe y el IVA de proveedores excluidos */
-function parseDiarioCompras(txt){
-  const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
-  const ivaTotal=tot(/TOTAL I\.V\.A\.\s*\.+;?\s*([\d.,-]+)/);
-  const percIVA=tot(/TOTAL PERCEPCION IVA \(P\)\.+;?\s*([\d.,-]+)/);
-  const percIIBB=tot(/TOTAL PERCEPCION INGRESOS BRUTOS \(B\)\.+;?\s*([\d.,-]+)/);
-  const neto=tot(/NETO\s*\.+;?\s*([\d.,-]+)/);
-  // IVA de excluidos + neto por proveedor: recorrer líneas de detalle
-  const excl=(state.exclusionesIVA||[]).map(x=>x.toUpperCase());
-  let ivaExcluido=0;
-  const provNeto={};  // {nombreProveedor: netoAcumulado}
-  txt.split("\n").forEach(ln=>{
-    const c=ln.split(";");
-    if(c.length<11)return;
-    const razon=(c[5]||"").trim();
-    if(!razon)return;  // saltear líneas de continuación (sin razón social)
-    const razonUp=razon.toUpperCase();
-    const importe=parseNumAr(c[9]||"");
-    const ivaLinea=parseNumAr(c[10]||"");
-    if(excl.some(ex=>razonUp.includes(ex))){
-      ivaExcluido+=ivaLinea;
-    }
-    if(importe){ provNeto[razon]=(provNeto[razon]||0)+importe; }
-  });
-  return {ivaTotal,percIVA,percIIBB,neto,ivaExcluido,ivaCompNeto:ivaTotal-ivaExcluido,provNeto};
-}
-function parseDiarioVentas(txt){
-  const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
-  const ivaTotal=tot(/TOTAL I\.V\.A\.\s*\.+;?\s*([\d.,-]+)/);
-  const neto=tot(/NETO\s*\.+;?\s*([\d.,-]+)/);
-  return {ivaTotal,neto};
-}
-/* Informe de PARTE B (negro): suma a los gastos, NO calcula IVA.
-   Formato: DIA Fac/NCr LETRA NUMERO Alta PROVEEDOR ... CANT NETO TOTAL
-   Las notas de crédito (NCr) vienen en negativo y restan. */
-function parseParteB(txt){
-  const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
-  const neto=tot(/NETO\s*\.+\s*([\d.,-]+)/);
-  const provNeto={};
-  txt.split("\n").forEach(ln=>{
-    const l=ln.trim();
-    if(!l || /^(Total|NETO|TOTAL)/i.test(l))return;
-    const m=l.match(/^\s*(\d+)\s+(Fac|NCr|NDb)\s+\w+\s+[\d-]+\s+\w+\s+(.+?)\s+(?:[A-Z]\s+Cons\.Final|I\s+\d{11}|\d{11})\s+\d+\s+([\d.,-]+)\s+([\d.,-]+)\s*$/);
-    if(!m)return;
-    const prov=m[3].trim();
-    const monto=parseNumAr(m[5]);
-    if(!prov)return;
-    provNeto[prov]=(provNeto[prov]||0)+monto;
-  });
-  // sacar los que quedaron en cero (facturas anuladas por nota de crédito)
-  Object.keys(provNeto).forEach(p=>{ if(Math.abs(provNeto[p])<0.01)delete provNeto[p]; });
-  const sumaProv=Object.values(provNeto).reduce((a,b)=>a+b,0);
-  return {neto:neto||sumaProv, provNeto, sumaProv};
-}
-/* separa las retenciones sufridas por tipo (IVA, IIBB, Ganancias, SUSS) */
-function parseRetenciones(txt){
-  const lineas=txt.split("\n");
-  let retIVA=0, retIIBB=0, retGan=0, retSuss=0;
-  for(let i=0;i<lineas.length;i++){
-    const c=lineas[i].split(";");
-    if(c.length>=13 && /^\s*\d+\s*$/.test(c[0])){
-      const imp=parseNumAr((c[c.length-1]||"").trim());
-      const tipo=(lineas[i+1]||"").trim().toUpperCase();
-      if(tipo.includes("RETENCION IVA"))retIVA+=imp;
-      else if(tipo.includes("RETENCION IIBB"))retIIBB+=imp;
-      else if(tipo.includes("RETENCION GANANCIAS"))retGan+=imp;
-      else if(tipo.includes("S.U.S.S"))retSuss+=imp;
-    }
-  }
-  return {retIVA,retIIBB,retGan,retSuss};
-}
-function mesMasTres(mes){
-  const n=normMes(mes); if(!n)return "";
-  const [y,m]=n.split("-").map(Number);
-  const d=new Date(y,m-1+3,1);
-  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
-}
-function renderDiarioIVA(){
-  const sel=$("di_mes");
-  const arr=mesesSelector(Object.keys(state.impuestos));
-  const prev=normMes(sel.value);
-  sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
-  sel.value=arr.includes(prev)?prev:curMonthISO();
-  sel.onchange=renderDiarioIVA;
-  drawExclusiones();
-  // mostrar lo ya guardado del mes
-  const d=state.impuestos[sel.value]||{};
-  if(d.ivaCompras)mostrarResCompras({ivaTotal:d.ivaCompras,percIVA:d.percIVACompras,percIIBB:d.percIIBBCompras,neto:d.netoCompras,ivaExcluido:d.ivaExcluido,ivaCompNeto:d.ivaCompNeto});
-  else $("di_res_compras").innerHTML="";
-  if(d.ivaVentas)mostrarResVentas({ivaTotal:d.ivaVentas,neto:d.netoVentas});
-  else $("di_res_ventas").innerHTML="";
-  if(d.retIVAClientes||d.retIIBBClientes||d.retGanancias)mostrarResRet({retIVA:d.retIVAClientes||0,retIIBB:d.retIIBBClientes||0,retGan:d.retGanancias||0});
-  else $("di_res_ret").innerHTML="";
-  // parte B guardada (total desde los gastos del informe tipo negro)
-  const pbTot=state.gastosInforme.filter(g=>normMes(g.mes)===sel.value && g.tipo==="negro").reduce((a,g)=>a+g.monto,0);
-  if(pbTot)$("di_res_partb").innerHTML=`<div class="led" style="border-color:var(--gold)"><div class="l">Total parte B</div><div class="v">${money0(pbTot)}</div><div class="sub">guardado · Tipo B</div></div>`;
-  else $("di_res_partb").innerHTML="";
-  $("di_rubros_b").innerHTML="";
-  hideMsg("di_msg");
-}
-function drawExclusiones(){
-  const cont=$("di_exclu_list");
-  cont.innerHTML=(state.exclusionesIVA||[]).map((x,i)=>`<span style="display:inline-flex;align-items:center;gap:6px;background:var(--paper2);border:1px solid var(--edge);border-radius:16px;padding:4px 12px;font-size:13px">${x} <button data-exdel="${i}" style="border:none;background:none;cursor:pointer;color:var(--red);font-size:15px;line-height:1">×</button></span>`).join("")||'<span style="color:var(--faint);font-size:13px">Sin exclusiones</span>';
-  cont.querySelectorAll("[data-exdel]").forEach(b=>b.onclick=async ()=>{
-    state.exclusionesIVA.splice(+b.dataset.exdel,1); drawExclusiones();
-    await apiPost({action:"setConfig",clave:"exclusionesIVA",valor:JSON.stringify(state.exclusionesIVA)});
+    const s=state.servicios.find(x=>x.id===b.dataset.dels); if(!s)return;
+    if(confirm(`¿Borrar "${s.servicio}"?`)){ state.servicios=state.servicios.filter(x=>x.id!==s.id); drawServicios(); await apiPost({action:"deleteServicio",id:s.id}); }
   });
 }
-$("di_exclu_add").onclick=async ()=>{
-  const v=$("di_exclu_nuevo").value.trim().toUpperCase();
-  if(!v)return;
-  if(!state.exclusionesIVA)state.exclusionesIVA=[];
-  if(!state.exclusionesIVA.includes(v))state.exclusionesIVA.push(v);
-  $("di_exclu_nuevo").value="";
-  drawExclusiones();
-  await apiPost({action:"setConfig",clave:"exclusionesIVA",valor:JSON.stringify(state.exclusionesIVA)});
-};
-function mostrarResCompras(r){
-  $("di_res_compras").innerHTML=
-    `<div class="led"><div class="l">IVA compras (total)</div><div class="v">${money0(r.ivaTotal)}</div><div class="sub">crédito bruto</div></div>
-     <div class="led"><div class="l">(−) IVA excluidos</div><div class="v">${money0(r.ivaExcluido)}</div><div class="sub">Edesur/Aysa/etc.</div></div>
-     <div class="led" style="border-color:var(--gold)"><div class="l">IVA compras a computar</div><div class="v">${money0(r.ivaCompNeto)}</div><div class="sub">crédito fiscal</div></div>
-     <div class="led"><div class="l">Percep. IVA</div><div class="v">${money0(r.percIVA)}</div></div>
-     <div class="led"><div class="l">Percep. IIBB</div><div class="v">${money0(r.percIIBB)}</div></div>
-     <div class="led"><div class="l">Neto compras</div><div class="v">${money0(r.neto)}</div><div class="sub">gastos del mes</div></div>`;
-}
-function mostrarResVentas(r){
-  $("di_res_ventas").innerHTML=
-    `<div class="led" style="border-color:var(--gold)"><div class="l">IVA ventas</div><div class="v">${money0(r.ivaTotal)}</div><div class="sub">débito fiscal</div></div>
-     <div class="led"><div class="l">Neto ventas</div><div class="v">${money0(r.neto)}</div></div>`;
-}
-let diarioTmp={compras:null,ventas:null,ret:null,partb:null};
-$("di_calc_compras").onclick=()=>{
-  const txt=$("di_compras").value;
-  if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de compras.");return;}
-  const r=parseDiarioCompras(txt);
-  if(!r.ivaTotal){showMsg("di_msg","learn","No encontré el TOTAL I.V.A. en el informe. Fijate de copiar hasta el final (los totales).");return;}
-  diarioTmp.compras=r;
-  mostrarResCompras(r);
-  drawRubrosInforme(r.provNeto||{});
-  hideMsg("di_msg");
-};
-/* dibuja proveedores del informe agrupados por rubro, con los sin rubro para completar */
-let rubrosPendientes={};  // {proveedor: neto} de los que faltan rubro
-function drawRubrosInforme(provNeto){
-  const box=$("di_rubros_box");
-  const provs=Object.keys(provNeto);
-  if(!provs.length){box.innerHTML="";return;}
-  // separar conocidos de desconocidos
-  const porRubro={}; rubrosPendientes={};
-  provs.forEach(p=>{
-    const rubro=rubroDeProveedor(p);
-    if(rubro){ if(!porRubro[rubro])porRubro[rubro]=[]; porRubro[rubro].push([p,provNeto[p]]); }
-    else rubrosPendientes[p]=provNeto[p];
-  });
-  const excl=(state.exclusionesIVA||[]).map(x=>x.toUpperCase());
-  let h=`<div class="sectlabel" style="margin-top:8px">Gastos por rubro (del informe)</div>`;
-  // pendientes primero, resaltados
-  const pend=Object.keys(rubrosPendientes);
-  if(pend.length){
-    h+=`<div style="background:#fdf6e3;border:1px solid var(--gold);border-radius:8px;padding:12px;margin-bottom:12px">
-      <div style="font-weight:600;margin-bottom:8px;color:var(--ink)">⚠ ${pend.length} proveedor(es) sin rubro — asignalos una vez y quedan guardados:</div>`;
-    pend.sort((a,b)=>rubrosPendientes[b]-rubrosPendientes[a]).forEach(p=>{
-      h+=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
-        <span style="flex:1;min-width:180px;font-size:13px">${p} <b>${money(rubrosPendientes[p])}</b></span>
-        <select data-provrubro="${encodeURIComponent(p)}" style="max-width:220px">
-          <option value="">— elegí rubro —</option>
-          ${RUBROS.map(r=>`<option>${r}</option>`).join("")}
-        </select>
-      </div>`;
-    });
-    h+=`</div>`;
-  }
-  // agrupados por rubro
-  const rubrosOrden=Object.keys(porRubro).sort();
-  if(rubrosOrden.length){
-    h+=`<table style="width:100%"><tbody>`;
-    let totalGasto=0, totalNoGasto=0;
-    rubrosOrden.forEach(rubro=>{
-      const items=porRubro[rubro].sort((a,b)=>b[1]-a[1]);
-      const subtot=items.reduce((s,x)=>s+x[1],0);
-      const esNoGasto=RUBROS_NO_GASTO.includes(rubro);
-      if(esNoGasto)totalNoGasto+=subtot; else totalGasto+=subtot;
-      h+=`<tr style="background:var(--paper2)"><td class="l" colspan="2"><b>${rubro}</b>${esNoGasto?' <span style="font-size:10px;color:var(--faint)">(no suma al gasto)</span>':''}</td><td class="num"><b>${money(subtot)}</b></td></tr>`;
-      items.forEach(([p,neto])=>{
-        const esExcl=excl.some(ex=>p.toUpperCase().includes(ex));
-        h+=`<tr><td class="l" style="padding-left:16px;font-size:13px">${p}${esExcl?' <span style="font-size:10px;color:var(--faint)">(sin IVA)</span>':''}</td><td></td><td class="num">${money(neto)}</td></tr>`;
-      });
-    });
-    h+=`<tr class="tot"><td class="l"><b>Total gastos del mes</b></td><td></td><td class="num"><b>${money(totalGasto)}</b></td></tr>`;
-    if(totalNoGasto)h+=`<tr><td class="l" style="font-size:12px;color:var(--faint)">Personal / no gasto (aparte)</td><td></td><td class="num" style="font-size:12px;color:var(--faint)">${money(totalNoGasto)}</td></tr>`;
-    h+=`</tbody></table>`;
-  }
-  box.innerHTML=h;
-  // handlers de asignación de rubro
-  box.querySelectorAll("[data-provrubro]").forEach(sel=>sel.onchange=async ()=>{
-    const prov=decodeURIComponent(sel.dataset.provrubro);
-    const rubro=sel.value;
-    if(!rubro)return;
-    state.memoria[prov.trim().toLowerCase()]=rubro;
-    await apiPost({action:"setProv",prov:prov.trim().toLowerCase(),rubro});
-    // redibujar con el nuevo rubro aprendido
-    drawRubrosInforme(diarioTmp.compras?diarioTmp.compras.provNeto:{});
-  });
-}
-$("di_calc_ventas").onclick=()=>{
-  const txt=$("di_ventas").value;
-  if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de ventas.");return;}
-  const r=parseDiarioVentas(txt);
-  if(!r.ivaTotal){showMsg("di_msg","learn","No encontré el TOTAL I.V.A. en el informe de ventas.");return;}
-  diarioTmp.ventas=r;
-  mostrarResVentas(r);
-  hideMsg("di_msg");
-};
-function mostrarResRet(r){
-  $("di_res_ret").innerHTML=
-    `<div class="led" style="border-color:var(--gold)"><div class="l">Retención IVA</div><div class="v">${money0(r.retIVA)}</div><div class="sub">resta del IVA</div></div>
-     <div class="led"><div class="l">Retención IIBB</div><div class="v">${money0(r.retIIBB)}</div><div class="sub">resta de IIBB</div></div>
-     <div class="led"><div class="l">Retención Ganancias</div><div class="v">${money0(r.retGan)}</div><div class="sub">otro impuesto</div></div>`;
-}
-$("di_calc_ret").onclick=()=>{
-  const txt=$("di_ret").value;
-  if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de retenciones.");return;}
-  const r=parseRetenciones(txt);
-  if(!r.retIVA && !r.retIIBB && !r.retGan){showMsg("di_msg","learn","No encontré retenciones en el texto. Fijate de copiar el listado completo.");return;}
-  diarioTmp.ret=r;
-  mostrarResRet(r);
-  hideMsg("di_msg");
-};
-function mostrarResPartB(r){
-  $("di_res_partb").innerHTML=
-    `<div class="led" style="border-color:var(--gold)"><div class="l">Total parte B</div><div class="v">${money0(r.neto)}</div><div class="sub">gastos Tipo B · sin IVA</div></div>
-     <div class="led"><div class="l">Proveedores</div><div class="v">${Object.keys(r.provNeto).length}</div><div class="sub">con saldo distinto de cero</div></div>`;
-}
-$("di_calc_partb").onclick=()=>{
-  const txt=$("di_partb").value;
-  if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de parte B.");return;}
-  const r=parseParteB(txt);
-  if(!r.neto && !Object.keys(r.provNeto).length){showMsg("di_msg","learn","No pude leer el informe de parte B. Fijate de copiarlo completo.");return;}
-  diarioTmp.partb=r;
-  mostrarResPartB(r);
-  drawRubrosB(r.provNeto||{});
-  hideMsg("di_msg");
-};
-/* proveedores de parte B agrupados por rubro (usa la misma memoria) */
-function drawRubrosB(provNeto){
-  const box=$("di_rubros_b");
-  const provs=Object.keys(provNeto);
-  if(!provs.length){box.innerHTML="";return;}
-  const porRubro={}; const pend={};
-  provs.forEach(p=>{
-    const r=rubroDeProveedor(p);
-    if(r){ if(!porRubro[r])porRubro[r]=[]; porRubro[r].push([p,provNeto[p]]); }
-    else pend[p]=provNeto[p];
-  });
-  let h=`<div class="sectlabel" style="margin-top:8px">Parte B por rubro</div>`;
-  const pk=Object.keys(pend);
-  if(pk.length){
-    h+=`<div style="background:#fdf6e3;border:1px solid var(--gold);border-radius:8px;padding:12px;margin-bottom:12px">
-      <div style="font-weight:600;margin-bottom:8px">⚠ ${pk.length} proveedor(es) sin rubro:</div>`;
-    pk.sort((a,b)=>pend[b]-pend[a]).forEach(p=>{
-      h+=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
-        <span style="flex:1;min-width:180px;font-size:13px">${p} <b>${money(pend[p])}</b></span>
-        <select data-provrubrob="${encodeURIComponent(p)}" style="max-width:220px">
-          <option value="">— elegí rubro —</option>${RUBROS.map(r=>`<option>${r}</option>`).join("")}
-        </select></div>`;
-    });
-    h+=`</div>`;
-  }
-  const ord=Object.keys(porRubro).sort();
-  if(ord.length){
-    h+=`<table style="width:100%"><tbody>`;
-    let tot=0;
-    ord.forEach(rubro=>{
-      const items=porRubro[rubro].sort((a,b)=>b[1]-a[1]);
-      const st=items.reduce((s,x)=>s+x[1],0);
-      const noG=RUBROS_NO_GASTO.includes(rubro);
-      if(!noG)tot+=st;
-      h+=`<tr style="background:var(--paper2)"><td class="l" colspan="2"><b>${rubro}</b>${noG?' <span style="font-size:10px;color:var(--faint)">(no suma)</span>':''}</td><td class="num"><b>${money(st)}</b></td></tr>`;
-      items.forEach(([p,n])=>{ h+=`<tr><td class="l" style="padding-left:16px;font-size:13px">${p}</td><td></td><td class="num">${money(n)}</td></tr>`; });
-    });
-    h+=`<tr class="tot"><td class="l"><b>Total parte B al balance</b></td><td></td><td class="num"><b>${money(tot)}</b></td></tr></tbody></table>`;
-  }
-  box.innerHTML=h;
-  box.querySelectorAll("[data-provrubrob]").forEach(sel=>sel.onchange=async ()=>{
-    const prov=decodeURIComponent(sel.dataset.provrubrob);
-    const rubro=sel.value; if(!rubro)return;
-    state.memoria[prov.trim().toLowerCase()]=rubro;
-    await apiPost({action:"setProv",prov:prov.trim().toLowerCase(),rubro});
-    drawRubrosB(diarioTmp.partb?diarioTmp.partb.provNeto:{});
-  });
-}
-$("di_guardar").onclick=async ()=>{
-  const mes=normMes($("di_mes").value);
-  const c=diarioTmp.compras, v=diarioTmp.ventas, rt=diarioTmp.ret;
-  const dPrev=state.impuestos[mes]||{};
-  // usar lo recién calculado o lo que ya estaba
-  const compras=c||{ivaTotal:dPrev.ivaCompras||0,percIVA:dPrev.percIVACompras||0,percIIBB:dPrev.percIIBBCompras||0,neto:dPrev.netoCompras||0,ivaExcluido:dPrev.ivaExcluido||0,ivaCompNeto:dPrev.ivaCompNeto||0};
-  const ventas=v||{ivaTotal:dPrev.ivaVentas||0,neto:dPrev.netoVentas||0};
-  const ret=rt||{retIVA:dPrev.retIVAClientes||0,retIIBB:dPrev.retIIBBClientes||0,retGan:dPrev.retGanancias||0};
-  if(!compras.ivaTotal && !ventas.ivaTotal && !ret.retIVA && !diarioTmp.partb){showMsg("di_msg","learn","Leé al menos un informe antes de guardar.");return;}
-  // confirmación del mes: evita guardar en el mes equivocado
-  const yaExiste=(dPrev.ivaCompras||dPrev.ivaVentas)?" (ya había datos en este mes; se van a actualizar)":"";
-  const partes=[];
-  if(compras.ivaTotal)partes.push("IVA compras "+money(compras.ivaCompNeto));
-  if(ventas.ivaTotal)partes.push("IVA ventas "+money(ventas.ivaTotal));
-  if(ret.retIVA)partes.push("Ret. IVA "+money(ret.retIVA));
-  if(diarioTmp.partb)partes.push("Parte B "+money(diarioTmp.partb.neto));
-  if(!confirm(`Vas a guardar los informes en el mes:\n\n➡ ${ymLabel(mes).toUpperCase()}${yaExiste}\n\n${partes.join(" · ")}\n\n¿Es el mes correcto?`))return;
-  const mesPago=mesMasTres(mes);
-  state.impuestos[mes]=Object.assign({},dPrev,{
-    ivaVentas:ventas.ivaTotal, netoVentas:ventas.neto,
-    ivaCompras:compras.ivaTotal, ivaCompNeto:compras.ivaCompNeto, ivaExcluido:compras.ivaExcluido,
-    percIVACompras:compras.percIVA, percIIBBCompras:compras.percIIBB, netoCompras:compras.neto,
-    retIVAClientes:ret.retIVA, retIIBBClientes:ret.retIIBB, retGanancias:ret.retGan,
-    mesPagoIVA:mesPago
-  });
-  await apiPost({action:"setDiarioIVA",mes,ivaVentas:ventas.ivaTotal,netoVentas:ventas.neto,
-    ivaCompras:compras.ivaTotal,ivaCompNeto:compras.ivaCompNeto,ivaExcluido:compras.ivaExcluido,
-    percIVACompras:compras.percIVA,percIIBBCompras:compras.percIIBB,netoCompras:compras.neto,
-    retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,mesPagoIVA:mesPago});
-  // guardar los gastos por rubro (para que el balance los use)
-  const items=[];
-  let sinRubro=0;
-  // A) del informe de compras -> Tipo A (blanco)
-  if(compras.provNeto){
-    const porRubroA={};
-    Object.keys(compras.provNeto).forEach(p=>{
-      const r=rubroDeProveedor(p);
-      if(!r){ sinRubro++; return; }
-      if(RUBROS_NO_GASTO.includes(r))return;
-      porRubroA[r]=(porRubroA[r]||0)+compras.provNeto[p];
-    });
-    Object.keys(porRubroA).forEach(r=>items.push({rubro:r,monto:porRubroA[r],tipo:"blanco"}));
-  }
-  // B) del informe de parte B -> Tipo B (negro)
-  const pb=diarioTmp.partb;
-  if(pb && pb.provNeto){
-    const porRubroB={};
-    Object.keys(pb.provNeto).forEach(p=>{
-      const r=rubroDeProveedor(p);
-      if(!r){ sinRubro++; return; }
-      if(RUBROS_NO_GASTO.includes(r))return;
-      porRubroB[r]=(porRubroB[r]||0)+pb.provNeto[p];
-    });
-    Object.keys(porRubroB).forEach(r=>items.push({rubro:r,monto:porRubroB[r],tipo:"negro"}));
-  }
-  if(items.length || compras.provNeto){
-    state.gastosInforme=state.gastosInforme.filter(g=>normMes(g.mes)!==mes);
-    items.forEach(it=>state.gastosInforme.push({mes,rubro:it.rubro,monto:it.monto,tipo:it.tipo}));
-    await apiPost({action:"setGastosInforme",mes,items:JSON.stringify(items)});
-    if(sinRubro)showMsg("di_msg","learn",`Ojo: ${sinRubro} proveedor(es) quedaron sin rubro y no suman al balance. Asignales rubro y volvé a guardar.`);
-  }
-  diarioTmp={compras:null,ventas:null,ret:null,partb:null};
-  showMsg("di_msg","ok",`Informes de ${ymLabel(mes)} guardados. IVA ventas ${money(ventas.ivaTotal)} · IVA compras a computar ${money(compras.ivaCompNeto)} · Ret. IVA ${money(ret.retIVA)}. Se paga en ${ymLabel(mesPago)}. Mirá el cálculo en Impuestos.`);
-};
-
-/* ===== PAGOS IMPOSITIVOS (se cargan a mano y suman a gastos) ===== */
-function drawPagosImp(){
-  const mes=normMes($("t_mes").value);
-  const tb=$("pi_tbl")?$("pi_tbl").querySelector("tbody"):null;
-  if(!tb)return;
-  const pagos=state.gastos.filter(g=>ym(g.fecha)===mes && g.rubro==="IMPOSITIVO");
-  if(!pagos.length){ tb.innerHTML=`<tr><td colspan="4"><div class="empty">Sin pagos impositivos cargados en ${ymLabel(mes)}.</div></td></tr>`; return; }
-  let h=`<tr><th class="l">Concepto</th><th class="num">Monto</th><th>Tipo</th><th></th></tr>`;
-  let tot=0;
-  pagos.forEach(g=>{ tot+=g.monto||0;
-    h+=`<tr class="${g.bn==="negro"?"rowB":"rowA"}"><td class="l">${g.sub||g.prov||"Impuesto"}</td><td class="num">${money(g.monto)}</td>
-      <td><span class="chipTipo ${g.bn==="negro"?"b":"a"}">${g.bn==="negro"?"B":"A"}</span></td>
-      <td><button class="del" data-delpi="${g.id}">✕</button></td></tr>`;
-  });
-  h+=`<tr class="tot"><td class="l"><b>Total pagado</b></td><td class="num"><b>${money(tot)}</b></td><td colspan="2"></td></tr>`;
-  tb.innerHTML=h;
-  tb.querySelectorAll("[data-delpi]").forEach(b=>b.onclick=async ()=>{
-    const id=b.dataset.delpi;
-    if(confirm("¿Borrar este pago impositivo?")){
-      state.gastos=state.gastos.filter(g=>g.id!==id);
-      drawPagosImp(); drawImpuestos();
-      await apiPost({action:"deleteGasto",id});
-    }
-  });
-}
-if($("pi_add"))$("pi_add").onclick=async ()=>{
-  const mes=normMes($("t_mes").value);
-  const concepto=$("pi_concepto").value.trim();
-  const monto=parseNum($("pi_monto").value)||0;
-  const bn=$("pi_bn").value;
-  if(!concepto){showMsg("pi_msg","learn","Poné el concepto (IVA, IIBB, etc.).");return;}
-  if(!monto){showMsg("pi_msg","learn","Poné el monto pagado.");return;}
-  const gid=uid();
-  const fecha=mes+"-01";
-  const g={id:gid,fecha,prov:concepto,rubro:"IMPOSITIVO",sub:concepto,monto,bn,iva:0,piva:0,piibb:0};
-  state.gastos.push(g);
-  $("pi_concepto").value=""; $("pi_monto").value="";
-  drawPagosImp(); drawImpuestos();
-  showMsg("pi_msg","ok",`Pago de ${concepto} por ${money(monto)} agregado a los gastos de ${ymLabel(mes)}.`);
-  await apiPost({action:"addGasto",id:gid,fecha,prov:concepto,rubro:"IMPOSITIVO",sub:concepto,bn,monto,iva:0,piva:0,piibb:0});
-};
-
-/* ===== SUELDOS, CCSS Y SINDICATO ===== */
-const EMP_BASE=["Bianchini","Cacavelos","Fotini","Gutman","Escalada","Gomez","Longoni","Candia","Dittrich","Duarte"];
-function totA(s){ return (s.depA||0)+(s.q1A||0)+(s.q2A||0)+(s.vacA||0)+(s.sacA||0); }
-function totB(s){ return (s.manoB||0)+(s.q1B||0)+(s.q2B||0)+(s.vacB||0)+(s.sacB||0); }
-function renderSueldos(){
-  const sel=$("su_mes");
-  const arr=mesesSelector(state.sueldos.map(s=>s.mes));
-  const prev=normMes(sel.value);
-  sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
-  sel.value=arr.includes(prev)?prev:curMonthISO();
-  sel.onchange=renderSueldos;
-  drawSueldos();
-}
-function drawSueldos(){
-  const mes=$("su_mes").value;
-  const emps=state.sueldos.filter(s=>s.mes===mes && s.tipo==="empleado");
-  const tb=$("su_tbl").querySelector("tbody");
-  if(!emps.length){
-    tb.innerHTML=`<tr><td colspan="5"><div class="empty">No hay empleados cargados para ${ymLabel(mes)}. Usá "Cargar empleados" o "+ Empleado".</div></td></tr>`;
-  } else {
-    let h=`<tr><th class="l">Empleado</th><th class="l">Modalidad</th><th class="num">Total A (blanco)</th><th class="num">Total B (mano)</th><th class="num">Total</th><th></th></tr>`;
-    emps.sort((a,b)=>a.nombre.localeCompare(b.nombre));
-    emps.forEach(s=>{
-      const ta=totA(s), tbb=totB(s);
-      h+=`<tr>
-        <td class="l">${s.nombre}</td>
-        <td class="l"><span style="font-size:12px;color:var(--faint)">${s.modalidad==="quincenal"?"Quincenal":"Mensual"}</span></td>
-        <td class="num" style="background:var(--bgA)">${ta?money(ta):'·'}</td>
-        <td class="num" style="background:var(--bgB)">${tbb?money(tbb):'·'}</td>
-        <td class="num"><b>${money(ta+tbb)}</b></td>
-        <td style="white-space:nowrap"><button class="del" data-edsu="${s.id}" title="Editar">✎</button> <button class="del" data-delsu="${s.id}" title="Borrar">✕</button></td>
-      </tr>`;
-    });
-    tb.innerHTML=h;
-    tb.querySelectorAll("[data-edsu]").forEach(b=>b.onclick=()=>abrirEditSueldo(b.dataset.edsu));
-    tb.querySelectorAll("[data-delsu]").forEach(b=>b.onclick=async ()=>{
-      if(confirm("¿Borrar este empleado del mes?")){ const id=b.dataset.delsu; const s=state.sueldos.find(x=>x.id===id);
-        if(s){ if(s.gastoIdA){state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdA);await apiPost({action:"deleteGasto",id:s.gastoIdA});}
-               if(s.gastoIdB){state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdB);await apiPost({action:"deleteGasto",id:s.gastoIdB});} }
-        state.sueldos=state.sueldos.filter(x=>x.id!==id); drawSueldos(); await apiPost({action:"deleteSueldo",id}); }
-    });
-  }
-  const totalA=emps.reduce((a,s)=>a+totA(s),0);
-  const totalB=emps.reduce((a,s)=>a+totB(s),0);
-  $("su_resumen").innerHTML=
-    `<div class="led" style="background:var(--bgA);border-color:var(--lineA)"><div class="l">Total A (blanco)</div><div class="v">${money0(totalA)}</div><div class="sub">depositado + vac + SAC</div></div>
-     <div class="led" style="background:var(--bgB);border-color:var(--lineB)"><div class="l">Total B (mano)</div><div class="v">${money0(totalB)}</div><div class="sub">mano + vac + SAC</div></div>
-     <div class="led" style="border-color:var(--gold)"><div class="l">Total A+B</div><div class="v">${money0(totalA+totalB)}</div><div class="sub">sueldos del mes</div></div>`;
-  drawCCSS();
-  // si el detalle está abierto, refrescarlo
-  if(typeof sueldoDetalleAbierto!=="undefined" && sueldoDetalleAbierto && $("su_detalle_box")){
-    $("su_detalle_box").innerHTML=`<div class="sectlabel">Detalle de ${ymLabel($("su_mes").value)}</div><div style="overflow-x:auto">${sueldoDetalleHTML($("su_mes").value,false)}</div>`;
-  }
-}
-function drawCCSS(){
-  const mes=$("su_mes").value;
-  const items=state.sueldos.filter(s=>s.mes===mes && s.tipo==="ccss");
-  const tb=$("su_ccss_tbl").querySelector("tbody");
-  if(!items.length){
-    tb.innerHTML=`<tr><td colspan="3"><div class="empty">No hay conceptos de CCSS/sindicato para ${ymLabel(mes)}.</div></td></tr>`;
-    return;
-  }
-  let h=`<tr><th class="l">Concepto</th><th class="num">Monto</th><th></th></tr>`;
-  let tot=0;
-  items.forEach(s=>{ tot+=s.monto||0;
-    h+=`<tr><td class="l">${s.nombre}</td><td class="num">${money(s.monto)}</td>
-      <td style="white-space:nowrap"><button class="del" data-edcc="${s.id}" title="Editar">✎</button> <button class="del" data-delcc="${s.id}" title="Borrar">✕</button></td></tr>`;
-  });
-  h+=`<tr class="tot"><td class="l"><b>Total CCSS + sindicato</b></td><td class="num"><b>${money(tot)}</b></td><td></td></tr>`;
-  tb.innerHTML=h;
-  tb.querySelectorAll("[data-edcc]").forEach(b=>b.onclick=()=>abrirEditCCSS(b.dataset.edcc));
-  tb.querySelectorAll("[data-delcc]").forEach(b=>b.onclick=async ()=>{
-    if(confirm("¿Borrar este concepto?")){ const id=b.dataset.delcc; const s=state.sueldos.find(x=>x.id===id);
-      if(s&&s.gastoIdA){state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdA);await apiPost({action:"deleteGasto",id:s.gastoIdA});}
-      state.sueldos=state.sueldos.filter(x=>x.id!==id); drawCCSS(); await apiPost({action:"deleteSueldo",id}); }
-  });
-}
-$("su_seed").onclick=async ()=>{
-  const mes=$("su_mes").value;
-  const MENSUALES=["fotini","gutman","cacavelos","bianchini"];
-  const existentes=new Set(state.sueldos.filter(s=>s.mes===mes&&s.tipo==="empleado").map(s=>s.nombre.toLowerCase()));
-  const faltan=EMP_BASE.filter(n=>!existentes.has(n.toLowerCase()));
-  if(!faltan.length){showMsg("su_msg","ok","Ya están todos los empleados.");return;}
-  const nuevos=faltan.map(n=>({id:uid(),mes,tipo:"empleado",modalidad:MENSUALES.includes(n.toLowerCase())?"mensual":"quincenal",nombre:n,depA:0,q1A:0,q2A:0,vacA:0,sacA:0,manoB:0,q1B:0,q2B:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""}));
-  nuevos.forEach(n=>state.sueldos.push(n));
-  drawSueldos();
-  for(const n of nuevos){ await apiPost(Object.assign({action:"setSueldo"},n)); }
-};
-/* detalle completo de sueldos: tabla con todos los parciales */
-function sueldoDetalleHTML(mes,paraImprimir){
-  const emps=state.sueldos.filter(s=>s.mes===mes && s.tipo==="empleado" && s.nombre);
-  if(!emps.length)return `<div class="empty">Sin sueldos cargados en ${ymLabel(mes)}.</div>`;
-  emps.sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  const f=n=>n?money(n):(paraImprimir?'—':'·');
-  let rows="";
-  emps.forEach(s=>{
-    // mostrar según lo que tenga cargado (no según la etiqueta de modalidad)
-    const tieneQuincA=(s.q1A||s.q2A), tieneQuincB=(s.q1B||s.q2B);
-    const aParts = tieneQuincA ? `${f(s.q1A)} · ${f(s.q2A)}` : f(s.depA);
-    const bParts = tieneQuincB ? `${f(s.q1B)} · ${f(s.q2B)}` : f(s.manoB);
-    const modo = (tieneQuincA||tieneQuincB) ? "Quinc." : "Mens.";
-    rows+=`<tr>
-      <td class="l">${s.nombre}</td>
-      <td style="font-size:11px;color:var(--faint)">${modo}</td>
-      <td class="num" style="background:var(--bgA)">${aParts}</td>
-      <td class="num" style="background:var(--bgA)">${f(s.vacA)}</td>
-      <td class="num" style="background:var(--bgA)">${f(s.sacA)}</td>
-      <td class="num" style="background:var(--bgB)">${bParts}</td>
-      <td class="num" style="background:var(--bgB)">${f(s.vacB)}</td>
-      <td class="num" style="background:var(--bgB)">${f(s.sacB)}</td>
-      <td class="num"><b>${money(totA(s)+totB(s))}</b></td>
-    </tr>`;
-  });
-  const totalA=emps.reduce((a,s)=>a+totA(s),0), totalB=emps.reduce((a,s)=>a+totB(s),0);
-  let tabla=`<table style="width:100%;font-size:13px"><tbody>
-    <tr>
-      <th class="l">Empleado</th><th></th>
-      <th class="num" style="background:var(--bgA2)" colspan="3">TIPO A (blanco): Q1·Q2 / dep · Vac · SAC</th>
-      <th class="num" style="background:var(--bgB2)" colspan="3">TIPO B (mano): Q1·Q2 / mano · Vac · SAC</th>
-      <th class="num">Total</th>
-    </tr>
-    ${rows}
-    <tr class="tot"><td class="l"><b>Totales</b></td><td></td>
-      <td class="num" colspan="3" style="background:var(--bgA2)"><b>${money(totalA)}</b></td>
-      <td class="num" colspan="3" style="background:var(--bgB2)"><b>${money(totalB)}</b></td>
-      <td class="num"><b>${money(totalA+totalB)}</b></td></tr>
-  </tbody></table>`;
-  // CCSS, sindicato y federación del mes
-  const ccss=state.sueldos.filter(s=>s.mes===mes && s.tipo==="ccss");
-  if(ccss.length){
-    let ct=0;
-    const filas=ccss.map(c=>{ ct+=c.monto||0; return `<tr><td class="l">${c.nombre||"Concepto"}</td><td class="num">${money(c.monto)}</td></tr>`; }).join("");
-    tabla+=`<div class="sectlabel" style="margin-top:16px">CCSS, sindicato y federación</div>
-      <table style="width:100%;font-size:13px"><tbody>${filas}
-      <tr class="tot"><td class="l"><b>Total</b></td><td class="num"><b>${money(ct)}</b></td></tr></tbody></table>`;
-  }
-  return tabla;
-}
-let sueldoDetalleAbierto=false;
-if($("su_detalle"))$("su_detalle").onclick=()=>{
-  const box=$("su_detalle_box");
-  sueldoDetalleAbierto=!sueldoDetalleAbierto;
-  if(sueldoDetalleAbierto){
-    box.style.display="block";
-    box.innerHTML=`<div class="sectlabel">Detalle de ${ymLabel($("su_mes").value)}</div><div style="overflow-x:auto">${sueldoDetalleHTML($("su_mes").value,false)}</div>`;
-    $("su_detalle").textContent="Ocultar detalle";
-  } else {
-    box.style.display="none"; box.innerHTML="";
-    $("su_detalle").textContent="Ver detalle completo";
-  }
-};
-if($("su_print"))$("su_print").onclick=()=>{
-  const mes=$("su_mes").value;
-  const w=window.open("","_blank");
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sueldos ${ymLabel(mes)}</title>
-    <style>
-      body{font-family:Georgia,serif;color:#23201a;max-width:900px;margin:24px auto;padding:0 16px}
-      h1{font-size:20px;margin-bottom:2px} .sub{color:#666;font-size:12px;margin-bottom:16px}
-      table{width:100%;border-collapse:collapse;margin-top:10px}
-      td,th{padding:6px 8px;border-bottom:1px solid #ddd;font-size:12px;text-align:right}
-      td.l,th.l{text-align:left} th{background:#f0ece4}
-      .tot td{border-top:2px solid #333;font-weight:bold}
-      @media print{button{display:none}}
-    </style></head><body>
-    <h1>Detalle de sueldos — ${ymLabel(mes)}</h1>
-    <div class="sub">EG Corrugados · generado ${new Date().toLocaleDateString("es-AR")}</div>
-    ${sueldoDetalleHTML(mes,true)}
-    <button onclick="window.print()" style="margin-top:18px;padding:9px 18px;cursor:pointer">Imprimir</button>
-    </body></html>`);
-  w.document.close();
-};
-
-$("su_addemp").onclick=()=>{
-  const mes=$("su_mes").value;
-  const nuevo={id:uid(),mes,tipo:"empleado",modalidad:"mensual",nombre:"",depA:0,q1A:0,q2A:0,vacA:0,sacA:0,manoB:0,q1B:0,q2B:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""};
-  state.sueldos.push(nuevo);
-  abrirEditSueldo(nuevo.id);
-};
-$("su_addccss").onclick=()=>{
-  const mes=$("su_mes").value;
-  const nuevo={id:uid(),mes,tipo:"ccss",modalidad:"mensual",nombre:"",depA:0,q1A:0,q2A:0,vacA:0,sacA:0,manoB:0,q1B:0,q2B:0,vacB:0,sacB:0,monto:0,obs:"",gastoIdA:"",gastoIdB:""};
-  state.sueldos.push(nuevo);
-  abrirEditCCSS(nuevo.id);
-};
-function sumToggleModalidad(){
-  const q=$("sum_modalidad").value==="quincenal";
-  document.querySelectorAll(".sum-quincenal").forEach(e=>e.style.display=q?"grid":"none");
-  document.querySelectorAll(".sum-mensual").forEach(e=>e.style.display=q?"none":"grid");
-}
-function abrirEditSueldo(id){
-  const s=state.sueldos.find(x=>x.id===id); if(!s)return;
-  $("sum_id").value=s.id;
-  $("sum_nombre").value=s.nombre||"";
-  $("sum_modalidad").value=s.modalidad||"mensual";
-  // mensual
-  $("sum_depA").value=s.depA||""; $("sum_vacA").value=s.vacA||""; $("sum_sacA").value=s.sacA||"";
-  $("sum_manoB").value=s.manoB||""; $("sum_vacB").value=s.vacB||""; $("sum_sacB").value=s.sacB||"";
-  // quincenal
-  $("sum_q1A").value=s.q1A||""; $("sum_q2A").value=s.q2A||""; $("sum_vacA2").value=s.vacA||""; $("sum_sacA2").value=s.sacA||"";
-  $("sum_q1B").value=s.q1B||""; $("sum_q2B").value=s.q2B||""; $("sum_vacB2").value=s.vacB||""; $("sum_sacB2").value=s.sacB||"";
-  sumToggleModalidad();
-  hideMsg("sum_msg");
-  $("sum_overlay").style.display="flex";
-}
-$("sum_modalidad").addEventListener("change",sumToggleModalidad);
-function sueldoCancelar(){
-  const s=state.sueldos.find(x=>x.id===$("sum_id").value);
-  if(s && !s.nombre && !totA(s) && !totB(s)){ state.sueldos=state.sueldos.filter(x=>x.id!==s.id); }
-  $("sum_overlay").style.display="none"; drawSueldos();
-}
-$("sum_cancel").onclick=sueldoCancelar;
-$("sum_overlay").addEventListener("click",e=>{ if(e.target===$("sum_overlay"))sueldoCancelar(); });
-$("sum_save").onclick=async ()=>{
-  const s=state.sueldos.find(x=>x.id===$("sum_id").value); if(!s)return;
-  s.nombre=$("sum_nombre").value.trim()||"Empleado";
-  s.modalidad=$("sum_modalidad").value;
-  if(s.modalidad==="quincenal"){
-    s.q1A=parseNum($("sum_q1A").value)||0; s.q2A=parseNum($("sum_q2A").value)||0;
-    s.vacA=parseNum($("sum_vacA2").value)||0; s.sacA=parseNum($("sum_sacA2").value)||0;
-    s.q1B=parseNum($("sum_q1B").value)||0; s.q2B=parseNum($("sum_q2B").value)||0;
-    s.vacB=parseNum($("sum_vacB2").value)||0; s.sacB=parseNum($("sum_sacB2").value)||0;
-    s.depA=0; s.manoB=0;
-  } else {
-    s.depA=parseNum($("sum_depA").value)||0; s.vacA=parseNum($("sum_vacA").value)||0; s.sacA=parseNum($("sum_sacA").value)||0;
-    s.manoB=parseNum($("sum_manoB").value)||0; s.vacB=parseNum($("sum_vacB").value)||0; s.sacB=parseNum($("sum_sacB").value)||0;
-    s.q1A=0; s.q2A=0; s.q1B=0; s.q2B=0;
-  }
-  const alBalance=$("su_albalance").checked;
-  await sueldoAlBalance(s,alBalance);
-  $("sum_overlay").style.display="none";
-  drawSueldos();
-  await apiPost(Object.assign({action:"setSueldo"},s));
-  showMsg("su_msg","ok",`Sueldo de "${s.nombre}" guardado.`);
-};
-function abrirEditCCSS(id){
-  const s=state.sueldos.find(x=>x.id===id); if(!s)return;
-  $("succ_id").value=s.id;
-  $("succ_nombre").value=s.nombre||"";
-  $("succ_monto").value=s.monto||"";
-  $("succ_albalance").checked=true;
-  hideMsg("succ_msg");
-  $("succ_overlay").style.display="flex";
-}
-function ccssCancelar(){
-  const s=state.sueldos.find(x=>x.id===$("succ_id").value);
-  if(s && !s.nombre && !s.monto){ state.sueldos=state.sueldos.filter(x=>x.id!==s.id); }
-  $("succ_overlay").style.display="none"; drawCCSS();
-}
-$("succ_cancel").onclick=ccssCancelar;
-$("succ_overlay").addEventListener("click",e=>{ if(e.target===$("succ_overlay"))ccssCancelar(); });
-$("succ_save").onclick=async ()=>{
-  const s=state.sueldos.find(x=>x.id===$("succ_id").value); if(!s)return;
-  s.nombre=$("succ_nombre").value.trim()||"CCSS";
-  s.monto=parseNum($("succ_monto").value)||0;
-  const alBalance=$("succ_albalance").checked;
-  if(alBalance && s.monto>0){
-    const fecha=($("su_mes").value)+"-01";
-    if(s.gastoIdA && state.gastos.find(g=>g.id===s.gastoIdA)){
-      const g=state.gastos.find(x=>x.id===s.gastoIdA);
-      Object.assign(g,{fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:s.nombre,monto:s.monto,iva:0,piva:0,piibb:0,bn:"blanco"});
-      await apiPost({action:"updateGasto",id:s.gastoIdA,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:s.nombre,bn:"blanco",monto:s.monto,iva:0,piva:0,piibb:0});
-    } else {
-      const gid=uid();
-      state.gastos.push({id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:s.nombre,monto:s.monto,bn:"blanco",iva:0,piva:0,piibb:0});
-      s.gastoIdA=gid;
-      await apiPost({action:"addGasto",id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:s.nombre,bn:"blanco",monto:s.monto,iva:0,piva:0,piibb:0});
-    }
-  } else if(s.gastoIdA && state.gastos.find(g=>g.id===s.gastoIdA)){
-    state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdA); await apiPost({action:"deleteGasto",id:s.gastoIdA}); s.gastoIdA="";
-  }
-  $("succ_overlay").style.display="none";
-  drawCCSS();
-  await apiPost(Object.assign({action:"setSueldo"},s));
-  showMsg("su_msg","ok",`Concepto "${s.nombre}" guardado.`);
-};
-async function sueldoAlBalance(s,alBalance){
-  const fecha=(s.mes)+"-01";
-  const ta=totA(s), tb=totB(s);
-  if(alBalance && ta>0){
-    if(s.gastoIdA && state.gastos.find(g=>g.id===s.gastoIdA)){
-      const g=state.gastos.find(x=>x.id===s.gastoIdA);
-      Object.assign(g,{fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",monto:ta,iva:0,piva:0,piibb:0,bn:"blanco"});
-      await apiPost({action:"updateGasto",id:s.gastoIdA,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",bn:"blanco",monto:ta,iva:0,piva:0,piibb:0});
-    } else {
-      const gid=uid();
-      state.gastos.push({id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",monto:ta,bn:"blanco",iva:0,piva:0,piibb:0});
-      s.gastoIdA=gid;
-      await apiPost({action:"addGasto",id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",bn:"blanco",monto:ta,iva:0,piva:0,piibb:0});
-    }
-  } else if(s.gastoIdA && state.gastos.find(g=>g.id===s.gastoIdA)){
-    state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdA); await apiPost({action:"deleteGasto",id:s.gastoIdA}); s.gastoIdA="";
-  }
-  if(alBalance && tb>0){
-    if(s.gastoIdB && state.gastos.find(g=>g.id===s.gastoIdB)){
-      const g=state.gastos.find(x=>x.id===s.gastoIdB);
-      Object.assign(g,{fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",monto:tb,iva:0,piva:0,piibb:0,bn:"negro"});
-      await apiPost({action:"updateGasto",id:s.gastoIdB,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",bn:"negro",monto:tb,iva:0,piva:0,piibb:0});
-    } else {
-      const gid=uid();
-      state.gastos.push({id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",monto:tb,bn:"negro",iva:0,piva:0,piibb:0});
-      s.gastoIdB=gid;
-      await apiPost({action:"addGasto",id:gid,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:"Sueldos",bn:"negro",monto:tb,iva:0,piva:0,piibb:0});
-    }
-  } else if(s.gastoIdB && state.gastos.find(g=>g.id===s.gastoIdB)){
-    state.gastos=state.gastos.filter(g=>g.id!==s.gastoIdB); await apiPost({action:"deleteGasto",id:s.gastoIdB}); s.gastoIdB="";
-  }
-}
-
-/* ===== CHEQUES EMITIDOS ===== */
-function parseChequesEmit(texto){
-  const bloques=texto.split(/(?=ID:\s)/);
-  const out=[];
-  bloques.forEach(b=>{
-    if(!/ID:\s/.test(b))return;
-    const nro=(b.match(/N°:\s*(\d+)/)||b.match(/N[º°]:\s*(\d+)/)||[])[1]||"";
-    const cuit=(b.match(/CUIT\s*([\d-]+)/)||[])[1]||"";
-    const fecha=(b.match(/(\d{2}\/\d{2}\/\d{4})/)||[])[1]||"";
-    const imp=(b.match(/\$\s*([\d.]+,\d{2})/)||[])[1]||"";
-    // beneficiario: línea entre N°: y CUIT que no sea "..." ni vacía
-    let benef="";
-    const lineas=b.split("\n").map(l=>l.trim());
-    for(let i=0;i<lineas.length;i++){
-      if(/^N[º°]:/.test(lineas[i])){
-        for(let j=i+1;j<lineas.length;j++){
-          if(lineas[j] && !/^CUIT/.test(lineas[j]) && lineas[j]!=="..."){ benef=lineas[j]; break; }
-        }
-        break;
-      }
-    }
-    if(!nro && !imp)return;
-    out.push({nro,cuit,beneficiario:benef,fechaPago:fecha?isoDe(fecha):"",monto:imp?parseFloat(imp.replace(/\./g,"").replace(",",".")):0});
-  });
-  return out;
-}
-function isoDe(ddmmaaaa){ const p=ddmmaaaa.split("/"); return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:""; }
-
-function renderChequesEmit(){
-  $("che_rango").onchange=drawAvisoCaja;
-  $("che_filtro").onchange=drawChequesTabla;
-  drawAvisoCaja();
-  drawChequesTabla();
-}
-$("che_calc").onclick=async ()=>{
-  const texto=$("che_texto").value;
-  if(!texto.trim()){showMsg("che_msg","learn","Pegá primero el texto de los cheques.");return;}
-  const parsed=parseChequesEmit(texto);
-  if(!parsed.length){showMsg("che_msg","learn","No encontré cheques en el texto. Fijate de copiar desde \"ID:\".");return;}
-  let nuevos=0, repetidos=0;
-  for(const p of parsed){
-    // evitar duplicar por nro
-    if(p.nro && state.chequesEmit.some(c=>c.nro===p.nro)){ repetidos++; continue; }
-    const c={id:uid(),tipo:"electronico",nro:p.nro,beneficiario:p.beneficiario,cuit:p.cuit,fechaPago:p.fechaPago,monto:p.monto,estado:"No cobrado",obs:""};
-    state.chequesEmit.push(c); nuevos++;
-    await apiPost(Object.assign({action:"setChequeEmit"},c));
-  }
-  $("che_texto").value="";
-  drawAvisoCaja(); drawChequesTabla();
-  showMsg("che_msg","ok",`Cargué ${nuevos} cheque(s).${repetidos?" Omití "+repetidos+" que ya estaban (mismo N°).":""}`);
-};
-$("che_clear").onclick=()=>{$("che_texto").value="";hideMsg("che_msg");};
-$("che_add").onclick=()=>{
-  const c={id:uid(),tipo:"fisico",nro:"",beneficiario:"",cuit:"",fechaPago:"",monto:0,estado:"No cobrado",obs:""};
-  state.chequesEmit.push(c);
-  abrirEditCheque(c.id);
-};
-function drawChequesTabla(){
-  const f=$("che_filtro").value;
-  let list=state.chequesEmit.slice().sort((a,b)=>(a.fechaPago||"").localeCompare(b.fechaPago||""));
-  if(f==="No cobrado"||f==="Cobrado")list=list.filter(c=>c.estado===f);
-  if(f==="electronico"||f==="fisico")list=list.filter(c=>c.tipo===f);
-  const tb=$("che_tbl").querySelector("tbody");
-  if(!list.length){tb.innerHTML=`<tr><td colspan="7"><div class="empty">No hay cheques${f?" con ese filtro":" cargados"}.</div></td></tr>`;return;}
-  let h=`<tr><th class="l">Tipo</th><th class="l">N°</th><th class="l">Beneficiario</th><th class="l">Pago</th><th class="num">Monto</th><th>Estado</th><th></th></tr>`;
-  list.forEach(c=>{
-    h+=`<tr>
-      <td class="l"><span style="font-size:11px">${c.tipo==="fisico"?"Físico":"Electrónico"}</span></td>
-      <td class="l">${c.nro||"—"}</td>
-      <td class="l">${c.beneficiario||'<span style="color:var(--faint)">—</span>'}</td>
-      <td class="l">${c.fechaPago?fechaLinda(c.fechaPago):"—"}</td>
-      <td class="num">${money(c.monto)}</td>
-      <td><button class="estado-btn ${c.estado==="Cobrado"?'pagado':'pend'}" data-estch="${c.id}">${c.estado}</button></td>
-      <td style="white-space:nowrap"><button class="del" data-edch="${c.id}" title="Editar">✎</button> <button class="del" data-delche="${c.id}" title="Borrar">✕</button></td>
-    </tr>`;
-  });
-  tb.innerHTML=h;
-  tb.querySelectorAll("[data-estch]").forEach(b=>b.onclick=async ()=>{
-    const c=state.chequesEmit.find(x=>x.id===b.dataset.estch); if(!c)return;
-    c.estado=c.estado==="Cobrado"?"No cobrado":"Cobrado";
-    drawChequesTabla(); drawAvisoCaja();
-    await apiPost(Object.assign({action:"setChequeEmit"},c));
-  });
-  tb.querySelectorAll("[data-edch]").forEach(b=>b.onclick=()=>abrirEditCheque(b.dataset.edch));
-  tb.querySelectorAll("[data-delche]").forEach(b=>b.onclick=async ()=>{
-    if(confirm("¿Borrar este cheque?")){ const id=b.dataset.delche; state.chequesEmit=state.chequesEmit.filter(x=>x.id!==id); drawChequesTabla(); drawAvisoCaja(); await apiPost({action:"deleteChequeEmit",id}); }
-  });
-}
-function abrirEditCheque(id){
-  const c=state.chequesEmit.find(x=>x.id===id); if(!c)return;
-  $("chm_id").value=c.id;
-  $("chm_tipo").value=c.tipo||"electronico";
-  $("chm_nro").value=c.nro||"";
-  $("chm_benef").value=c.beneficiario||"";
-  $("chm_fpago").value=c.fechaPago||"";
-  $("chm_monto").value=c.monto||"";
-  $("chm_obs").value=c.obs||"";
-  hideMsg("chm_msg");
-  $("chm_overlay").style.display="flex";
-}
-$("chm_cancel").onclick=()=>{$("chm_overlay").style.display="none"; drawChequesTabla();};
-$("chm_overlay").addEventListener("click",e=>{ if(e.target===$("chm_overlay")){$("chm_overlay").style.display="none";drawChequesTabla();} });
-$("chm_save").onclick=async ()=>{
-  const c=state.chequesEmit.find(x=>x.id===$("chm_id").value); if(!c)return;
-  c.tipo=$("chm_tipo").value;
-  c.nro=$("chm_nro").value.trim();
-  c.beneficiario=$("chm_benef").value.trim();
-  c.fechaPago=$("chm_fpago").value;
-  c.monto=parseNum($("chm_monto").value)||0;
-  c.obs=$("chm_obs").value.trim();
-  $("chm_overlay").style.display="none";
-  drawChequesTabla(); drawAvisoCaja();
-  await apiPost(Object.assign({action:"setChequeEmit"},c));
-};
-function drawAvisoCaja(){
-  const rango=parseInt($("che_rango").value);
-  const noCob=state.chequesEmit.filter(c=>c.estado!=="Cobrado" && c.fechaPago);
-  // ya pueden salir: fecha de pago <= hoy
-  const yaSalen=noCob.filter(c=>diasAlVenc(c.fechaPago)<=0);
-  // por venir: fecha futura dentro del rango
-  const porVenir=noCob.filter(c=>{const d=diasAlVenc(c.fechaPago); return d>0 && d<=rango;});
-  const totalYa=yaSalen.reduce((s,c)=>s+c.monto,0);
-  const totalVen=porVenir.reduce((s,c)=>s+c.monto,0);
-  // servicios pendientes en el rango (para el total por separado)
-  const servPend=state.servicios.filter(s=>s.estado!=="Pagado"&&s.venc&&totalPagarServicio(s)>0);
-  const servYa=servPend.filter(s=>diasAlVenc(s.venc)<=0).reduce((a,s)=>a+totalPagarServicio(s),0);
-  const servVen=servPend.filter(s=>{const d=diasAlVenc(s.venc);return d>0&&d<=rango;}).reduce((a,s)=>a+totalPagarServicio(s),0);
-  $("che_aviso").innerHTML=
-    `<div class="led"><div class="l">Cheques — ya pueden salir</div><div class="v ${totalYa>0?'neg':''}">${money0(totalYa)}</div><div class="sub">${yaSalen.length} cheque(s) no cobrados</div></div>
-     <div class="led"><div class="l">Cheques — por venir (${rango}d)</div><div class="v">${money0(totalVen)}</div><div class="sub">${porVenir.length} cheque(s)</div></div>
-     <div class="led"><div class="l">Servicios — ya / por venir</div><div class="v">${money0(servYa)} / ${money0(servVen)}</div><div class="sub">pendientes</div></div>
-     <div class="led" style="border-color:var(--gold)"><div class="l">Total a cubrir ya</div><div class="v ${(totalYa+servYa)>0?'neg':''}">${money0(totalYa+servYa)}</div><div class="sub">cheques + servicios que ya pueden salir</div></div>`;
-}
-
-/* ===== PRÓXIMOS VENCIMIENTOS ===== */
-function renderVencimientos(){
-  $("vc_rango").onchange=drawVencimientos;
-  drawVencimientos();
-}
-function drawVencimientos(){
-  const rango=parseInt($("vc_rango").value);
-  // todos los servicios con vencimiento, de cualquier mes
-  const conVenc=state.servicios.filter(s=>s.venc);
-  const hoy=new Date(); hoy.setHours(0,0,0,0);
-  // calcular días y filtrar por rango (incluye vencidos impagos siempre)
-  let items=conVenc.map(s=>({s,d:diasAlVenc(s.venc)}));
-  items=items.filter(({s,d})=>{
-    if(s.estado!=="Pagado" && d<0) return true;          // vencido impago: siempre se muestra
-    return d>=0 && d<=rango;                              // dentro del rango
-  });
-  items.sort((a,b)=>a.d-b.d);
-  const tb=$("vc_tbl").querySelector("tbody");
-  if(!items.length){
-    tb.innerHTML=`<tr><td colspan="6"><div class="empty">No hay vencimientos en el rango elegido.</div></td></tr>`;
-    $("vc_resumen").innerHTML="";
-    return;
-  }
-  let h=`<tr><th class="l">Vence</th><th class="l">Servicio</th><th class="l">Mes</th><th class="l">Tipo pago</th><th class="num">Monto</th><th>Estado</th></tr>`;
-  items.forEach(({s,d})=>{
-    let etiqueta="",cls="";
-    if(s.estado!=="Pagado"){
-      if(d<0){etiqueta=`venció hace ${Math.abs(d)}d`;cls="venc-rojo";}
-      else if(d===0){etiqueta="vence hoy";cls="venc-rojo";}
-      else if(d<=3){etiqueta=`en ${d}d`;cls="venc-amar";}
-      else etiqueta=`en ${d}d`;
-    }
-    h+=`<tr class="${cls}">
-      <td class="l">${fechaLinda(s.venc)}${etiqueta?` <span style="font-size:11px;color:var(--faint)">(${etiqueta})</span>`:""}</td>
-      <td class="l">${s.servicio}</td>
-      <td class="l"><span style="font-size:12px;color:var(--faint)">${ymLabel(s.mes)}</span></td>
-      <td class="l"><span style="font-size:12px">${s.tipoPago||""}</span></td>
-      <td class="num">${totalPagarServicio(s)?money(totalPagarServicio(s)):'<span style="color:var(--faint)">—</span>'}</td>
-      <td>${s.estado==="Pagado"?'<span style="color:var(--green);font-size:12px">✓ Pagado</span>':'<span style="font-size:12px;color:var(--ink2)">Pendiente</span>'}</td>
-    </tr>`;
-  });
-  tb.innerHTML=h;
-  // resumen: total a pagar (pendiente) en el rango, separado por tipo de pago
-  const pend=items.filter(({s})=>s.estado!=="Pagado");
-  const totalPend=pend.reduce((acc,{s})=>acc+totalPagarServicio(s),0);
-  const debito=pend.filter(({s})=>/d[ée]bito/i.test(s.tipoPago)).reduce((acc,{s})=>acc+totalPagarServicio(s),0);
-  const transf=totalPend-debito;
-  $("vc_resumen").innerHTML=
-    `<div class="led"><div class="l">Total pendiente</div><div class="v ${totalPend>0?'neg':''}">${money0(totalPend)}</div><div class="sub">${pend.length} pago(s)</div></div>
-     <div class="led"><div class="l">Por débito automático</div><div class="v">${money0(debito)}</div><div class="sub">sale solo</div></div>
-     <div class="led"><div class="l">Por transferencia</div><div class="v">${money0(transf)}</div><div class="sub">lo hacés vos</div></div>`;
-}
-
-$("sv_seed").onclick=async ()=>{
-  const mes=$("sv_mes").value;
-  const existentes=state.servicios.filter(s=>s.mes===mes).map(s=>s.servicio.toLowerCase().trim());
-  // solo agrega los servicios de la lista base que NO estén ya en el mes
-  const faltantes=SERV_BASE.filter(b=>!existentes.includes(b.servicio.toLowerCase().trim()));
-  if(!faltantes.length){
-    showMsg("sv_msg","learn",`${ymLabel(mes)} ya tiene toda la lista base cargada. No agregué nada para no duplicar.`);
-    return;
-  }
-  if(existentes.length && !confirm(`${ymLabel(mes)} ya tiene ${existentes.length} servicio(s). Voy a agregar los ${faltantes.length} que faltan de la lista base (sin duplicar los que ya están). ¿Seguimos?`))return;
-  const nuevos=faltantes.map(b=>({id:uid(),mes,servicio:b.servicio,categoria:b.categoria,tipoPago:b.tipoPago,rubro:b.rubro||"",sub:b.sub||"",entidad:"",fechaEmision:"",venc:"",fechaPago:"",monto:0,iva:0,piva:0,piibb:0,estado:"Pendiente",obs:"",enBalance:false,gastoId:""}));
-  nuevos.forEach(n=>state.servicios.push(n));
-  drawServicios();
-  showMsg("sv_msg","ok",`Agregué ${nuevos.length} servicio(s) a ${ymLabel(mes)}${existentes.length?" (los que faltaban)":""}.`);
-  for(const n of nuevos){ await apiPost(Object.assign({action:"setServicio"},n)); }
-};
-
-$("sv_limpiar").onclick=async ()=>{
-  const mes=$("sv_mes").value;
-  const delMes=state.servicios.filter(s=>s.mes===mes);
-  // agrupar por nombre normalizado
-  const grupos={};
-  delMes.forEach(s=>{ const k=s.servicio.toLowerCase().trim(); (grupos[k]=grupos[k]||[]).push(s); });
-  // detectar duplicados
-  const aBorrar=[];
-  Object.values(grupos).forEach(arr=>{
-    if(arr.length<=1)return;
-    // puntaje: cuántos datos tiene cargados (para conservar el más completo)
-    const score=s=>(s.monto>0?2:0)+(s.venc?1:0)+(s.fechaEmision?1:0)+(s.enBalance?2:0)+(s.estado==="Pagado"?1:0);
-    arr.sort((a,b)=>score(b)-score(a));
-    // el primero (mejor) se queda; el resto a borrar
-    arr.slice(1).forEach(s=>aBorrar.push(s));
-  });
-  if(!aBorrar.length){ showMsg("sv_msg","ok",`No encontré duplicados en ${ymLabel(mes)}.`); return; }
-  if(!confirm(`Encontré ${aBorrar.length} servicio(s) duplicado(s) en ${ymLabel(mes)}. Voy a dejar uno de cada uno (el más completo) y borrar las copias. ¿Seguimos?`))return;
-  const ids=new Set(aBorrar.map(s=>s.id));
-  state.servicios=state.servicios.filter(s=>!ids.has(s.id));
-  drawServicios();
-  showMsg("sv_msg","ok",`Limpié ${aBorrar.length} duplicado(s) de ${ymLabel(mes)}.`);
-  for(const s of aBorrar){ await apiPost({action:"deleteServicio",id:s.id}); }
-};
-$("sv_add").onclick=()=>{
-  const mes=$("sv_mes").value;
-  const nuevo={id:uid(),mes,servicio:"Nuevo servicio",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"",entidad:"",fechaEmision:"",venc:"",fechaPago:"",monto:0,iva:0,piva:0,piibb:0,estado:"Pendiente",obs:"",enBalance:false,gastoId:""};
-  state.servicios.push(nuevo);
-  drawServicios();
-  abrirEditServicio(nuevo.id);
-};
-
-/* Busca los datos fijos guardados de un servicio (del más reciente con datos) */
-function plantillaServicio(nombre){
-  const n=nombre.toLowerCase().trim();
-  const previos=state.servicios
-    .filter(s=>s.servicio.toLowerCase().trim()===n && (s.rubro||s.tipoPago||s.entidad))
-    .sort((a,b)=>(b.mes||"").localeCompare(a.mes||""));
-  if(previos.length)return previos[0];
-  // si no hay previo, usar sugerencia de la lista base
-  const base=SERV_BASE.find(b=>b.servicio.toLowerCase().trim()===n);
-  return base||null;
-}
-/* Crea un servicio nuevo en el mes actual y abre el formulario */
-function abrirNuevoServicio(){
-  const mes=curMonthISO();
-  const nuevo={id:uid(),mes,servicio:"",categoria:"Servicios",tipoPago:"Transferencia",rubro:"LOCACION, ABL Y SERVICIOS",sub:"",entidad:"",fechaEmision:"",venc:"",fechaPago:"",monto:0,iva:0,piva:0,piibb:0,estado:"Pendiente",obs:"",enBalance:false,gastoId:""};
-  state.servicios.push(nuevo);
-  abrirEditServicio(nuevo.id);
-}
-
-function abrirEditServicio(id){
+function abrirEdServicio(id){
   const s=state.servicios.find(x=>x.id===id); if(!s)return;
   $("eds_id").value=s.id;
-  $("eds_serv").value=s.servicio;
-  // datalist con nombres de servicios conocidos (base + cargados antes)
-  const nombres=[...new Set([...SERV_BASE.map(b=>b.servicio), ...state.servicios.map(x=>x.servicio)].filter(Boolean))].sort();
-  $("eds_servlist").innerHTML=nombres.map(n=>`<option value="${n}">`).join("");
-  $("eds_cat").innerHTML=CAT_SERV.map(c=>`<option ${c===s.categoria?"selected":""}>${c}</option>`).join("");
-  // rubro/sub: usa lo guardado, o la plantilla (memoria de meses previos / lista base)
-  const pl=s.rubro?null:plantillaServicio(s.servicio);
-  const rubro=s.rubro||(pl&&pl.rubro)||"LOCACION, ABL Y SERVICIOS";
-  $("eds_rubro").innerHTML=RUBROS.map(r=>`<option ${r===rubro?"selected":""}>${r}</option>`).join("");
-  edsFillSubs(s.sub||(pl&&pl.sub)||"");
-  $("eds_emision").value=s.fechaEmision||"";
+  $("eds_nombre").value=s.servicio||"";
+  $("eds_monto").value=s.monto?money(s.monto).replace("$","").trim():"";
   $("eds_venc").value=s.venc||"";
-  $("eds_fpago").value=s.fechaPago||"";
-  const tipoPago=s.tipoPago||(pl&&pl.tipoPago)||"Transferencia";
-  $("eds_tipo").innerHTML=TIPOS_PAGO.map(t=>`<option ${t===tipoPago?"selected":""}>${t}</option>`).join("");
-  $("eds_ent").value=s.entidad||(pl&&pl.entidad)||"";
-  $("eds_monto").value=(s.bn==="negro"&&s.monto)?("*"+s.monto):(s.monto||"");
-  // alícuota deducida
-  let alic="21";
-  if(s.monto>0&&s.iva>0){const r=Math.round(s.iva/s.monto*1000)/10; if(Math.abs(r-10.5)<1)alic="10.5"; else if(Math.abs(r-27)<1)alic="27";}
-  $("eds_alic").value=alic;
-  $("eds_piva").value=s.piva||"";
-  $("eds_piibb").value=s.piibb||"";
+  $("eds_debito").checked=!!s.debito;
   $("eds_obs").value=s.obs||"";
-  // marca "ya viene en el informe": del servicio, o de la memoria por nombre
-  const memInf=(state.svInforme||{})[(s.servicio||"").trim().toLowerCase()];
-  $("eds_eninforme").checked = (s.enInforme!==undefined && s.enInforme!==null) ? !!s.enInforme : !!memInf;
-  edsCalcIva();
   hideMsg("eds_msg");
   $("eds_overlay").style.display="flex";
 }
-/* al elegir/escribir un nombre conocido, aplica sus datos fijos guardados */
-function edsAplicarPlantilla(){
-  const nombre=$("eds_serv").value;
-  const pl=plantillaServicio(nombre);
-  if(!pl)return;
-  if(pl.categoria)$("eds_cat").value=pl.categoria;
-  if(pl.rubro){ $("eds_rubro").value=pl.rubro; edsFillSubs(pl.sub||""); }
-  if(pl.tipoPago)$("eds_tipo").value=pl.tipoPago;
-  if(pl.entidad)$("eds_ent").value=pl.entidad;
-}
-$("eds_serv").addEventListener("change",edsAplicarPlantilla);
-function edsFillSubs(sel){
-  const rubro=$("eds_rubro").value;
-  const lista=(state.subs[rubro]||[]).slice().sort((a,b)=>a.localeCompare(b));
-  // si la sub sugerida no está en la lista, la agrego igual como opción
-  if(sel && !lista.includes(sel))lista.push(sel);
-  $("eds_sub").innerHTML=`<option value="">— sin subcategoría —</option>`+lista.map(x=>`<option ${x===sel?"selected":""}>${x}</option>`).join("");
-}
-$("eds_rubro").addEventListener("change",()=>edsFillSubs(""));
-function edsMontoEsNegro(){ return $("eds_monto").value.trim().startsWith("*"); }
-function edsCalcIva(){
-  const esNegro=edsMontoEsNegro();
-  const neto=parseNum($("eds_monto").value);
-  // Si es Tipo B (asterisco), no se computa IVA
-  if(esNegro){ $("eds_iva").value="0,00"; return; }
-  const a=parseFloat($("eds_alic").value);
-  if(isNaN(neto)||neto<=0){ $("eds_iva").value=""; return; }
-  const iva=a>0?Math.round(neto*a/100*100)/100:0;
-  $("eds_iva").value=iva.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
-}
-$("eds_monto").addEventListener("input",edsCalcIva);
-$("eds_alic").addEventListener("change",edsCalcIva);
-function edsCancelar(){
-  const s=state.servicios.find(x=>x.id===$("eds_id").value);
-  // si era un servicio nuevo sin nombre ni datos, lo saco para no dejar basura
-  if(s && !s.servicio && !s.monto && !s.venc && !s.fechaEmision){ state.servicios=state.servicios.filter(x=>x.id!==s.id); }
-  $("eds_overlay").style.display="none";
-  drawServicios();
-}
+function edsCancelar(){ $("eds_overlay").style.display="none"; }
 $("eds_cancel").onclick=edsCancelar;
 $("eds_overlay").addEventListener("click",e=>{ if(e.target===$("eds_overlay"))edsCancelar(); });
+$("sv_add").onclick=()=>{
+  const mes=$("sv_mes").value;
+  const gid=uid();
+  const nuevo={id:gid,servicio:"",mes,venc:"",monto:0,debito:false,pagado:false,obs:""};
+  state.servicios.push(nuevo);
+  abrirEdServicio(gid);
+};
+if($("sv_limpiar"))$("sv_limpiar").onclick=async ()=>{
+  const mes=$("sv_mes").value;
+  const items=state.servicios.filter(s=>s.mes===mes);
+  const vistos={}, aBorrar=[];
+  items.forEach(s=>{
+    const k=(s.servicio||"").trim().toLowerCase()+"|"+(s.venc||"");
+    if(!s.servicio || s.monto===0){ aBorrar.push(s); return; }
+    if(vistos[k]){ aBorrar.push(s); return; }
+    vistos[k]=s;
+  });
+  if(!aBorrar.length){ showMsg("sv_msg","ok","No hay servicios vacíos ni repetidos para limpiar."); return; }
+  if(!confirm(`Voy a borrar ${aBorrar.length} servicio(s) vacío(s) o repetido(s). ¿Confirmás?`))return;
+  const ids=new Set(aBorrar.map(s=>s.id));
+  state.servicios=state.servicios.filter(s=>!ids.has(s.id));
+  drawServicios();
+  for(const s of aBorrar){ try{ await apiPost({action:"deleteServicio",id:s.id}); }catch(e){} }
+  showMsg("sv_msg","ok",`Listo: borré ${aBorrar.length} servicio(s).`);
+};
 $("eds_save").onclick=async ()=>{
   const s=state.servicios.find(x=>x.id===$("eds_id").value); if(!s)return;
-  s.servicio=$("eds_serv").value.trim()||"Servicio";
-  s.categoria=$("eds_cat").value;
-  s.rubro=$("eds_rubro").value;
-  s.sub=$("eds_sub").value||"";
-  s.fechaEmision=$("eds_emision").value;
+  s.servicio=$("eds_nombre").value.trim()||"Servicio";
+  s.monto=parseNum($("eds_monto").value)||0;
   s.venc=$("eds_venc").value;
-  s.fechaPago=$("eds_fpago").value;
-  s.tipoPago=$("eds_tipo").value;
-  s.entidad=$("eds_ent").value.trim();
-  const esNegro=edsMontoEsNegro();
-  s.bn=esNegro?"negro":"blanco";
-  s.monto=parseNum($("eds_monto").value)||0;  // parseNum ya saca el *
-  const a=parseFloat($("eds_alic").value);
-  s.iva=(!esNegro && a>0 && s.monto>0)?Math.round(s.monto*a/100*100)/100:0;
-  s.piva=esNegro?0:(parseNum($("eds_piva").value)||0);
-  s.piibb=parseNum($("eds_piibb").value)||0;
+  s.debito=$("eds_debito").checked;
   s.obs=$("eds_obs").value.trim();
-  // el mes del servicio sale de la fecha de VENCIMIENTO (lo que pago en julio, va en julio)
-  s.mes=normMes(s.venc)||normMes(s.fechaEmision)||curMonthISO();
-  s.enInforme=$("eds_eninforme").checked;
-  const bn=s.bn;
-  // Si YA VIENE EN EL INFORME: solo calendario, NO suma al balance (el gasto entra por el informe).
-  // Si NO viene en el informe: sí suma al balance.
-  const mandarBalance=!s.enInforme;
-
-  if(mandarBalance){
-    if(!s.fechaEmision){showMsg("eds_msg","learn","Para que sume al balance necesito la fecha de emisión. Cargala, o marcá \"Ya viene en el informe\" si el gasto entra por ahí.");return;}
-    if(s.monto<=0){showMsg("eds_msg","learn","Para que sume al balance necesito el monto. Cargalo, o marcá \"Ya viene en el informe\".");return;}
-    const prov=capProv(s.servicio);
-    if(s.enBalance && s.gastoId){
-      const g=state.gastos.find(x=>x.id===s.gastoId);
-      if(g){ Object.assign(g,{fecha:s.fechaEmision,prov,rubro:s.rubro,sub:s.sub,monto:s.monto,iva:s.iva,piva:s.piva,piibb:s.piibb,bn}); }
-      await apiPost({action:"updateGasto",id:s.gastoId,fecha:s.fechaEmision,prov,rubro:s.rubro,sub:s.sub,bn,monto:s.monto,iva:s.iva,piva:s.piva,piibb:s.piibb});
-    } else {
-      const gid=uid();
-      state.gastos.push({id:gid,fecha:s.fechaEmision,prov,rubro:s.rubro,sub:s.sub,monto:s.monto,bn,iva:s.iva,piva:s.piva,piibb:s.piibb});
-      s.gastoId=gid; s.enBalance=true;
-      state.memoria[prov.toLowerCase()]=s.rubro;
-      await apiPost({action:"addGasto",id:gid,fecha:s.fechaEmision,prov,rubro:s.rubro,sub:s.sub,bn,monto:s.monto,iva:s.iva,piva:s.piva,piibb:s.piibb});
-    }
-  } else if(s.enBalance && s.gastoId){
-    // pasó a estar "en el informe": sacamos el gasto que había creado antes, para no duplicar
-    state.gastos=state.gastos.filter(g=>g.id!==s.gastoId);
-    await apiPost({action:"deleteGasto",id:s.gastoId});
-    s.gastoId=""; s.enBalance=false;
-  }
-  // recordar la marca para este servicio (la próxima vez viene marcada sola)
-  if(!state.svInforme)state.svInforme={};
-  state.svInforme[s.servicio.trim().toLowerCase()]=s.enInforme;
-  await apiPost({action:"setConfig",clave:"svInforme",valor:JSON.stringify(state.svInforme)});
-
+  s.mes=normMes(s.venc)||curMonthISO();
   $("eds_overlay").style.display="none";
-  drawServicios();
+  drawServicios(); renderServicios();
   await apiPost(Object.assign({action:"setServicio"},s));
-  showMsg("sv_msg","ok",`Servicio "${s.servicio}" guardado. ${s.enInforme?"Va solo al calendario (el gasto entra por el informe).":"Suma al balance del mes."}`);
+  showMsg("sv_msg","ok",`Servicio "${s.servicio}" guardado en el calendario.`);
 };
 
 /* ===== RESUMEN ANUAL ===== */
