@@ -2555,22 +2555,24 @@ function parseRetenciones(txt){
 }
 /* PARTE B: suma a gastos como negro, sin IVA. NCr resta. */
 function parseParteB(txt){
-  const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
-  const neto=tot(/NETO\s*\.+\s*([\d.,-]+)/);
   const provNeto={};
   txt.split("\n").forEach(ln=>{
     const l=ln.trim();
-    if(!l || /^(Total|NETO|TOTAL)/i.test(l))return;
-    const m=l.match(/^\s*(\d+)\s+(Fac|NCr|NDb)\s+\w+\s+[\d-]+\s+\w+\s+(.+?)\s+(?:[A-Z]\s+Cons\.Final|I\s+\d{11}|\d{11})\s+\d+\s+([\d.,-]+)\s+([\d.,-]+)\s*$/);
+    if(!l || /^(Total|NETO|TOTAL|Dia|REG|---|===|#)/i.test(l))return;
+    // Formato real del informe parte B:
+    // Día Fac/NCr Letra Nrocomprob Estado RAZON SOCIAL [C Cons.Final | I CUIT] Tipo Importe Total
+    const m=l.match(/^\s*(\d+)\s+(Fac|NCr|NDb)\s+([BCAM])\s+[\d-]+\s+\w+\s+(.+?)\s+(?:C\s+Cons\.Final|[A-Z]\s+\d{11}|\d{11})\s+\d+\s+([\d.,-]+)\s+([\d.,-]+)\s*$/);
     if(!m)return;
-    const prov=m[3].trim();
-    const monto=parseNumAr(m[5]);
+    const prov=m[4].trim();
+    const monto=parseNumAr(m[6]);   // última columna = TOTAL de la línea
     if(!prov)return;
     provNeto[prov]=(provNeto[prov]||0)+monto;
   });
+  // eliminar proveedores que netean a cero (factura + nota de crédito)
   Object.keys(provNeto).forEach(p=>{ if(Math.abs(provNeto[p])<0.01)delete provNeto[p]; });
   const sumaProv=Object.values(provNeto).reduce((a,b)=>a+b,0);
-  return {neto:neto||sumaProv, provNeto, sumaProv};
+  // el neto sale de la suma real de proveedores (no del pie, para no duplicar)
+  return {neto:sumaProv, provNeto, sumaProv};
 }
 function mesMasTres(mes){ const [y,m]=normMes(mes).split("-").map(Number); const d=new Date(y,m-1+3,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
 let diarioTmp={compras:null,ventas:null,ret:null,partb:null};
