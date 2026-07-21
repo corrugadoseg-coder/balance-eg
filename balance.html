@@ -2512,8 +2512,8 @@ function rubroDeProveedor(nombre){
 function parseDiarioCompras(txt){
   const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
   const ivaTotal=tot(/TOTAL I\.V\.A\.\s*\.+;?\s*([\d.,-]+)/);
-  const percIVA=tot(/PERCEP[^\n]*I\.V\.A\.\s*\.+;?\s*([\d.,-]+)/i);
-  const percIIBB=tot(/PERCEP[^\n]*I\.I\.B\.B\.\s*\.+;?\s*([\d.,-]+)/i);
+  const percIVA=tot(/PERCEPCION\s+IVA[^\n;]*;?\s*([\d.,-]+)/i);
+  const percIIBB=tot(/PERCEPCION\s+INGRESOS\s+BRUTOS[^\n;]*;?\s*([\d.,-]+)/i);
   const neto=tot(/NETO\s*\.+;?\s*([\d.,-]+)/);
   const excl=(state.exclusionesIVA||[]).map(x=>x.toUpperCase());
   let ivaExcluido=0;
