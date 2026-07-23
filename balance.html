@@ -1452,8 +1452,9 @@ function datosMes(mes){ // datos cargados a mano para el mes, con defaults
   mes=normMes(mes);
   const d=state.impuestos[mes]||{};
   return {
-    ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
-    alicIIBB:d.alicIIBB||DEF_ALIC, coefCABA:d.coefCABA||DEF_CC, coefBsAs:d.coefBsAs||DEF_CB
+   ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
+    alicIIBB:d.alicIIBB||DEF_ALIC, coefCABA:d.coefCABA||DEF_CC, coefBsAs:d.coefBsAs||DEF_CB,
+    saldoFavorIIBB:d.saldoFavorIIBB||0
   };
 }
 function mesAnterior(mes){ const [y,m]=mes.split("-").map(Number); const d=new Date(y,m-2,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
