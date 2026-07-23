@@ -1280,9 +1280,8 @@ $("v_add").onclick=async ()=>{
   await apiPost({action:"addVenta",mes,blanco:bl,negro:ng,ivaDebito,retIVA,retIIBB,retGan});
 };
 $("v_calciva").onclick=()=>{
-  const bl=parseNum($("v_blanco").value)||0, ng=parseNum($("v_negro").value)||0;
-  const base=bl+ng;
-  if(base<=0){showMsg("v_msg","learn","Cargá primero los montos de ventas.");return;}
+  const base=parseNum($("v_blanco").value)||0;
+  if(base<=0){showMsg("v_msg","learn","Cargá primero las ventas Tipo A.");return;}
   $("v_ivad").value=(Math.round(base*0.21*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
   showMsg("v_msg","ok",`IVA estimado al 21%: <b>${money(base*0.21)}</b>. Podés corregirlo si hace falta.`);
 };
