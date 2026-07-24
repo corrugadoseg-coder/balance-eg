@@ -1,3 +1,7 @@
+<!--
+  En memoria de mi papá, Gerardo, analista programador,
+  que me enseñó que las producciones propias se firman.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -239,11 +243,12 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   <div class="savebox" id="savebox_home" style="margin-top:6px"><span class="dot"></span><span id="saveTxt_home">conectando…</span></div>
   <div class="hint">Elegí por dónde empezar</div>
   <div class="quick">
-    <button data-go="diarioiva"><span class="qn">01 · Registro</span>Subir diario IVA</button>
+    <button data-go="diarioiva"><span class="qn">01 · Registro</span>Carga de Informes</button>
     <button data-go="gasto"><span class="qn">01 · Registro</span>Cargar factura a mano</button>
     <button data-go="balance"><span class="qn">03 · Análisis</span>Ver balance del mes</button>
   </div>
   <div style="margin-top:24px"><button class="btn ghost sm" id="home_menu">Ver todas las opciones</button></div>
+  <div style="margin-top:28px;font-size:11px;color:var(--faint);letter-spacing:.06em">Desarrollado por Raquel · EG Corrugados · 2026</div>
 </div>
 
 <div class="layout" id="layout" style="display:none">
@@ -253,7 +258,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="menu-body">
       <div class="grupo">
         <div class="grupo-t">01 · Registro</div>
-        <button class="mitem" data-v="diarioiva"><span class="mn">01</span>Diario IVA</button>
+        <button class="mitem" data-v="diarioiva"><span class="mn">01</span>Carga de Informes</button>
         <button class="mitem" data-v="gasto"><span class="mn">02</span>Facturas a mano</button>
         <button class="mitem" data-v="venta"><span class="mn">03</span>Ventas del mes</button>
       </div>
@@ -480,6 +485,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
       <div class="f"><label>Saldo a favor anterior (IIBB) <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">positivo = a favor tuyo</span></label><input id="t_sfav" class="mono" inputmode="decimal" placeholder="0,00"></div>
       <div class="f"><label>IIBB al contador <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">cuando lo tengas</span></label><input id="t_iibbcont" class="mono" inputmode="decimal" placeholder="0,00"></div>
+    </div>
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
       <div class="f"><label>Alícuota IIBB %</label><input id="t_alic" class="mono" inputmode="decimal" placeholder="3"></div>
       <div class="f"><label>Coef. CABA %</label><input id="t_cc" class="mono" inputmode="decimal" placeholder="87.76"></div>
@@ -488,6 +494,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="msg" id="t_msg"></div>
     <div class="row-actions">
       <button class="btn" id="t_save">Guardar datos del mes</button>
+      <button class="btn ghost sm" id="t_dedup" type="button">Limpiar duplicados</button>
       <small class="note">Los coeficientes y la alícuota se guardan por mes; si cambian, los editás.</small>
     </div>
   </div>
@@ -519,7 +526,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 <!-- ===== 05 DIARIO IVA ===== -->
 <section class="view" data-v="diarioiva">
   <div class="card">
-    <h2>Diario de IVA (informes del sistema)</h2>
+    <h2>Carga de Informes</h2>
     <p class="lead">Pegá los informes de tu sistema. La app extrae los totales y los usa para el cálculo de IVA e IIBB (pestaña Impuestos).</p>
     <div class="grid" style="grid-template-columns:auto;max-width:260px;margin-bottom:16px">
       <div class="f"><label>Mes del informe</label><select id="di_mes"></select></div>
@@ -1020,7 +1027,7 @@ $("g_subadd").onclick=async ()=>{
 
 /* ---- navegación: inicio + menú lateral ---- */
 const TITULOS={gasto:"Facturas a mano",venta:"Ventas del mes",balance:"Balance mensual",impuestos:"Impuestos — IVA e IIBB",
-  diarioiva:"Diario IVA",cheque:"Impuesto al cheque",servicios:"Servicios y calendario de pagos",sueldos:"Sueldos, CCSS y sindicato",
+  diarioiva:"Carga de Informes",cheque:"Impuesto al cheque",servicios:"Servicios y calendario de pagos",sueldos:"Sueldos, CCSS y sindicato",
   chemit:"Cheques emitidos",resumen:"Resumen anual",informes:"Informes",datos:"Datos"};
 function irA(v){
   $("home").style.display="none";
@@ -1311,7 +1318,10 @@ function renderBalance(){
   const sel=$("b_mes"); const meses=mesesConDatos();
   const prev=sel.value;
   sel.innerHTML=meses.length?meses.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join(""):`<option value="">Sin datos</option>`;
-  if(meses.includes(prev))sel.value=prev; else if(meses.length)sel.value=meses[meses.length-1];
+  const hoy=curMonthISO();
+  if(meses.includes(prev))sel.value=prev;
+  else if(meses.includes(hoy))sel.value=hoy;          // arranca en el mes en curso si ya tiene datos
+  else if(meses.length)sel.value=meses[meses.length-1];
   drawBalance();
   sel.onchange=drawBalance;
   $$("#b_view button").forEach(b=>b.onclick=()=>{$$("#b_view button").forEach(x=>x.classList.remove("on"));b.classList.add("on");balView=b.dataset.v;drawBalance();});
@@ -1452,12 +1462,14 @@ function datosMes(mes){ // datos cargados a mano para el mes, con defaults
   mes=normMes(mes);
   const d=state.impuestos[mes]||{};
   return {
-    ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
+   ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
     alicIIBB:d.alicIIBB||DEF_ALIC, coefCABA:d.coefCABA||DEF_CC, coefBsAs:d.coefBsAs||DEF_CB,
     saldoFavorIIBB:d.saldoFavorIIBB||0
   };
 }
 function mesAnterior(mes){ const [y,m]=mes.split("-").map(Number); const d=new Date(y,m-2,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+/* corre un mes N posiciones hacia adelante (N negativo va hacia atrás) */
+function mesMasN(mes,n){ const [y,m]=normMes(mes).split("-").map(Number); const d=new Date(y,m-1+n,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
 
 function renderImpuestosTab(){
   const sel=$("t_mes"); const meses=mesesSelector();
@@ -1474,179 +1486,21 @@ function cargarFormImp(){
   const f=n=>n?n.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2}):"";
   $("t_retbanc").value=f(d.retBancIIBB);
   if($("t_retcli"))$("t_retcli").value=f((state.impuestos[mes]||{}).retIVAClientes||0);
-  if($("t_sfav")){
-    let sf=(state.impuestos[mes]||{}).saldoFavorIIBB||0;
-    if(!sf){
-      const ant=(state.impuestos[mesAnterior(mes)]||{}).iibbContador||0;
-      if(ant<0) sf=-ant;
-    }
-    $("t_sfav").value=f(sf);
+  // saldo a favor de IIBB: si el mes no tiene nada guardado, lo proponemos con
+  // el saldo que quedó deducido el mes anterior (IIBB al contador negativo = a favor)
+  let sfav=(state.impuestos[mes]||{}).saldoFavorIIBB||0;
+  if(!sfav){
+    const iibbAnt=(state.impuestos[mesAnterior(mes)]||{}).iibbContador||0;
+    if(iibbAnt<0)sfav=-iibbAnt;
   }
+  if($("t_sfav"))$("t_sfav").value=f(sfav);
   $("t_ivacont").value=f(d.ivaContador);
   $("t_iibbcont").value=f(d.iibbContador);
   $("t_alic").value=d.alicIIBB;
   $("t_cc").value=d.coefCABA;
   $("t_cb").value=d.coefBsAs;
 }
-
-3 — renderServicios (muestra meses futuros)
-
-js
-function renderServicios(){
-  const sel=$("sv_mes");
-  // el mes de cada servicio sale de su vencimiento
-  state.servicios.forEach(s=>{ const c=normMes(s.venc)||normMes(s.mes)||""; if(c && c!==s.mes){ s.mes=c; apiPost(Object.assign({action:"setServicio"},s)); } });
-  let meses=new Set(state.servicios.map(s=>s.mes).filter(Boolean));
-  // agregar el mes actual y los 6 siguientes, para poder planificar
-  const hoy=new Date();
-  for(let i=0;i<7;i++){
-    const d=new Date(hoy.getFullYear(),hoy.getMonth()+i,1);
-    meses.add(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"));
-  }
-  const arr=[...meses].filter(m=>/^\d{4}-\d{2}$/.test(m)).sort();
-  const prev=sel.value;
-  sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
-  sel.value=arr.includes(prev)?prev:curMonthISO();
-  sel.onchange=renderServicios;
-  // lista de nombres ya usados, para el autocompletar
-  const dl=$("eds_lista"); if(dl){ const nombres=[...new Set(state.servicios.map(s=>s.servicio).filter(Boolean))].sort(); dl.innerHTML=nombres.map(n=>`<option value="${n}">`).join(""); }
-  drawServicios();
-}
-
-4 — renderBalance (abre en el mes en curso)
-
-js
-function renderBalance(){
-  const sel=$("b_mes"); const meses=mesesConDatos();
-  const prev=sel.value;
-  sel.innerHTML=meses.length?meses.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join(""):`<option value="">Sin datos</option>`;
-  const actual=curMonthISO();
-  if(meses.includes(prev))sel.value=prev;
-  else if(meses.includes(actual))sel.value=actual;
-  else if(meses.length)sel.value=meses[meses.length-1];
-  drawBalance();
-  sel.onchange=drawBalance;
-  $$("#b_view button").forEach(b=>b.onclick=()=>{$$("#b_view button").forEach(x=>x.classList.remove("on"));b.classList.add("on");balView=b.dataset.v;drawBalance();});
-}
-
-5 — drawAvisoCaja (agrega el contador de cheques)
-
-js
-function drawAvisoCaja(){
-  const rango=parseInt($("che_rango").value);
-  const noCob=state.chequesEmit.filter(c=>c.estado!=="Cobrado" && c.fechaPago);
-  const yaSalen=noCob.filter(c=>diasAlVenc(c.fechaPago)<=0);
-  const porVenir=noCob.filter(c=>{const d=diasAlVenc(c.fechaPago); return d>0 && d<=rango;});
-  const totalYa=yaSalen.reduce((s,c)=>s+c.monto,0);
-  const totalVen=porVenir.reduce((s,c)=>s+c.monto,0);
-  // conteo general de cheques
-  const totalCheques=state.chequesEmit.length;
-  const cobrados=state.chequesEmit.filter(c=>c.estado==="Cobrado").length;
-  const sinCobrar=totalCheques-cobrados;
-  // servicios pendientes en el rango (para el total por separado)
-  const servPend=state.servicios.filter(s=>!s.pagado&&s.venc&&s.monto>0);
-  const servYa=servPend.filter(s=>diasAlVenc(s.venc)<=0).reduce((a,s)=>a+s.monto,0);
-  const servVen=servPend.filter(s=>{const d=diasAlVenc(s.venc);return d>0&&d<=rango;}).reduce((a,s)=>a+s.monto,0);
-  $("che_aviso").innerHTML=
-    `<div class="led"><div class="l">Cheques emitidos</div><div class="v">${totalCheques}</div><div class="sub">${cobrados} cobrados · ${sinCobrar} sin cobrar</div></div>
-     <div class="led"><div class="l">Cheques — ya pueden salir</div><div class="v ${totalYa>0?'neg':''}">${money0(totalYa)}</div><div class="sub">${yaSalen.length} cheque(s) no cobrados</div></div>
-     <div class="led"><div class="l">Cheques — por venir (${rango}d)</div><div class="v">${money0(totalVen)}</div><div class="sub">${porVenir.length} cheque(s)</div></div>
-     <div class="led"><div class="l">Servicios — ya / por venir</div><div class="v">${money0(servYa)} / ${money0(servVen)}</div><div class="sub">pendientes</div></div>
-     <div class="led" style="border-color:var(--gold)"><div class="l">Total a cubrir ya</div><div class="v ${(totalYa+servYa)>0?'neg':''}">${money0(totalYa+servYa)}</div><div class="sub">cheques + servicios que ya pueden salir</div></div>`;
-}
-
-6 — el handler de v_calciva (IVA solo sobre Tipo A)
-
-js
-$("v_calciva").onclick=()=>{
-  const base=parseNum($("v_blanco").value)||0;
-  if(base<=0){showMsg("v_msg","learn","Cargá primero las ventas Tipo A.");return;}
-  $("v_ivad").value=(Math.round(base*0.21*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
-  showMsg("v_msg","ok",`IVA estimado al 21% sobre ventas Tipo A: <b>${money(base*0.21)}</b>. Verificá contra tu informe y corregilo si hace falta.`);
-};
-
-Con esas seis van los puntos 5, 6, 7, 10 y 13. Guardá, subí a GitHub y abrí con ?v=86.
-
-Faltan de esta tanda: el renombre a "Carga de Informes", la firma, el homenaje, el aviso de informes parciales y el botón de limpiar duplicados. Esos son textos sueltos y te los paso en cuanto tengas estas seis andando — así probamos por partes.
-
-No me animo aparecen 3 datosMes
-
-Bien que preguntes antes de tocar. Vamos a identificar cuál es.
-
-De esas tres apariciones, solo una es la definición de la función — las otras dos son llamadas (lugares donde se usa).
-
-La que tenés que reemplazar es la que empieza exactamente así:
-
-js
-function datosMes(mes){ // datos cargados a mano para el mes, con defaults
-
-Fijate que empieza con la palabra function. Esa es la definición.
-
-Las otras dos van a verse parecidas a esto:
-
-js
-const d=datosMes(mes);
-
-Esas no se tocan — son las que usan la función.
-
-Para ubicarla rápido en el Bloc de notas: con Ctrl+B buscá function datosMes (con la palabra function adelante). Así te lleva directo a la única correcta.
-
-La función completa a reemplazar son estas 8 líneas, desde function datosMes hasta la llave } que la cierra:
-
-js
-function datosMes(mes){ // datos cargados a mano para el mes, con defaults
-  mes=normMes(mes);
-  const d=state.impuestos[mes]||{};
-  return {
-    ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
-    alicIIBB:d.alicIIBB||DEF_ALIC, coefCABA:d.coefCABA||DEF_CC, coefBsAs:d.coefBsAs||DEF_CB
-  };
-}
-
-Seleccionás esas 8 líneas y pegás encima la versión nueva que te pasé.
-
-¿La ubicaste?
-
-Ojo, ahí hay algo raro: aparece }; y después }. Eso es una llave de más.
-
-La función tiene que terminar así:
-
-js
-    saldoFavorIIBB:d.saldoFavorIIBB||0
-  };
-}
-function mesAnterior(mes){ ...
-
-O sea: }; cierra el return {, y el } solo cierra la función. Si tenés exactamente eso, está bien.
-
-Pero como solo me pegaste el final, no puedo confirmarlo. Pegame la función datosMes completa, desde function datosMes hasta el function mesAnterior, así verifico que no haya quedado ninguna llave suelta.
-
-const DEF_ALIC=3, DEF_CC=87.76, DEF_CB=12.24;
-function datosMes(mes){ // datos cargados a mano para el mes, con defaults
-  mes=normMes(mes);
-  const d=state.impuestos[mes]||{};
-  return {
-    ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
-    alicIIBB:d.alicIIBB||DEF_ALIC, coefCABA:d.coefCABA||DEF_CC, coefBsAs:d.coefBsAs||DEF_CB,
-    saldoFavorIIBB:d.saldoFavorIIBB||0
-  };
-}
-function mesAnterior(mes){ const [y,m]=mes.split("-").map(Number); const d=new Date(y,m-2,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
-function renderImpuestosTab(){
-  const sel=$("t_mes"); const meses=mesesSelector();
-  const prev=normMes(sel.value);
-
-Mostrar más
-
-Perfecto, quedó impecable. Las llaves están bien: }; cierra el return, } cierra la función, y mesAnterior arranca en su propia línea.
-
-Función 1 lista. Pasá a la 2 — cargarFormImp.
-
-Esa aparece dos veces: la definición (function cargarFormImp) y una o dos llamadas (cargarFormImp();). Buscá con Ctrl+B function cargarFormImp para ir directo a la correcta.
-
-Reemplazá desde function cargarFormImp(){ hasta su llave de cierre } por la versión nueva que te pasé.
-
-Avisame cuando esté.$("t_save").onclick=async ()=>{
+$("t_save").onclick=async ()=>{
   const mes=normMes($("t_mes").value); if(!mes){showMsg("t_msg","learn","No hay mes seleccionado.");return;}
   const ivaExtractoPrev=(state.impuestos[mes]||{}).ivaExtracto||0;  // preservar lo que vino del extracto
   const payload={
@@ -1670,6 +1524,35 @@ Avisame cuando esté.$("t_save").onclick=async ()=>{
   drawImpuestos();
   await apiPost({action:"setImpuestos",...payload});
   await apiPost({action:"setDiarioIVA",mes,saldoFavorIIBB:sfav,...(yaHayInforme?{}:{retIVAClientes:retCli})});
+};
+
+/* Relee la planilla y avisa si hay filas repetidas del mismo mes.
+   Solo reporta: no borra nada de la planilla. */
+if($("t_dedup"))$("t_dedup").onclick=async ()=>{
+  showMsg("t_msg","learn","Consultando la planilla…");
+  let j=null;
+  try{ j=await apiGet(); }catch(e){ j=null; }
+  if(!j||!j.ok||!j.data){ showMsg("t_msg","learn","No se pudo leer la planilla. Revisá la conexión."); return; }
+  const problemas=[];
+  // hojas guardadas por mes: buscamos claves distintas que caen en el mismo YYYY-MM
+  const dupPorMes=(obj,nombre)=>{
+    const porMes={};
+    Object.keys(obj||{}).forEach(k=>{ const n=normMes(k)||k; (porMes[n]=porMes[n]||[]).push(k); });
+    Object.keys(porMes).forEach(m=>{
+      if(porMes[m].length>1)problemas.push(`<b>${nombre}</b> — ${ymLabel(m)}: ${porMes[m].length} filas (${porMes[m].join(" · ")})`);
+    });
+  };
+  dupPorMes(j.data.impuestos,"Impuestos");
+  dupPorMes(j.data.cheque,"Impuesto al cheque");
+  // gastos de informe: mismo mes + rubro + tipo cargado más de una vez
+  const cnt={};
+  (j.data.gastosInforme||[]).forEach(g=>{ const k=(normMes(g.mes)||g.mes)+"|"+(g.rubro||"—")+"|"+(g.tipo||"—"); cnt[k]=(cnt[k]||0)+1; });
+  Object.keys(cnt).forEach(k=>{
+    if(cnt[k]>1){ const p=k.split("|"); problemas.push(`<b>Gastos de informe</b> — ${ymLabel(p[0])}: rubro ${p[1]} (${p[2]}) aparece ${cnt[k]} veces`); }
+  });
+  renderImpuestosTab(); renderAll();
+  if(!problemas.length){ showMsg("t_msg","ok","No se encontraron filas duplicadas en la planilla."); return; }
+  showMsg("t_msg","learn",`Se encontraron ${problemas.length} duplicado(s):<br>• ${problemas.join("<br>• ")}<br><br><i>La app los unifica al leer, pero conviene borrar las filas repetidas en la planilla.</i>`);
 };
 
 function ivaMes(mes){ // calcula componentes de IVA del mes
@@ -2056,11 +1939,13 @@ function renderServicios(){
   // el mes de cada servicio sale de su vencimiento
   state.servicios.forEach(s=>{ const c=normMes(s.venc)||normMes(s.mes)||""; if(c && c!==s.mes){ s.mes=c; apiPost(Object.assign({action:"setServicio"},s)); } });
   let meses=new Set(state.servicios.map(s=>s.mes).filter(Boolean));
-  meses.add(curMonthISO());
+  // además de los meses con servicios, ofrecemos el mes actual y los 6 siguientes
+  const hoy=curMonthISO();
+  for(let i=0;i<=6;i++)meses.add(mesMasN(hoy,i));
   const arr=[...meses].filter(m=>/^\d{4}-\d{2}$/.test(m)).sort();
   const prev=sel.value;
   sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
-  sel.value=arr.includes(prev)?prev:arr[arr.length-1];
+  sel.value=arr.includes(prev)?prev:(arr.includes(hoy)?hoy:arr[arr.length-1]);
   sel.onchange=renderServicios;
   // lista de nombres ya usados, para el autocompletar
   const dl=$("eds_lista"); if(dl){ const nombres=[...new Set(state.servicios.map(s=>s.servicio).filter(Boolean))].sort(); dl.innerHTML=nombres.map(n=>`<option value="${n}">`).join(""); }
@@ -2648,8 +2533,13 @@ function drawAvisoCaja(){
   const servPend=state.servicios.filter(s=>!s.pagado&&s.venc&&s.monto>0);
   const servYa=servPend.filter(s=>diasAlVenc(s.venc)<=0).reduce((a,s)=>a+s.monto,0);
   const servVen=servPend.filter(s=>{const d=diasAlVenc(s.venc);return d>0&&d<=rango;}).reduce((a,s)=>a+s.monto,0);
+  // conteo general de cheques emitidos (solo cantidades, sin montos)
+  const chTot=state.chequesEmit.length;
+  const chCob=state.chequesEmit.filter(c=>c.estado==="Cobrado").length;
+  const chSin=chTot-chCob;
   $("che_aviso").innerHTML=
-    `<div class="led"><div class="l">Cheques — ya pueden salir</div><div class="v ${totalYa>0?'neg':''}">${money0(totalYa)}</div><div class="sub">${yaSalen.length} cheque(s) no cobrados</div></div>
+    `<div class="led"><div class="l">Cheques emitidos</div><div class="v">${chTot}</div><div class="sub">${chCob} cobrado(s) · ${chSin} sin cobrar</div></div>
+     <div class="led"><div class="l">Cheques — ya pueden salir</div><div class="v ${totalYa>0?'neg':''}">${money0(totalYa)}</div><div class="sub">${yaSalen.length} cheque(s) no cobrados</div></div>
      <div class="led"><div class="l">Cheques — por venir (${rango}d)</div><div class="v">${money0(totalVen)}</div><div class="sub">${porVenir.length} cheque(s)</div></div>
      <div class="led"><div class="l">Servicios — ya / por venir</div><div class="v">${money0(servYa)} / ${money0(servVen)}</div><div class="sub">pendientes</div></div>
      <div class="led" style="border-color:var(--gold)"><div class="l">Total a cubrir ya</div><div class="v ${(totalYa+servYa)>0?'neg':''}">${money0(totalYa+servYa)}</div><div class="sub">cheques + servicios que ya pueden salir</div></div>`;
@@ -2904,6 +2794,15 @@ $("di_guardar").onclick=async ()=>{
   if(ret.retIVA)partes.push("Ret. IVA "+money(ret.retIVA));
   if(diarioTmp.partb)partes.push("Parte B "+money(diarioTmp.partb.neto));
   if(!confirm(`Vas a guardar los informes en el mes:\n\n➡ ${ymLabel(mes).toUpperCase()}${yaExiste}\n\n${partes.join(" · ")}\n\n¿Es el mes correcto?`))return;
+  // al guardar compras se reescriben TODOS los rubros del mes: si no se leyó la parte B,
+  // los rubros Tipo B que ya estaban guardados se pierden. Avisamos antes.
+  if(diarioTmp.compras && !diarioTmp.partb){
+    const rubrosB=state.gastosInforme.filter(g=>normMes(g.mes)===mes && g.tipo==="negro");
+    if(rubrosB.length){
+      const totB=rubrosB.reduce((s,g)=>s+(g.monto||0),0);
+      if(!confirm(`OJO: ${ymLabel(mes).toUpperCase()} ya tiene ${rubrosB.length} rubro(s) de Parte B guardados por ${money(totB)}.\n\nComo no leíste el informe de Parte B, esos rubros se van a BORRAR del balance.\n\nSi querés conservarlos, cancelá y pegá también la parte B.\n\n¿Guardar igual?`))return;
+    }
+  }
   const mesPago=mesMasTres(mes);
   const imp=Object.assign({},dPrev,{
     ivaVentas:ventas.ivaTotal,netoVentas:ventas.neto,
