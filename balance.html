@@ -1452,7 +1452,7 @@ function datosMes(mes){ // datos cargados a mano para el mes, con defaults
   mes=normMes(mes);
   const d=state.impuestos[mes]||{};
   return {
-   ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
+    ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
     alicIIBB:d.alicIIBB||DEF_ALIC, coefCABA:d.coefCABA||DEF_CC, coefBsAs:d.coefBsAs||DEF_CB,
     saldoFavorIIBB:d.saldoFavorIIBB||0
   };
@@ -1474,14 +1474,179 @@ function cargarFormImp(){
   const f=n=>n?n.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2}):"";
   $("t_retbanc").value=f(d.retBancIIBB);
   if($("t_retcli"))$("t_retcli").value=f((state.impuestos[mes]||{}).retIVAClientes||0);
-  if($("t_sfav"))$("t_sfav").value=f((state.impuestos[mes]||{}).saldoFavorIIBB||0);
+  if($("t_sfav")){
+    let sf=(state.impuestos[mes]||{}).saldoFavorIIBB||0;
+    if(!sf){
+      const ant=(state.impuestos[mesAnterior(mes)]||{}).iibbContador||0;
+      if(ant<0) sf=-ant;
+    }
+    $("t_sfav").value=f(sf);
+  }
   $("t_ivacont").value=f(d.ivaContador);
   $("t_iibbcont").value=f(d.iibbContador);
   $("t_alic").value=d.alicIIBB;
   $("t_cc").value=d.coefCABA;
   $("t_cb").value=d.coefBsAs;
 }
-$("t_save").onclick=async ()=>{
+
+3 — renderServicios (muestra meses futuros)
+
+js
+function renderServicios(){
+  const sel=$("sv_mes");
+  // el mes de cada servicio sale de su vencimiento
+  state.servicios.forEach(s=>{ const c=normMes(s.venc)||normMes(s.mes)||""; if(c && c!==s.mes){ s.mes=c; apiPost(Object.assign({action:"setServicio"},s)); } });
+  let meses=new Set(state.servicios.map(s=>s.mes).filter(Boolean));
+  // agregar el mes actual y los 6 siguientes, para poder planificar
+  const hoy=new Date();
+  for(let i=0;i<7;i++){
+    const d=new Date(hoy.getFullYear(),hoy.getMonth()+i,1);
+    meses.add(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"));
+  }
+  const arr=[...meses].filter(m=>/^\d{4}-\d{2}$/.test(m)).sort();
+  const prev=sel.value;
+  sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
+  sel.value=arr.includes(prev)?prev:curMonthISO();
+  sel.onchange=renderServicios;
+  // lista de nombres ya usados, para el autocompletar
+  const dl=$("eds_lista"); if(dl){ const nombres=[...new Set(state.servicios.map(s=>s.servicio).filter(Boolean))].sort(); dl.innerHTML=nombres.map(n=>`<option value="${n}">`).join(""); }
+  drawServicios();
+}
+
+4 — renderBalance (abre en el mes en curso)
+
+js
+function renderBalance(){
+  const sel=$("b_mes"); const meses=mesesConDatos();
+  const prev=sel.value;
+  sel.innerHTML=meses.length?meses.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join(""):`<option value="">Sin datos</option>`;
+  const actual=curMonthISO();
+  if(meses.includes(prev))sel.value=prev;
+  else if(meses.includes(actual))sel.value=actual;
+  else if(meses.length)sel.value=meses[meses.length-1];
+  drawBalance();
+  sel.onchange=drawBalance;
+  $$("#b_view button").forEach(b=>b.onclick=()=>{$$("#b_view button").forEach(x=>x.classList.remove("on"));b.classList.add("on");balView=b.dataset.v;drawBalance();});
+}
+
+5 — drawAvisoCaja (agrega el contador de cheques)
+
+js
+function drawAvisoCaja(){
+  const rango=parseInt($("che_rango").value);
+  const noCob=state.chequesEmit.filter(c=>c.estado!=="Cobrado" && c.fechaPago);
+  const yaSalen=noCob.filter(c=>diasAlVenc(c.fechaPago)<=0);
+  const porVenir=noCob.filter(c=>{const d=diasAlVenc(c.fechaPago); return d>0 && d<=rango;});
+  const totalYa=yaSalen.reduce((s,c)=>s+c.monto,0);
+  const totalVen=porVenir.reduce((s,c)=>s+c.monto,0);
+  // conteo general de cheques
+  const totalCheques=state.chequesEmit.length;
+  const cobrados=state.chequesEmit.filter(c=>c.estado==="Cobrado").length;
+  const sinCobrar=totalCheques-cobrados;
+  // servicios pendientes en el rango (para el total por separado)
+  const servPend=state.servicios.filter(s=>!s.pagado&&s.venc&&s.monto>0);
+  const servYa=servPend.filter(s=>diasAlVenc(s.venc)<=0).reduce((a,s)=>a+s.monto,0);
+  const servVen=servPend.filter(s=>{const d=diasAlVenc(s.venc);return d>0&&d<=rango;}).reduce((a,s)=>a+s.monto,0);
+  $("che_aviso").innerHTML=
+    `<div class="led"><div class="l">Cheques emitidos</div><div class="v">${totalCheques}</div><div class="sub">${cobrados} cobrados · ${sinCobrar} sin cobrar</div></div>
+     <div class="led"><div class="l">Cheques — ya pueden salir</div><div class="v ${totalYa>0?'neg':''}">${money0(totalYa)}</div><div class="sub">${yaSalen.length} cheque(s) no cobrados</div></div>
+     <div class="led"><div class="l">Cheques — por venir (${rango}d)</div><div class="v">${money0(totalVen)}</div><div class="sub">${porVenir.length} cheque(s)</div></div>
+     <div class="led"><div class="l">Servicios — ya / por venir</div><div class="v">${money0(servYa)} / ${money0(servVen)}</div><div class="sub">pendientes</div></div>
+     <div class="led" style="border-color:var(--gold)"><div class="l">Total a cubrir ya</div><div class="v ${(totalYa+servYa)>0?'neg':''}">${money0(totalYa+servYa)}</div><div class="sub">cheques + servicios que ya pueden salir</div></div>`;
+}
+
+6 — el handler de v_calciva (IVA solo sobre Tipo A)
+
+js
+$("v_calciva").onclick=()=>{
+  const base=parseNum($("v_blanco").value)||0;
+  if(base<=0){showMsg("v_msg","learn","Cargá primero las ventas Tipo A.");return;}
+  $("v_ivad").value=(Math.round(base*0.21*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  showMsg("v_msg","ok",`IVA estimado al 21% sobre ventas Tipo A: <b>${money(base*0.21)}</b>. Verificá contra tu informe y corregilo si hace falta.`);
+};
+
+Con esas seis van los puntos 5, 6, 7, 10 y 13. Guardá, subí a GitHub y abrí con ?v=86.
+
+Faltan de esta tanda: el renombre a "Carga de Informes", la firma, el homenaje, el aviso de informes parciales y el botón de limpiar duplicados. Esos son textos sueltos y te los paso en cuanto tengas estas seis andando — así probamos por partes.
+
+No me animo aparecen 3 datosMes
+
+Bien que preguntes antes de tocar. Vamos a identificar cuál es.
+
+De esas tres apariciones, solo una es la definición de la función — las otras dos son llamadas (lugares donde se usa).
+
+La que tenés que reemplazar es la que empieza exactamente así:
+
+js
+function datosMes(mes){ // datos cargados a mano para el mes, con defaults
+
+Fijate que empieza con la palabra function. Esa es la definición.
+
+Las otras dos van a verse parecidas a esto:
+
+js
+const d=datosMes(mes);
+
+Esas no se tocan — son las que usan la función.
+
+Para ubicarla rápido en el Bloc de notas: con Ctrl+B buscá function datosMes (con la palabra function adelante). Así te lleva directo a la única correcta.
+
+La función completa a reemplazar son estas 8 líneas, desde function datosMes hasta la llave } que la cierra:
+
+js
+function datosMes(mes){ // datos cargados a mano para el mes, con defaults
+  mes=normMes(mes);
+  const d=state.impuestos[mes]||{};
+  return {
+    ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
+    alicIIBB:d.alicIIBB||DEF_ALIC, coefCABA:d.coefCABA||DEF_CC, coefBsAs:d.coefBsAs||DEF_CB
+  };
+}
+
+Seleccionás esas 8 líneas y pegás encima la versión nueva que te pasé.
+
+¿La ubicaste?
+
+Ojo, ahí hay algo raro: aparece }; y después }. Eso es una llave de más.
+
+La función tiene que terminar así:
+
+js
+    saldoFavorIIBB:d.saldoFavorIIBB||0
+  };
+}
+function mesAnterior(mes){ ...
+
+O sea: }; cierra el return {, y el } solo cierra la función. Si tenés exactamente eso, está bien.
+
+Pero como solo me pegaste el final, no puedo confirmarlo. Pegame la función datosMes completa, desde function datosMes hasta el function mesAnterior, así verifico que no haya quedado ninguna llave suelta.
+
+const DEF_ALIC=3, DEF_CC=87.76, DEF_CB=12.24;
+function datosMes(mes){ // datos cargados a mano para el mes, con defaults
+  mes=normMes(mes);
+  const d=state.impuestos[mes]||{};
+  return {
+    ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
+    alicIIBB:d.alicIIBB||DEF_ALIC, coefCABA:d.coefCABA||DEF_CC, coefBsAs:d.coefBsAs||DEF_CB,
+    saldoFavorIIBB:d.saldoFavorIIBB||0
+  };
+}
+function mesAnterior(mes){ const [y,m]=mes.split("-").map(Number); const d=new Date(y,m-2,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+function renderImpuestosTab(){
+  const sel=$("t_mes"); const meses=mesesSelector();
+  const prev=normMes(sel.value);
+
+Mostrar más
+
+Perfecto, quedó impecable. Las llaves están bien: }; cierra el return, } cierra la función, y mesAnterior arranca en su propia línea.
+
+Función 1 lista. Pasá a la 2 — cargarFormImp.
+
+Esa aparece dos veces: la definición (function cargarFormImp) y una o dos llamadas (cargarFormImp();). Buscá con Ctrl+B function cargarFormImp para ir directo a la correcta.
+
+Reemplazá desde function cargarFormImp(){ hasta su llave de cierre } por la versión nueva que te pasé.
+
+Avisame cuando esté.$("t_save").onclick=async ()=>{
   const mes=normMes($("t_mes").value); if(!mes){showMsg("t_msg","learn","No hay mes seleccionado.");return;}
   const ivaExtractoPrev=(state.impuestos[mes]||{}).ivaExtracto||0;  // preservar lo que vino del extracto
   const payload={
