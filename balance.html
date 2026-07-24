@@ -1,3 +1,7 @@
+<!--
+  En memoria de mi papá, Gerardo, analista programador,
+  que me enseñó que las producciones propias se firman.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -239,11 +243,12 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   <div class="savebox" id="savebox_home" style="margin-top:6px"><span class="dot"></span><span id="saveTxt_home">conectando…</span></div>
   <div class="hint">Elegí por dónde empezar</div>
   <div class="quick">
-    <button data-go="diarioiva"><span class="qn">01 · Registro</span>Subir diario IVA</button>
+    <button data-go="diarioiva"><span class="qn">01 · Registro</span>Carga de Informes</button>
     <button data-go="gasto"><span class="qn">01 · Registro</span>Cargar factura a mano</button>
     <button data-go="balance"><span class="qn">03 · Análisis</span>Ver balance del mes</button>
   </div>
   <div style="margin-top:24px"><button class="btn ghost sm" id="home_menu">Ver todas las opciones</button></div>
+  <div style="margin-top:28px;font-size:11px;color:var(--faint);letter-spacing:.06em">Desarrollado por Raquel · EG Corrugados · 2026</div>
 </div>
 
 <div class="layout" id="layout" style="display:none">
@@ -253,7 +258,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="menu-body">
       <div class="grupo">
         <div class="grupo-t">01 · Registro</div>
-        <button class="mitem" data-v="diarioiva"><span class="mn">01</span>Diario IVA</button>
+        <button class="mitem" data-v="diarioiva"><span class="mn">01</span>Carga de Informes</button>
         <button class="mitem" data-v="gasto"><span class="mn">02</span>Facturas a mano</button>
         <button class="mitem" data-v="venta"><span class="mn">03</span>Ventas del mes</button>
       </div>
@@ -480,6 +485,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
       <div class="f"><label>Saldo a favor anterior (IIBB) <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">positivo = a favor tuyo</span></label><input id="t_sfav" class="mono" inputmode="decimal" placeholder="0,00"></div>
       <div class="f"><label>IIBB al contador <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">cuando lo tengas</span></label><input id="t_iibbcont" class="mono" inputmode="decimal" placeholder="0,00"></div>
+    </div>
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
       <div class="f"><label>Alícuota IIBB %</label><input id="t_alic" class="mono" inputmode="decimal" placeholder="3"></div>
       <div class="f"><label>Coef. CABA %</label><input id="t_cc" class="mono" inputmode="decimal" placeholder="87.76"></div>
@@ -488,6 +494,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="msg" id="t_msg"></div>
     <div class="row-actions">
       <button class="btn" id="t_save">Guardar datos del mes</button>
+      <button class="btn ghost sm" id="t_dedup" type="button">Limpiar duplicados</button>
       <small class="note">Los coeficientes y la alícuota se guardan por mes; si cambian, los editás.</small>
     </div>
   </div>
@@ -519,7 +526,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 <!-- ===== 05 DIARIO IVA ===== -->
 <section class="view" data-v="diarioiva">
   <div class="card">
-    <h2>Diario de IVA (informes del sistema)</h2>
+    <h2>Carga de Informes</h2>
     <p class="lead">Pegá los informes de tu sistema. La app extrae los totales y los usa para el cálculo de IVA e IIBB (pestaña Impuestos).</p>
     <div class="grid" style="grid-template-columns:auto;max-width:260px;margin-bottom:16px">
       <div class="f"><label>Mes del informe</label><select id="di_mes"></select></div>
@@ -884,6 +891,19 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
       <button class="btn ghost" id="d_xlsx">Exportar todo a Excel</button>
     </div>
     <div class="msg" id="d_msg"></div>
+
+    <div class="sectlabel" style="margin-top:26px">Conexión con la planilla</div>
+    <p class="lead" style="margin-bottom:12px">La URL no se guarda en el archivo: queda en este navegador. Si abrís la app en otra computadora, la pegás de nuevo.</p>
+    <div class="grid" style="grid-template-columns:1fr auto auto;gap:10px;align-items:end;max-width:760px">
+      <div class="f">
+        <label>URL de la planilla (termina en /exec)</label>
+        <input id="d_api" placeholder="https://script.google.com/macros/s/…/exec">
+      </div>
+      <div class="row-actions" style="margin:0"><button class="btn sm" id="d_api_save" type="button">Guardar URL</button></div>
+      <div class="row-actions" style="margin:0"><button class="btn ghost sm" id="d_api_clear" type="button">Borrar</button></div>
+    </div>
+    <div class="msg" id="d_api_msg"></div>
+
     <div class="sectlabel" style="margin-top:26px">Estado</div>
     <table style="max-width:480px">
       <tbody id="d_stats"></tbody>
@@ -907,10 +927,28 @@ const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","S
 
 /* =====================================================================
    CONEXIÓN CON LA PLANILLA (Google Apps Script)
-   Pegá acá abajo, entre las comillas, la URL que termina en /exec
-   que te dio "Implementar". Igual que en pedidos-eg.
+
+   La URL NO va escrita acá. Se pega una sola vez desde la pestaña
+   "Datos" y queda guardada en este navegador (localStorage).
+   Así el archivo se puede publicar en GitHub sin dar acceso a la
+   planilla: quien lo descargue tiene la app, pero no tus datos.
    ===================================================================== */
-const API="https://script.google.com/macros/s/AKfycbx1sFjSf5EHhJwBeat2l_LNMsUEWng1VNOOEaj8knaZX-FUQL1-NYg4DmNn23oF330P/exec";
+const API_LS="eg_balance_api_url";
+const API_RX=/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_\-]+\/exec$/;
+let API="";
+try{ API=localStorage.getItem(API_LS)||""; }catch(e){ API=""; }   // por si el navegador bloquea localStorage
+function apiConfigurada(){ return API_RX.test(API); }
+function guardarApiUrl(u){
+  u=String(u||"").trim().replace(/\?.*$/,"");
+  if(!API_RX.test(u))return false;
+  API=u;
+  try{ localStorage.setItem(API_LS,u); }catch(e){}   // si no se puede guardar, sirve para esta sesión
+  return true;
+}
+function olvidarApiUrl(){
+  API="";
+  try{ localStorage.removeItem(API_LS); }catch(e){}
+}
 /* ===================================================================== */
 
 let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[], chequesEmit:[], sueldos:[], exclusionesIVA:["EDESUR","AYSA","METROGAS"], gastosInforme:[], svInforme:{} };  // impuestos: {"2026-01":{...}}
@@ -965,7 +1003,14 @@ function setSync(estado,txt){
 
 /* ---- llamadas a la planilla ---- */
 async function apiGet(){
-  const r=await fetch(API); const j=await r.json();
+  if(!apiConfigurada())return {ok:false,sinConfigurar:true};
+  let j;
+  try{
+    const r=await fetch(API);
+    j=await r.json();          // si la implementación no existe, Google devuelve HTML y esto falla
+  }catch(e){
+    return {ok:false,error:String((e&&e.message)||e)};
+  }
   if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; state.chequesEmit=j.data.chequesEmit||[]; state.sueldos=j.data.sueldos||[]; state.gastosInforme=j.data.gastosInforme||[]; if(j.data.config&&j.data.config.exclusionesIVA){try{state.exclusionesIVA=JSON.parse(j.data.config.exclusionesIVA);}catch(e){}}
     if(j.data.config&&j.data.config.svInforme){try{state.svInforme=JSON.parse(j.data.config.svInforme);}catch(e){}}
     // corregir claves de mes rotas en impuestos (ej. "Mon Jun 01 2026..." -> "2026-06")
@@ -981,6 +1026,7 @@ async function apiGet(){
   return j;
 }
 async function apiPost(payload){
+  if(!apiConfigurada()){ setSync("err","sin configurar"); return false; }
   setSync("busy");
   try{
     await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
@@ -1020,7 +1066,7 @@ $("g_subadd").onclick=async ()=>{
 
 /* ---- navegación: inicio + menú lateral ---- */
 const TITULOS={gasto:"Facturas a mano",venta:"Ventas del mes",balance:"Balance mensual",impuestos:"Impuestos — IVA e IIBB",
-  diarioiva:"Diario IVA",cheque:"Impuesto al cheque",servicios:"Servicios y calendario de pagos",sueldos:"Sueldos, CCSS y sindicato",
+  diarioiva:"Carga de Informes",cheque:"Impuesto al cheque",servicios:"Servicios y calendario de pagos",sueldos:"Sueldos, CCSS y sindicato",
   chemit:"Cheques emitidos",resumen:"Resumen anual",informes:"Informes",datos:"Datos"};
 function irA(v){
   $("home").style.display="none";
@@ -1311,7 +1357,10 @@ function renderBalance(){
   const sel=$("b_mes"); const meses=mesesConDatos();
   const prev=sel.value;
   sel.innerHTML=meses.length?meses.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join(""):`<option value="">Sin datos</option>`;
-  if(meses.includes(prev))sel.value=prev; else if(meses.length)sel.value=meses[meses.length-1];
+  const hoy=curMonthISO();
+  if(meses.includes(prev))sel.value=prev;
+  else if(meses.includes(hoy))sel.value=hoy;          // arranca en el mes en curso si ya tiene datos
+  else if(meses.length)sel.value=meses[meses.length-1];
   drawBalance();
   sel.onchange=drawBalance;
   $$("#b_view button").forEach(b=>b.onclick=()=>{$$("#b_view button").forEach(x=>x.classList.remove("on"));b.classList.add("on");balView=b.dataset.v;drawBalance();});
@@ -1329,6 +1378,30 @@ function drawBalance(){
       gByR[g.rubro]=(gByR[g.rubro]||0)+g.monto; gTot+=g.monto;
     }
   });
+  // 2b) detalle por proveedor de esos mismos gastos, para poder desplegar cada rubro.
+  //     Las filas viejas (guardadas antes de tener proveedor) no aportan detalle.
+  const detByR={};
+  state.gastosInforme.filter(g=>normMes(g.mes)===normMes(mes)).forEach(g=>{
+    const esNegro=(g.tipo==="negro");
+    if(bn!=="total" && ((bn==="blanco")===esNegro))return;
+    if(!g.prov)return;
+    (detByR[g.rubro]=detByR[g.rubro]||[]).push(g);
+  });
+  // flecha sólo si el rubro tiene detalle; si no, un hueco del mismo ancho para no desalinear
+  const caret=det=>det
+    ? `<span class="caret" style="color:var(--gold);margin-right:7px;display:inline-block;width:9px">▸</span>`
+    : `<span style="margin-right:7px;display:inline-block;width:9px"></span>`;
+  const filaDetalle=(r,cols)=>{
+    const d=(detByR[r]||[]).slice().sort((a,b)=>b.monto-a.monto);
+    if(!d.length)return "";
+    const sub=d.reduce((s,x)=>s+(x.monto||0),0);
+    const filas=d.map(x=>`<tr>
+      <td class="l" style="border:none;padding:4px 8px">${x.prov}${bn==="total"?` <span class="chipTipo ${x.tipo==="negro"?"b":"a"}">${x.tipo==="negro"?"B":"A"}</span>`:""}</td>
+      <td class="num" style="border:none;padding:4px 8px">${money(x.monto)}</td></tr>`).join("");
+    return `<tr class="det" style="display:none"><td colspan="${cols}" style="background:var(--paper2);padding:10px 10px 14px 30px">
+      <div class="sectlabel" style="margin-bottom:8px">${d.length} proveedor(es) · ${money(sub)}</div>
+      <table style="width:100%;max-width:540px">${filas}</table></td></tr>`;
+  };
   const vTot=ventaVal(mes,bn);
   const res=vTot-gTot;
   const lbl=bn==="total"?"":(bn==="blanco"?" · Tipo A":" · Tipo B");
@@ -1358,11 +1431,12 @@ function drawBalance(){
     const totB=Object.values(gB).reduce((a,b)=>a+b,0);
     h=`<tr><th class="l">Rubro</th><th class="num">Tipo A</th><th class="num">Tipo B</th><th class="num">Total</th><th class="num">%</th></tr>`;
     RUBROS.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a]).forEach(r=>{
-      h+=`<tr><td class="l">${r}</td>
+      const det=filaDetalle(r,5);
+      h+=`<tr class="${det?'rub':''}"><td class="l">${caret(det)}${r}</td>
         <td class="num" style="background:var(--bgA)">${gA[r]?money(gA[r]):'·'}</td>
         <td class="num" style="background:var(--bgB)">${gB[r]?money(gB[r]):'·'}</td>
         <td class="num"><b>${money(gByR[r])}</b></td>
-        <td class="num">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`;});
+        <td class="num">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`+det;});
     h+=`<tr class="tot"><td class="l">TOTAL GASTOS</td>
       <td class="num" style="background:var(--bgA2)"><b>${money(totA)}</b></td>
       <td class="num" style="background:var(--bgB2)"><b>${money(totB)}</b></td>
@@ -1370,10 +1444,22 @@ function drawBalance(){
   } else {
     h=`<tr><th class="l">Rubro</th><th class="num">Monto</th><th class="num">% de gastos</th></tr>`;
     RUBROS.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a]).forEach(r=>{
-      h+=`<tr><td class="l">${r}</td><td class="num">${money(gByR[r])}</td><td class="num">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`;});
+      const det=filaDetalle(r,3);
+      h+=`<tr class="${det?'rub':''}"><td class="l">${caret(det)}${r}</td><td class="num">${money(gByR[r])}</td><td class="num">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`+det;});
     h+=`<tr class="tot"><td class="l">TOTAL GASTOS</td><td class="num">${money(gTot)}</td><td class="num">100%</td></tr>`;
   }
   tb.innerHTML=h;
+  // cada rubro con detalle abre/cierra la fila de proveedores que va justo abajo
+  tb.querySelectorAll("tr.rub").forEach(tr=>{
+    const det=tr.nextElementSibling;
+    if(!det||!det.classList.contains("det"))return;
+    tr.style.cursor="pointer";
+    tr.onclick=()=>{
+      const abierto=det.style.display!=="none";
+      det.style.display=abierto?"none":"";
+      const c=tr.querySelector(".caret"); if(c)c.textContent=abierto?"▸":"▾";
+    };
+  });
   // botón imprimir
   const btn=$("b_print");
   if(btn)btn.onclick=()=>imprimirBalance(mes,gByR,gTot,vTot,res,bn);
@@ -1452,12 +1538,14 @@ function datosMes(mes){ // datos cargados a mano para el mes, con defaults
   mes=normMes(mes);
   const d=state.impuestos[mes]||{};
   return {
-    ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
+   ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
     alicIIBB:d.alicIIBB||DEF_ALIC, coefCABA:d.coefCABA||DEF_CC, coefBsAs:d.coefBsAs||DEF_CB,
     saldoFavorIIBB:d.saldoFavorIIBB||0
   };
 }
 function mesAnterior(mes){ const [y,m]=mes.split("-").map(Number); const d=new Date(y,m-2,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+/* corre un mes N posiciones hacia adelante (N negativo va hacia atrás) */
+function mesMasN(mes,n){ const [y,m]=normMes(mes).split("-").map(Number); const d=new Date(y,m-1+n,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
 
 function renderImpuestosTab(){
   const sel=$("t_mes"); const meses=mesesSelector();
@@ -1474,179 +1562,21 @@ function cargarFormImp(){
   const f=n=>n?n.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2}):"";
   $("t_retbanc").value=f(d.retBancIIBB);
   if($("t_retcli"))$("t_retcli").value=f((state.impuestos[mes]||{}).retIVAClientes||0);
-  if($("t_sfav")){
-    let sf=(state.impuestos[mes]||{}).saldoFavorIIBB||0;
-    if(!sf){
-      const ant=(state.impuestos[mesAnterior(mes)]||{}).iibbContador||0;
-      if(ant<0) sf=-ant;
-    }
-    $("t_sfav").value=f(sf);
+  // saldo a favor de IIBB: si el mes no tiene nada guardado, lo proponemos con
+  // el saldo que quedó deducido el mes anterior (IIBB al contador negativo = a favor)
+  let sfav=(state.impuestos[mes]||{}).saldoFavorIIBB||0;
+  if(!sfav){
+    const iibbAnt=(state.impuestos[mesAnterior(mes)]||{}).iibbContador||0;
+    if(iibbAnt<0)sfav=-iibbAnt;
   }
+  if($("t_sfav"))$("t_sfav").value=f(sfav);
   $("t_ivacont").value=f(d.ivaContador);
   $("t_iibbcont").value=f(d.iibbContador);
   $("t_alic").value=d.alicIIBB;
   $("t_cc").value=d.coefCABA;
   $("t_cb").value=d.coefBsAs;
 }
-
-3 — renderServicios (muestra meses futuros)
-
-js
-function renderServicios(){
-  const sel=$("sv_mes");
-  // el mes de cada servicio sale de su vencimiento
-  state.servicios.forEach(s=>{ const c=normMes(s.venc)||normMes(s.mes)||""; if(c && c!==s.mes){ s.mes=c; apiPost(Object.assign({action:"setServicio"},s)); } });
-  let meses=new Set(state.servicios.map(s=>s.mes).filter(Boolean));
-  // agregar el mes actual y los 6 siguientes, para poder planificar
-  const hoy=new Date();
-  for(let i=0;i<7;i++){
-    const d=new Date(hoy.getFullYear(),hoy.getMonth()+i,1);
-    meses.add(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"));
-  }
-  const arr=[...meses].filter(m=>/^\d{4}-\d{2}$/.test(m)).sort();
-  const prev=sel.value;
-  sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
-  sel.value=arr.includes(prev)?prev:curMonthISO();
-  sel.onchange=renderServicios;
-  // lista de nombres ya usados, para el autocompletar
-  const dl=$("eds_lista"); if(dl){ const nombres=[...new Set(state.servicios.map(s=>s.servicio).filter(Boolean))].sort(); dl.innerHTML=nombres.map(n=>`<option value="${n}">`).join(""); }
-  drawServicios();
-}
-
-4 — renderBalance (abre en el mes en curso)
-
-js
-function renderBalance(){
-  const sel=$("b_mes"); const meses=mesesConDatos();
-  const prev=sel.value;
-  sel.innerHTML=meses.length?meses.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join(""):`<option value="">Sin datos</option>`;
-  const actual=curMonthISO();
-  if(meses.includes(prev))sel.value=prev;
-  else if(meses.includes(actual))sel.value=actual;
-  else if(meses.length)sel.value=meses[meses.length-1];
-  drawBalance();
-  sel.onchange=drawBalance;
-  $$("#b_view button").forEach(b=>b.onclick=()=>{$$("#b_view button").forEach(x=>x.classList.remove("on"));b.classList.add("on");balView=b.dataset.v;drawBalance();});
-}
-
-5 — drawAvisoCaja (agrega el contador de cheques)
-
-js
-function drawAvisoCaja(){
-  const rango=parseInt($("che_rango").value);
-  const noCob=state.chequesEmit.filter(c=>c.estado!=="Cobrado" && c.fechaPago);
-  const yaSalen=noCob.filter(c=>diasAlVenc(c.fechaPago)<=0);
-  const porVenir=noCob.filter(c=>{const d=diasAlVenc(c.fechaPago); return d>0 && d<=rango;});
-  const totalYa=yaSalen.reduce((s,c)=>s+c.monto,0);
-  const totalVen=porVenir.reduce((s,c)=>s+c.monto,0);
-  // conteo general de cheques
-  const totalCheques=state.chequesEmit.length;
-  const cobrados=state.chequesEmit.filter(c=>c.estado==="Cobrado").length;
-  const sinCobrar=totalCheques-cobrados;
-  // servicios pendientes en el rango (para el total por separado)
-  const servPend=state.servicios.filter(s=>!s.pagado&&s.venc&&s.monto>0);
-  const servYa=servPend.filter(s=>diasAlVenc(s.venc)<=0).reduce((a,s)=>a+s.monto,0);
-  const servVen=servPend.filter(s=>{const d=diasAlVenc(s.venc);return d>0&&d<=rango;}).reduce((a,s)=>a+s.monto,0);
-  $("che_aviso").innerHTML=
-    `<div class="led"><div class="l">Cheques emitidos</div><div class="v">${totalCheques}</div><div class="sub">${cobrados} cobrados · ${sinCobrar} sin cobrar</div></div>
-     <div class="led"><div class="l">Cheques — ya pueden salir</div><div class="v ${totalYa>0?'neg':''}">${money0(totalYa)}</div><div class="sub">${yaSalen.length} cheque(s) no cobrados</div></div>
-     <div class="led"><div class="l">Cheques — por venir (${rango}d)</div><div class="v">${money0(totalVen)}</div><div class="sub">${porVenir.length} cheque(s)</div></div>
-     <div class="led"><div class="l">Servicios — ya / por venir</div><div class="v">${money0(servYa)} / ${money0(servVen)}</div><div class="sub">pendientes</div></div>
-     <div class="led" style="border-color:var(--gold)"><div class="l">Total a cubrir ya</div><div class="v ${(totalYa+servYa)>0?'neg':''}">${money0(totalYa+servYa)}</div><div class="sub">cheques + servicios que ya pueden salir</div></div>`;
-}
-
-6 — el handler de v_calciva (IVA solo sobre Tipo A)
-
-js
-$("v_calciva").onclick=()=>{
-  const base=parseNum($("v_blanco").value)||0;
-  if(base<=0){showMsg("v_msg","learn","Cargá primero las ventas Tipo A.");return;}
-  $("v_ivad").value=(Math.round(base*0.21*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
-  showMsg("v_msg","ok",`IVA estimado al 21% sobre ventas Tipo A: <b>${money(base*0.21)}</b>. Verificá contra tu informe y corregilo si hace falta.`);
-};
-
-Con esas seis van los puntos 5, 6, 7, 10 y 13. Guardá, subí a GitHub y abrí con ?v=86.
-
-Faltan de esta tanda: el renombre a "Carga de Informes", la firma, el homenaje, el aviso de informes parciales y el botón de limpiar duplicados. Esos son textos sueltos y te los paso en cuanto tengas estas seis andando — así probamos por partes.
-
-No me animo aparecen 3 datosMes
-
-Bien que preguntes antes de tocar. Vamos a identificar cuál es.
-
-De esas tres apariciones, solo una es la definición de la función — las otras dos son llamadas (lugares donde se usa).
-
-La que tenés que reemplazar es la que empieza exactamente así:
-
-js
-function datosMes(mes){ // datos cargados a mano para el mes, con defaults
-
-Fijate que empieza con la palabra function. Esa es la definición.
-
-Las otras dos van a verse parecidas a esto:
-
-js
-const d=datosMes(mes);
-
-Esas no se tocan — son las que usan la función.
-
-Para ubicarla rápido en el Bloc de notas: con Ctrl+B buscá function datosMes (con la palabra function adelante). Así te lleva directo a la única correcta.
-
-La función completa a reemplazar son estas 8 líneas, desde function datosMes hasta la llave } que la cierra:
-
-js
-function datosMes(mes){ // datos cargados a mano para el mes, con defaults
-  mes=normMes(mes);
-  const d=state.impuestos[mes]||{};
-  return {
-    ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
-    alicIIBB:d.alicIIBB||DEF_ALIC, coefCABA:d.coefCABA||DEF_CC, coefBsAs:d.coefBsAs||DEF_CB
-  };
-}
-
-Seleccionás esas 8 líneas y pegás encima la versión nueva que te pasé.
-
-¿La ubicaste?
-
-Ojo, ahí hay algo raro: aparece }; y después }. Eso es una llave de más.
-
-La función tiene que terminar así:
-
-js
-    saldoFavorIIBB:d.saldoFavorIIBB||0
-  };
-}
-function mesAnterior(mes){ ...
-
-O sea: }; cierra el return {, y el } solo cierra la función. Si tenés exactamente eso, está bien.
-
-Pero como solo me pegaste el final, no puedo confirmarlo. Pegame la función datosMes completa, desde function datosMes hasta el function mesAnterior, así verifico que no haya quedado ninguna llave suelta.
-
-const DEF_ALIC=3, DEF_CC=87.76, DEF_CB=12.24;
-function datosMes(mes){ // datos cargados a mano para el mes, con defaults
-  mes=normMes(mes);
-  const d=state.impuestos[mes]||{};
-  return {
-    ivaContador:d.ivaContador||0, retBancIIBB:d.retBancIIBB||0, iibbContador:d.iibbContador||0,
-    alicIIBB:d.alicIIBB||DEF_ALIC, coefCABA:d.coefCABA||DEF_CC, coefBsAs:d.coefBsAs||DEF_CB,
-    saldoFavorIIBB:d.saldoFavorIIBB||0
-  };
-}
-function mesAnterior(mes){ const [y,m]=mes.split("-").map(Number); const d=new Date(y,m-2,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
-function renderImpuestosTab(){
-  const sel=$("t_mes"); const meses=mesesSelector();
-  const prev=normMes(sel.value);
-
-Mostrar más
-
-Perfecto, quedó impecable. Las llaves están bien: }; cierra el return, } cierra la función, y mesAnterior arranca en su propia línea.
-
-Función 1 lista. Pasá a la 2 — cargarFormImp.
-
-Esa aparece dos veces: la definición (function cargarFormImp) y una o dos llamadas (cargarFormImp();). Buscá con Ctrl+B function cargarFormImp para ir directo a la correcta.
-
-Reemplazá desde function cargarFormImp(){ hasta su llave de cierre } por la versión nueva que te pasé.
-
-Avisame cuando esté.$("t_save").onclick=async ()=>{
+$("t_save").onclick=async ()=>{
   const mes=normMes($("t_mes").value); if(!mes){showMsg("t_msg","learn","No hay mes seleccionado.");return;}
   const ivaExtractoPrev=(state.impuestos[mes]||{}).ivaExtracto||0;  // preservar lo que vino del extracto
   const payload={
@@ -1670,6 +1600,36 @@ Avisame cuando esté.$("t_save").onclick=async ()=>{
   drawImpuestos();
   await apiPost({action:"setImpuestos",...payload});
   await apiPost({action:"setDiarioIVA",mes,saldoFavorIIBB:sfav,...(yaHayInforme?{}:{retIVAClientes:retCli})});
+};
+
+/* Relee la planilla y avisa si hay filas repetidas del mismo mes.
+   Solo reporta: no borra nada de la planilla. */
+if($("t_dedup"))$("t_dedup").onclick=async ()=>{
+  showMsg("t_msg","learn","Consultando la planilla…");
+  let j=null;
+  try{ j=await apiGet(); }catch(e){ j=null; }
+  if(!j||!j.ok||!j.data){ showMsg("t_msg","learn","No se pudo leer la planilla. Revisá la conexión."); return; }
+  const problemas=[];
+  // hojas guardadas por mes: buscamos claves distintas que caen en el mismo YYYY-MM
+  const dupPorMes=(obj,nombre)=>{
+    const porMes={};
+    Object.keys(obj||{}).forEach(k=>{ const n=normMes(k)||k; (porMes[n]=porMes[n]||[]).push(k); });
+    Object.keys(porMes).forEach(m=>{
+      if(porMes[m].length>1)problemas.push(`<b>${nombre}</b> — ${ymLabel(m)}: ${porMes[m].length} filas (${porMes[m].join(" · ")})`);
+    });
+  };
+  dupPorMes(j.data.impuestos,"Impuestos");
+  dupPorMes(j.data.cheque,"Impuesto al cheque");
+  // gastos de informe: ahora hay una fila por proveedor, así que el duplicado
+  // es el mismo mes + rubro + proveedor + tipo cargado más de una vez
+  const cnt={};
+  (j.data.gastosInforme||[]).forEach(g=>{ const k=(normMes(g.mes)||g.mes)+"|"+(g.rubro||"—")+"|"+(g.prov||"—")+"|"+(g.tipo||"—"); cnt[k]=(cnt[k]||0)+1; });
+  Object.keys(cnt).forEach(k=>{
+    if(cnt[k]>1){ const p=k.split("|"); problemas.push(`<b>Gastos de informe</b> — ${ymLabel(p[0])}: ${p[1]} · ${p[2]} (${p[3]}) aparece ${cnt[k]} veces`); }
+  });
+  renderImpuestosTab(); renderAll();
+  if(!problemas.length){ showMsg("t_msg","ok","No se encontraron filas duplicadas en la planilla."); return; }
+  showMsg("t_msg","learn",`Se encontraron ${problemas.length} duplicado(s):<br>• ${problemas.join("<br>• ")}<br><br><i>La app los unifica al leer, pero conviene borrar las filas repetidas en la planilla.</i>`);
 };
 
 function ivaMes(mes){ // calcula componentes de IVA del mes
@@ -2056,11 +2016,13 @@ function renderServicios(){
   // el mes de cada servicio sale de su vencimiento
   state.servicios.forEach(s=>{ const c=normMes(s.venc)||normMes(s.mes)||""; if(c && c!==s.mes){ s.mes=c; apiPost(Object.assign({action:"setServicio"},s)); } });
   let meses=new Set(state.servicios.map(s=>s.mes).filter(Boolean));
-  meses.add(curMonthISO());
+  // además de los meses con servicios, ofrecemos el mes actual y los 6 siguientes
+  const hoy=curMonthISO();
+  for(let i=0;i<=6;i++)meses.add(mesMasN(hoy,i));
   const arr=[...meses].filter(m=>/^\d{4}-\d{2}$/.test(m)).sort();
   const prev=sel.value;
   sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
-  sel.value=arr.includes(prev)?prev:arr[arr.length-1];
+  sel.value=arr.includes(prev)?prev:(arr.includes(hoy)?hoy:arr[arr.length-1]);
   sel.onchange=renderServicios;
   // lista de nombres ya usados, para el autocompletar
   const dl=$("eds_lista"); if(dl){ const nombres=[...new Set(state.servicios.map(s=>s.servicio).filter(Boolean))].sort(); dl.innerHTML=nombres.map(n=>`<option value="${n}">`).join(""); }
@@ -2648,8 +2610,13 @@ function drawAvisoCaja(){
   const servPend=state.servicios.filter(s=>!s.pagado&&s.venc&&s.monto>0);
   const servYa=servPend.filter(s=>diasAlVenc(s.venc)<=0).reduce((a,s)=>a+s.monto,0);
   const servVen=servPend.filter(s=>{const d=diasAlVenc(s.venc);return d>0&&d<=rango;}).reduce((a,s)=>a+s.monto,0);
+  // conteo general de cheques emitidos (solo cantidades, sin montos)
+  const chTot=state.chequesEmit.length;
+  const chCob=state.chequesEmit.filter(c=>c.estado==="Cobrado").length;
+  const chSin=chTot-chCob;
   $("che_aviso").innerHTML=
-    `<div class="led"><div class="l">Cheques — ya pueden salir</div><div class="v ${totalYa>0?'neg':''}">${money0(totalYa)}</div><div class="sub">${yaSalen.length} cheque(s) no cobrados</div></div>
+    `<div class="led"><div class="l">Cheques emitidos</div><div class="v">${chTot}</div><div class="sub">${chCob} cobrado(s) · ${chSin} sin cobrar</div></div>
+     <div class="led"><div class="l">Cheques — ya pueden salir</div><div class="v ${totalYa>0?'neg':''}">${money0(totalYa)}</div><div class="sub">${yaSalen.length} cheque(s) no cobrados</div></div>
      <div class="led"><div class="l">Cheques — por venir (${rango}d)</div><div class="v">${money0(totalVen)}</div><div class="sub">${porVenir.length} cheque(s)</div></div>
      <div class="led"><div class="l">Servicios — ya / por venir</div><div class="v">${money0(servYa)} / ${money0(servVen)}</div><div class="sub">pendientes</div></div>
      <div class="led" style="border-color:var(--gold)"><div class="l">Total a cubrir ya</div><div class="v ${(totalYa+servYa)>0?'neg':''}">${money0(totalYa+servYa)}</div><div class="sub">cheques + servicios que ya pueden salir</div></div>`;
@@ -2904,6 +2871,16 @@ $("di_guardar").onclick=async ()=>{
   if(ret.retIVA)partes.push("Ret. IVA "+money(ret.retIVA));
   if(diarioTmp.partb)partes.push("Parte B "+money(diarioTmp.partb.neto));
   if(!confirm(`Vas a guardar los informes en el mes:\n\n➡ ${ymLabel(mes).toUpperCase()}${yaExiste}\n\n${partes.join(" · ")}\n\n¿Es el mes correcto?`))return;
+  // al guardar compras se reescriben TODOS los rubros del mes: si no se leyó la parte B,
+  // los rubros Tipo B que ya estaban guardados se pierden. Avisamos antes.
+  if(diarioTmp.compras && !diarioTmp.partb){
+    const rubrosB=state.gastosInforme.filter(g=>normMes(g.mes)===mes && g.tipo==="negro");
+    if(rubrosB.length){
+      const totB=rubrosB.reduce((s,g)=>s+(g.monto||0),0);
+      const nRub=new Set(rubrosB.map(g=>g.rubro)).size;
+      if(!confirm(`OJO: ${ymLabel(mes).toUpperCase()} ya tiene Parte B guardada por ${money(totB)} (${rubrosB.length} movimiento(s) en ${nRub} rubro(s)).\n\nComo no leíste el informe de Parte B, eso se va a BORRAR del balance.\n\nSi querés conservarlo, cancelá y pegá también la parte B.\n\n¿Guardar igual?`))return;
+    }
+  }
   const mesPago=mesMasTres(mes);
   const imp=Object.assign({},dPrev,{
     ivaVentas:ventas.ivaTotal,netoVentas:ventas.neto,
@@ -2915,22 +2892,22 @@ $("di_guardar").onclick=async ()=>{
     ivaCompras:compras.ivaTotal,ivaCompNeto:compras.ivaCompNeto,ivaExcluido:compras.ivaExcluido,
     percIVACompras:compras.percIVA,percIIBBCompras:compras.percIIBB,netoCompras:compras.neto,
     retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,mesPagoIVA:mesPago});
-  // gastos por rubro al balance
+  // gastos al balance: una fila por proveedor (el rubro se sigue usando para agrupar)
   const items=[]; let sinRubro=0;
-  if(compras.provNeto){
-    const porRubroA={};
-    Object.keys(compras.provNeto).forEach(p=>{ const r=rubroDeProveedor(p); if(!r){sinRubro++;return;} if(RUBROS_NO_GASTO.includes(r))return; porRubroA[r]=(porRubroA[r]||0)+compras.provNeto[p]; });
-    Object.keys(porRubroA).forEach(r=>items.push({rubro:r,monto:porRubroA[r],tipo:"blanco"}));
-  }
+  const itemsDeProv=(provNeto,tipo)=>{
+    Object.keys(provNeto).forEach(p=>{
+      const r=rubroDeProveedor(p);
+      if(!r){sinRubro++;return;}
+      if(RUBROS_NO_GASTO.includes(r))return;
+      items.push({rubro:r,prov:capProv(p),monto:provNeto[p],tipo});
+    });
+  };
+  if(compras.provNeto)itemsDeProv(compras.provNeto,"blanco");
   const pb=diarioTmp.partb;
-  if(pb && pb.provNeto){
-    const porRubroB={};
-    Object.keys(pb.provNeto).forEach(p=>{ const r=rubroDeProveedor(p); if(!r){sinRubro++;return;} if(RUBROS_NO_GASTO.includes(r))return; porRubroB[r]=(porRubroB[r]||0)+pb.provNeto[p]; });
-    Object.keys(porRubroB).forEach(r=>items.push({rubro:r,monto:porRubroB[r],tipo:"negro"}));
-  }
+  if(pb && pb.provNeto)itemsDeProv(pb.provNeto,"negro");
   if(items.length || compras.provNeto){
     state.gastosInforme=state.gastosInforme.filter(g=>normMes(g.mes)!==mes);
-    items.forEach(it=>state.gastosInforme.push({mes,rubro:it.rubro,monto:it.monto,tipo:it.tipo}));
+    items.forEach(it=>state.gastosInforme.push({mes,rubro:it.rubro,prov:it.prov,monto:it.monto,tipo:it.tipo}));
     await apiPost({action:"setGastosInforme",mes,items:JSON.stringify(items)});
   }
   diarioTmp={compras:null,ventas:null,ret:null,partb:null};
@@ -3148,6 +3125,27 @@ $("i_export").onclick=()=>{
 };
 
 /* ---- datos: recargar / export ---- */
+/* ---- URL de la planilla: se pega una vez y queda en este navegador ---- */
+function pintarApiUrl(){
+  const i=$("d_api"); if(i)i.value=API||"";
+}
+$("d_api_save").onclick=async ()=>{
+  const u=$("d_api").value;
+  if(!guardarApiUrl(u)){
+    showMsg("d_api_msg","learn","Esa no parece una URL válida. Tiene que ser la de <b>Implementar → Nueva implementación</b> y terminar en <b>/exec</b>.");
+    return;
+  }
+  showMsg("d_api_msg","ok","URL guardada en este navegador. Conectando…");
+  setSync("busy","conectando…");
+  const j=await apiGet();
+  if(j&&j.ok){ setSync("ok"); fillSubs(); renderAll(); showMsg("d_api_msg","ok",`Conectada. ${state.gastos.length} gastos y ${Object.keys(state.ventas).length} meses de ventas.`); }
+  else { setSync("err","sin conexión"); showMsg("d_api_msg","learn","Se guardó la URL, pero no respondió. Revisá que la implementación esté activa y con acceso para cualquiera."); }
+};
+$("d_api_clear").onclick=()=>{
+  if(!confirm("¿Borrar la URL guardada en este navegador?\n\nLa app deja de conectarse hasta que la pegues de nuevo. Tus datos en la planilla no se tocan."))return;
+  olvidarApiUrl(); pintarApiUrl(); setSync("err","sin configurar"); renderStats();
+  showMsg("d_api_msg","ok","URL borrada de este navegador.");
+};
 $("d_reload").onclick=async ()=>{
   showMsg("d_msg","ok","Recargando desde la planilla…");
   const j=await apiGet();
@@ -3183,7 +3181,7 @@ function renderStats(){
     <tr><td class="l">Período</td><td class="num">${meses.length?ymLabel(meses[0])+" – "+ymLabel(meses[meses.length-1]):"—"}</td></tr>
     <tr><td class="l">Total gastos histórico</td><td class="num">${money0(tg)}</td></tr>
     <tr><td class="l">Total ventas histórico</td><td class="num">${money0(tv)}</td></tr>`;
-  $("d_conn").textContent=API.indexOf("PEGÁ_TU_URL")===0?"⚠ Falta configurar la URL de la planilla (constante API en el código).":"Conectada a tu planilla de Google.";
+  $("d_conn").textContent=apiConfigurada()?"Conectada a tu planilla de Google.":"⚠ Falta pegar la URL de la planilla (más arriba, en “Conexión con la planilla”).";
 }
 
 function renderAll(){ renderGastos(); renderVentas(); renderBalance(); renderStats(); }
@@ -3191,9 +3189,11 @@ function renderAll(){ renderGastos(); renderVentas(); renderBalance(); renderSta
 /* ---- boot ---- */
 initSelects();
 updateFlag();
+pintarApiUrl();
 (async function(){
-  if(API.indexOf("PEGÁ_TU_URL")===0){ setSync("err","sin configurar"); renderAll();
-    showMsg("d_msg","learn","Todavía no pegaste la URL de la planilla. Abrí el archivo, buscá <b>const API</b> y pegá tu enlace /exec."); return; }
+  if(!apiConfigurada()){ setSync("err","sin configurar"); renderAll();
+    irA("datos");
+    showMsg("d_api_msg","learn","Pegá acá la URL de tu planilla (la que termina en <b>/exec</b>). Se guarda solo en este navegador, no en el archivo."); return; }
   setSync("busy","conectando…");
   const j=await apiGet();
   if(j&&j.ok){ setSync("ok"); fillSubs(); renderAll(); }
