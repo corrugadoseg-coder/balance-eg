@@ -1,0 +1,22 @@
+# Este repo guarda la app (balance.html). Documentos, planillas y archivos
+# temporales del sistema quedan afuera.
+
+# Documentos y planillas de Office
+*.docx
+*.doc
+*.xlsx
+*.xls
+*.pdf
+
+# Archivos temporales / de bloqueo de Office
+~$*
+*.tmp
+
+# Basura del sistema operativo
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Copias de seguridad de editores
+*.bak
+*~
