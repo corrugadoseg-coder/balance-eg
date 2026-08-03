@@ -1797,41 +1797,51 @@ function renderChequeTab(){
    Excluye lo que no es gasto bancario (transferencias, sueldos, cheques, rescates, etc.) */
 function parseCheque(texto){
   const EXCLUIR=["TRANSF SUELDOS","TRANSFERENCIA","P.CHEQUE","SUSCRIPCION","AC RESCATE","RECAUDACION","TRANSPORTE","DEBITO FISCAL"];
-  const lineas=texto.split(/\n/);
-  const grupos={};
+  const lineas=texto.split(/\r\n|\r|\n/);   // tolera fin de línea de Windows, Mac viejo o Unix
+  const grupos={}, detalle={};              // detalle[key] = [{fecha, importe, importeTxt}, ...]
   let total=0, sircreb=0, ley=0, ivaCom=0;
   // importe argentino: 1.234.567,89 · 70.000,54 · 123,45 · 1234,56
   const RE_IMP=/\d{1,3}(?:\.\d{3})+,\d{2}|\d+,\d{2}/;
-  // el concepto arranca en "N/D" (con o sin espacios en la barra) o en "DEBITO FISCAL IVA"
-  const RE_CONCEPTO=/(N\s*\/\s*D\b.*|D[EÉ]BITO\s+FISCAL\s+IVA.*)/i;
+  // marca de inicio de concepto: "N/D" (con o sin espacios en la barra) o "DEBITO FISCAL IVA"
+  const RE_INICIO=/N\s*\/\s*D\b|D[EÉ]BITO\s+FISCAL\s+IVA/gi;
+  // fecha: token tipo 14-JUL-2026 · 14/07/26 · 31-JUL (para el detalle)
+  const RE_FECHA=/\d{1,2}[-\/][A-Za-z]{3,}\.?(?:[-\/]\d{2,4})?|\d{1,2}[-\/]\d{1,2}(?:[-\/]\d{2,4})?/g;
   lineas.forEach(l=>{
-    const mc=l.match(RE_CONCEPTO);
-    if(!mc)return;
-    const resto=mc[1];
-    // primer importe argentino que aparezca en el concepto (ignora el saldo que venga después)
-    const mi=resto.match(RE_IMP);
-    if(!mi)return;
-    const val=parseFloat(mi[0].replace(/\./g,"").replace(",","."));
-    if(isNaN(val))return;
-    // concepto = todo lo anterior al importe, con espacios colapsados (tolera espaciado variable)
-    const concepto=resto.slice(0,mi.index).trim().replace(/\s+/g," ");
-    if(!concepto)return;
-    const cu=concepto.toUpperCase();
-    // detección tolerante a mayúsc/minúsc, espacio opcional o ausente y espacios múltiples
-    const esIVA   = /D[EÉ]BITO\s*FISCAL\s*IVA/i.test(concepto);
-    const esLey   = /LEY\s*25413/i.test(concepto);          // matchea "25413 CRED" y "25413DEBIT"
-    const esSirc  = /RET\s*IB\s*SIRCREB/i.test(concepto);
-    // IVA sobre comisiones va aparte (se suma al final, no se excluye)
-    if(!esIVA && EXCLUIR.some(x=>cu.indexOf(x)!==-1)) return;
-    // clave en mayúsculas: agrupa el mismo concepto aunque venga en distinta caja
-    let key=cu;
-    if(esLey){ key="N/D LEY 25413"; ley+=val; }   // suma CRED y DEBIT en el mismo grupo
-    if(esSirc){ sircreb+=val; }
-    if(esIVA){ key="DEBITO FISCAL IVA"; ivaCom+=val; }
-    grupos[key]=(grupos[key]||0)+val;
-    total+=val;
+    // TODOS los inicios de concepto del renglón (un renglón puede traer más de uno)
+    const inicios=[...l.matchAll(RE_INICIO)].map(m=>m.index);
+    for(let idx=0; idx<inicios.length; idx++){
+      const ini=inicios[idx];
+      const fin=(idx+1<inicios.length)?inicios[idx+1]:l.length;
+      const seg=l.slice(ini,fin);                 // "N/D COMISION MANTE 61.342,98 <saldo?>"
+      // primer importe del segmento (ignora el saldo que venga después)
+      const mi=seg.match(RE_IMP);
+      if(!mi)continue;
+      const val=parseFloat(mi[0].replace(/\./g,"").replace(",","."));
+      if(isNaN(val))continue;
+      // concepto = texto entre la marca y el importe, con espacios colapsados
+      const concepto=seg.slice(0,mi.index).trim().replace(/\s+/g," ");
+      if(!concepto)continue;
+      const cu=concepto.toUpperCase();
+      // detección tolerante a mayúsc/minúsc, espacio opcional o ausente y espacios múltiples
+      const esIVA  = /D[EÉ]BITO\s*FISCAL\s*IVA/i.test(concepto);
+      const esLey  = /LEY\s*25413/i.test(concepto);   // matchea "25413 CRED" y "25413DEBIT"
+      const esSirc = /RET\s*IB\s*SIRCREB/i.test(concepto);
+      // IVA sobre comisiones va aparte (se suma al final, no se excluye)
+      if(!esIVA && EXCLUIR.some(x=>cu.indexOf(x)!==-1)) continue;
+      // clave en mayúsculas: agrupa el mismo concepto aunque venga en distinta caja
+      let key=cu;
+      if(esLey){ key="N/D LEY 25413"; ley+=val; }   // suma CRED y DEBIT en el mismo grupo
+      if(esSirc){ sircreb+=val; }
+      if(esIVA){ key="DEBITO FISCAL IVA"; ivaCom+=val; }
+      grupos[key]=(grupos[key]||0)+val;
+      total+=val;
+      // fecha = último token de fecha a la izquierda de este concepto en el renglón
+      const izq=l.slice(0,ini).match(RE_FECHA);
+      const fecha=izq?izq[izq.length-1]:"";
+      (detalle[key]=detalle[key]||[]).push({fecha, importe:val, importeTxt:mi[0]});
+    }
   });
-  return {grupos,total,ley,sircreb,ivaCom};
+  return {grupos,detalle,total,ley,sircreb,ivaCom};
 }
 function imprimirDesglose(mes,grupos,total,ley,sircreb,ivaCom){
   const fmt=n=>"$"+(Math.round((n||0)*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -1868,11 +1878,23 @@ function imprimirDesglose(mes,grupos,total,ley,sircreb,ivaCom){
 $("ch_calc").onclick=()=>{
   const texto=$("ch_texto").value;
   if(!texto.trim()){showMsg("ch_msg","learn","Pegá primero el texto del extracto.");return;}
-  const {grupos,total,ley,sircreb,ivaCom}=parseCheque(texto);
+  const {grupos,detalle,total,ley,sircreb,ivaCom}=parseCheque(texto);
   const claves=Object.keys(grupos);
   if(!claves.length){showMsg("ch_msg","learn","No encontré cargos bancarios en el texto. Verificá que pegaste el extracto completo.");$("ch_result").innerHTML="";return;}
-  showMsg("ch_msg","ok",`Detecté <b>${claves.length}</b> concepto(s). Verificá el desglose contra tu planilla antes de guardar.`);
-  let filas=claves.sort().map(k=>`<tr><td class="l">${k}</td><td class="num">${money(grupos[k])}</td></tr>`).join("");
+  showMsg("ch_msg","ok",`Detecté <b>${claves.length}</b> concepto(s). Tocá cada uno para ver las líneas que sumó. Verificá el desglose contra tu planilla antes de guardar.`);
+  // cada concepto abre/cierra el detalle de las líneas individuales que sumó
+  const caret=hay=>hay
+    ? `<span class="caret" style="color:var(--gold);margin-right:7px;display:inline-block;width:9px">▸</span>`
+    : `<span style="margin-right:7px;display:inline-block;width:9px"></span>`;
+  let filas=claves.sort().map(k=>{
+    const det=detalle[k]||[];
+    const badge=det.length>1?` <span style="font-size:10px;color:var(--faint);margin-left:6px">${det.length} líneas</span>`:"";
+    const fila=`<tr class="${det.length?'chrub':''}"><td class="l">${caret(det.length>0)}${k}${badge}</td><td class="num">${money(grupos[k])}</td></tr>`;
+    if(!det.length)return fila;
+    const sub=det.map(d=>`<tr><td class="l" style="border:none;padding:4px 8px">${d.fecha||"—"}</td><td class="num" style="border:none;padding:4px 8px">${d.importeTxt}</td></tr>`).join("");
+    const detRow=`<tr class="chdet" style="display:none"><td colspan="2" style="background:var(--paper2);padding:10px 10px 14px 30px"><div class="sectlabel" style="margin-bottom:8px">${det.length} línea(s) · ${money(grupos[k])}</div><table style="width:100%;max-width:420px">${sub}</table></td></tr>`;
+    return fila+detRow;
+  }).join("");
   $("ch_result").innerHTML=`
     <div class="sectlabel" style="margin-top:8px">Desglose de gastos bancarios del mes (nombres del banco)</div>
     <table style="max-width:560px;margin:8px 0 14px"><tbody>
@@ -1886,6 +1908,17 @@ $("ch_calc").onclick=()=>{
     </div>
     <div class="row-actions"><button class="btn" id="ch_save">Guardar ${ymLabel($("ch_mes").value)}</button><button class="btn ghost" id="ch_print">🖨 Imprimir desglose</button></div>
     <small class="note">Al guardar: el 1,2‰ va al registro de abajo (para Ganancias) y las retenciones SIRCREB se cargan como "Retenciones bancarias IIBB" del mes en Impuestos. El desglose completo es informativo, para que lo compares con tu planilla.</small>`;
+  // clic en un concepto: abre/cierra la fila de detalle que va justo abajo
+  $("ch_result").querySelectorAll("tr.chrub").forEach(tr=>{
+    const det=tr.nextElementSibling;
+    if(!det||!det.classList.contains("chdet"))return;
+    tr.style.cursor="pointer";
+    tr.onclick=()=>{
+      const abierto=det.style.display!=="none";
+      det.style.display=abierto?"none":"";
+      const c=tr.querySelector(".caret"); if(c)c.textContent=abierto?"▸":"▾";
+    };
+  });
   $("ch_print").onclick=()=>imprimirDesglose($("ch_mes").value,grupos,total,ley,sircreb,ivaCom);
   $("ch_save").onclick=async ()=>{
     const mes=normMes($("ch_mes").value);
