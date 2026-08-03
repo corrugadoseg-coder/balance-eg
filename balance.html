@@ -1800,21 +1800,33 @@ function parseCheque(texto){
   const lineas=texto.split(/\n/);
   const grupos={};
   let total=0, sircreb=0, ley=0, ivaCom=0;
+  // importe argentino: 1.234.567,89 · 70.000,54 · 123,45 · 1234,56
+  const RE_IMP=/\d{1,3}(?:\.\d{3})+,\d{2}|\d+,\d{2}/;
+  // el concepto arranca en "N/D" (con o sin espacios en la barra) o en "DEBITO FISCAL IVA"
+  const RE_CONCEPTO=/(N\s*\/\s*D\b.*|D[EÉ]BITO\s+FISCAL\s+IVA.*)/i;
   lineas.forEach(l=>{
-    // captura concepto (N/D ... o DEBITO FISCAL IVA) + primer importe argentino
-    const m=l.match(/\d{2}-[A-Za-z]{3}-\d{4}\s+(N\/D\s+.+?|DEBITO FISCAL IVA)\s+([\d.]+,\d{2})\s/);
-    if(!m)return;
-    const concepto=m[1].trim();
-    const val=parseFloat(m[2].replace(/\./g,"").replace(",","."));
+    const mc=l.match(RE_CONCEPTO);
+    if(!mc)return;
+    const resto=mc[1];
+    // primer importe argentino que aparezca en el concepto (ignora el saldo que venga después)
+    const mi=resto.match(RE_IMP);
+    if(!mi)return;
+    const val=parseFloat(mi[0].replace(/\./g,"").replace(",","."));
     if(isNaN(val))return;
+    // concepto = todo lo anterior al importe, con espacios colapsados (tolera espaciado variable)
+    const concepto=resto.slice(0,mi.index).trim().replace(/\s+/g," ");
+    if(!concepto)return;
     const cu=concepto.toUpperCase();
-    // IVA sobre comisiones lo tratamos aparte (lo sumamos al final, no se excluye)
-    const esIVA = cu.indexOf("DEBITO FISCAL IVA")!==-1;
+    // detección tolerante a mayúsc/minúsc, espacio opcional o ausente y espacios múltiples
+    const esIVA   = /D[EÉ]BITO\s*FISCAL\s*IVA/i.test(concepto);
+    const esLey   = /LEY\s*25413/i.test(concepto);          // matchea "25413 CRED" y "25413DEBIT"
+    const esSirc  = /RET\s*IB\s*SIRCREB/i.test(concepto);
+    // IVA sobre comisiones va aparte (se suma al final, no se excluye)
     if(!esIVA && EXCLUIR.some(x=>cu.indexOf(x)!==-1)) return;
-    // normaliza LEY 25413 (CRED/DEBIT) a un solo grupo
-    let key=concepto;
-    if(cu.indexOf("LEY 25413")!==-1){ key="N/D LEY 25413"; ley+=val; }
-    if(cu.indexOf("RET IB SIRCREB")!==-1){ sircreb+=val; }
+    // clave en mayúsculas: agrupa el mismo concepto aunque venga en distinta caja
+    let key=cu;
+    if(esLey){ key="N/D LEY 25413"; ley+=val; }   // suma CRED y DEBIT en el mismo grupo
+    if(esSirc){ sircreb+=val; }
     if(esIVA){ key="DEBITO FISCAL IVA"; ivaCom+=val; }
     grupos[key]=(grupos[key]||0)+val;
     total+=val;
