@@ -1188,6 +1188,14 @@ $("g_clear").onclick=()=>{$("g_prov").value="";$("g_monto").value="";$("g_fecha"
 function bnChip(bn){return bn==="negro"?'<span class="bndot ng" title="Tipo B"></span>':'<span class="bndot bl" title="Tipo A"></span>';}
 function bnChipBtn(bn,id){return `<button class="bndot btn-dot ${bn==="negro"?"ng":"bl"}" data-toggle="${id}" title="Cambiar tipo"></button>`;}
 
+/* ids de gastos generados automáticamente desde la pestaña Sueldos.
+   Suman al balance y a todos los cálculos, pero NO se listan como
+   "Facturas a mano" (los sueldos se administran en su propia pestaña). */
+function idsDeSueldos(){
+  const s=new Set();
+  state.sueldos.forEach(x=>{ if(x.gastoIdA)s.add(x.gastoIdA); if(x.gastoIdB)s.add(x.gastoIdB); });
+  return s;
+}
 function renderGastos(){
   refreshProvList();
   poblarFiltroProv();
@@ -1196,12 +1204,15 @@ function renderGastos(){
   const fprov=$("g_filtprov").value;
   const frubro=$("g_filtrubro").value;
   const filtrando=fprov||frubro;
-  let base=state.gastos.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  // solo facturas manuales: excluimos los gastos generados desde Sueldos
+  const idsSueldo=idsDeSueldos();
+  const manuales=state.gastos.filter(g=>!idsSueldo.has(g.id));
+  let base=manuales.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
   if(fprov)base=base.filter(g=>g.prov.toLowerCase()===fprov);
   if(frubro)base=base.filter(g=>g.rubro===frubro);
   const list=base.slice(0,filtrando?500:40);
-  // contador de registros
-  const totalGral=state.gastos.length;
+  // contador de registros (también sin los sueldos)
+  const totalGral=manuales.length;
   if(filtrando){
     let desc=[];
     if(fprov)desc.push("proveedor");
@@ -1297,8 +1308,10 @@ function poblarFiltroProv(){
   const sel=$("g_filtprov"); if(!sel)return;
   const cur=sel.value;
   // agrupa por nombre normalizado para no duplicar por mayúsculas
+  // (sin los gastos generados desde Sueldos: no se listan acá)
+  const idsSueldo=idsDeSueldos();
   const mapa={};
-  state.gastos.forEach(g=>{ const k=capProv(g.prov); if(k)mapa[k]=true; });
+  state.gastos.forEach(g=>{ if(idsSueldo.has(g.id))return; const k=capProv(g.prov); if(k)mapa[k]=true; });
   const provs=Object.keys(mapa).sort((a,b)=>a.localeCompare(b));
   sel.innerHTML='<option value="">Todos</option>'+provs.map(p=>`<option value="${p.toLowerCase()}">${p}</option>`).join("");
   if([...sel.options].some(o=>o.value===cur))sel.value=cur;
