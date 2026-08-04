@@ -430,11 +430,12 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
         <button class="btn ghost sm" id="v_calciva" type="button">Calcular IVA (21% de las ventas)</button>
       </div>
     </div>
-    <div class="sectlabel" style="margin-top:22px">Retenciones que te hicieron los clientes <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px;margin-left:6px">total del mes · opcional</span></div>
-    <div class="grid" style="grid-template-columns:1fr 1fr 1fr;">
-      <div class="f"><label>Retención IVA</label><input id="v_riva" class="mono" inputmode="decimal" placeholder="0,00"></div>
-      <div class="f"><label>Retención IIBB</label><input id="v_riibb" class="mono" inputmode="decimal" placeholder="0,00"></div>
-      <div class="f"><label>Retención Ganancias</label><input id="v_rgan" class="mono" inputmode="decimal" placeholder="0,00"></div>
+    <div class="sectlabel" style="margin-top:22px">Retenciones que te hicieron los clientes <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px;margin-left:6px">Se carga automáticamente desde Carga de Informes</span></div>
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+      <div class="f"><label>Retención IVA</label><input id="v_riva" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
+      <div class="f"><label>Retención IIBB</label><input id="v_riibb" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
+      <div class="f"><label>Retención Ganancias</label><input id="v_rgan" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
+      <div class="f"><label>Retención SUSS <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">informativa</span></label><input id="v_rsuss" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
     </div>
     <div class="msg" id="v_msg"></div>
     <div class="row-actions">
@@ -476,9 +477,15 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="monthpick">
       <select id="t_mes"></select>
     </div>
-    <div class="sectlabel">Datos que cargás vos para este mes</div>
+    <div class="sectlabel">Retenciones de clientes <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px;margin-left:6px">Se carga automáticamente desde Carga de Informes</span></div>
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+      <div class="f"><label>Retención IVA</label><input id="t_retcli" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
+      <div class="f"><label>Retención IIBB</label><input id="t_retiibb" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
+      <div class="f"><label>Retención Ganancias</label><input id="t_retgan" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
+      <div class="f"><label>Retención SUSS <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">informativa</span></label><input id="t_retsuss" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
+    </div>
+    <div class="sectlabel" style="margin-top:18px">Datos que cargás vos para este mes</div>
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr;">
-      <div class="f"><label>Retenciones IVA de clientes <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">si no pegás el informe</span></label><input id="t_retcli" class="mono" inputmode="decimal" placeholder="0,00"></div>
       <div class="f"><label>Retenciones bancarias IIBB</label><input id="t_retbanc" class="mono" inputmode="decimal" placeholder="0,00"></div>
       <div class="f"><label>IVA al contador <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">cuando lo tengas</span></label><input id="t_ivacont" class="mono" inputmode="decimal" placeholder="0,00"></div>
     </div>
@@ -1328,13 +1335,15 @@ $("v_add").onclick=async ()=>{
   if(!mes){showMsg("v_msg","learn","Elegí el mes.");return;}
   if(bl<=0&&ng<=0){showMsg("v_msg","learn","Cargá al menos un monto de ventas.");return;}
   const ivaDebito=parseNum($("v_ivad").value)||0;
-  const retIVA=parseNum($("v_riva").value)||0;
-  const retIIBB=parseNum($("v_riibb").value)||0;
-  const retGan=parseNum($("v_rgan").value)||0;
+  // las retenciones de clientes ya no se tipean acá: vienen del informe (Carga de Informes)
+  const imp=state.impuestos[normMes(mes)]||{};
+  const retIVA=imp.retIVAClientes||0;
+  const retIIBB=imp.retIIBBClientes||0;
+  const retGan=imp.retGanancias||0;
   state.ventas[mes]={blanco:bl,negro:ng,ivaDebito,retIVA,retIIBB,retGan};
   showMsg("v_msg","ok",`Ventas de ${ymLabel(mes)} guardadas. Total ${money(bl+ng)}.`);
   $("v_blanco").value="";$("v_negro").value="";$("v_ivad").value="";
-  $("v_riva").value="";$("v_riibb").value="";$("v_rgan").value="";
+  pintarRetVentas();
   renderVentas();
   await apiPost({action:"addVenta",mes,blanco:bl,negro:ng,ivaDebito,retIVA,retIIBB,retGan});
 };
@@ -1345,6 +1354,7 @@ $("v_calciva").onclick=()=>{
   showMsg("v_msg","ok",`IVA estimado al 21%: <b>${money(base*0.21)}</b>. Podés corregirlo si hace falta.`);
 };
 function renderVentas(){
+  pintarRetVentas();   // refresca las retenciones (solo lectura) desde el informe
   const tb=$("v_tbl").querySelector("tbody");
   const keys=Object.keys(state.ventas).sort();
   if(!keys.length){tb.innerHTML=`<tr><td colspan="5"><div class="empty">Todavía no cargaste ventas.</div></td></tr>`;return;}
@@ -1355,6 +1365,18 @@ function renderVentas(){
   tb.innerHTML=h;
   tb.querySelectorAll(".del").forEach(b=>b.onclick=async ()=>{if(confirm("¿Borrar las ventas de este mes?")){const mes=b.dataset.k;delete state.ventas[mes];renderVentas();await apiPost({action:"addVenta",mes,blanco:0,negro:0,ivaDebito:0,retIVA:0,retIIBB:0,retGan:0});}});
 }
+/* las retenciones de clientes (IVA, IIBB, Ganancias, SUSS) se leen del informe de
+   retenciones sufridas (Carga de Informes). Acá solo se muestran, en solo lectura. */
+function pintarRetVentas(){
+  const mes=normMes($("v_mes")?$("v_mes").value:"");
+  const d=state.impuestos[mes]||{};
+  const f=n=>n?n.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2}):"";
+  if($("v_riva")) $("v_riva").value =f(d.retIVAClientes||0);
+  if($("v_riibb"))$("v_riibb").value=f(d.retIIBBClientes||0);
+  if($("v_rgan")) $("v_rgan").value =f(d.retGanancias||0);
+  if($("v_rsuss"))$("v_rsuss").value=f(d.retSUSSClientes||0);
+}
+if($("v_mes"))$("v_mes").addEventListener("change",pintarRetVentas);
 
 /* ---- helpers de cálculo ---- */
 function gastoVal(g,bn){ if(bn==="total")return g.monto; return g.bn===bn?g.monto:0; }
@@ -1574,7 +1596,12 @@ function cargarFormImp(){
   const d=datosMes(mes);
   const f=n=>n?n.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2}):"";
   $("t_retbanc").value=f(d.retBancIIBB);
-  if($("t_retcli"))$("t_retcli").value=f((state.impuestos[mes]||{}).retIVAClientes||0);
+  // retenciones de clientes: solo lectura, vienen del informe (Carga de Informes)
+  const im=state.impuestos[mes]||{};
+  if($("t_retcli")) $("t_retcli").value =f(im.retIVAClientes||0);
+  if($("t_retiibb"))$("t_retiibb").value=f(im.retIIBBClientes||0);
+  if($("t_retgan")) $("t_retgan").value =f(im.retGanancias||0);
+  if($("t_retsuss"))$("t_retsuss").value=f(im.retSUSSClientes||0);
   // saldo a favor de IIBB: si el mes no tiene nada guardado, lo proponemos con
   // el saldo que quedó deducido el mes anterior (IIBB al contador negativo = a favor)
   let sfav=(state.impuestos[mes]||{}).saldoFavorIIBB||0;
@@ -2728,18 +2755,27 @@ function parseDiarioVentas(txt){
   return {ivaTotal,neto};
 }
 /* retenciones sufridas por tipo */
+/* Clasifica cada retención por su CÓDIGO, que va en la MISMA línea que el importe:
+   202→IVA · 204→Ganancias · 205→IIBB · 206→S.U.S.S.
+   (En el informe el texto descriptor —"S.U.S.S.", "RETENCION IVA"— está en OTRA
+   línea; el código y el importe van juntos, y el importe es el último número.) */
 function parseRetenciones(txt){
-  const lines=txt.split("\n");
+  const lines=txt.split(/\r\n|\r|\n/);
   let retIVA=0,retIIBB=0,retGan=0,suss=0;
-  lines.forEach((ln,i)=>{
-    const m=ln.match(/([\d.]+,\d{2})\s*$/);
-    if(!m)return;
-    const val=parseNumAr(m[1]);
-    const ctx=(ln+" "+(lines[i+1]||"")).toUpperCase();
-    if(/I\.?V\.?A/.test(ctx))retIVA+=val;
-    else if(/I\.?I\.?B\.?B|INGRESOS BRUTOS|IIBB/.test(ctx))retIIBB+=val;
-    else if(/GANANC/.test(ctx))retGan+=val;
-    else if(/SUSS|SEG/.test(ctx))suss+=val;
+  lines.forEach(ln=>{
+    // importe = último número argentino (con decimales) de la línea
+    const imps=ln.match(/\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2}/g);
+    if(!imps)return;
+    // código de retención: 202/204/205/206 como entero aislado (no parte de un importe ni de un año/CUIT)
+    const cm=ln.match(/(?:^|[^\d.,])(20[2456])(?:[^\d.,]|$)/);
+    if(!cm)return;
+    const val=parseNumAr(imps[imps.length-1]);
+    if(!val)return;
+    const cod=cm[1];
+    if(cod==="202")retIVA+=val;
+    else if(cod==="204")retGan+=val;
+    else if(cod==="205")retIIBB+=val;
+    else if(cod==="206")suss+=val;   // S.U.S.S.: solo informativo, no entra en cálculos
   });
   return {retIVA,retIIBB,retGan,suss};
 }
@@ -2779,7 +2815,7 @@ function renderDiarioIVA(){
   else $("di_res_compras").innerHTML="";
   if(d.ivaVentas)$("di_res_ventas").innerHTML=`<div class="led" style="border-color:var(--gold)"><div class="l">IVA ventas (débito)</div><div class="v">${money0(d.ivaVentas)}</div><div class="sub">guardado</div></div>`;
   else $("di_res_ventas").innerHTML="";
-  if(d.retIVAClientes||d.retIIBBClientes||d.retGanancias)mostrarResRet({retIVA:d.retIVAClientes||0,retIIBB:d.retIIBBClientes||0,retGan:d.retGanancias||0});
+  if(d.retIVAClientes||d.retIIBBClientes||d.retGanancias||d.retSUSSClientes)mostrarResRet({retIVA:d.retIVAClientes||0,retIIBB:d.retIIBBClientes||0,retGan:d.retGanancias||0,suss:d.retSUSSClientes||0});
   else $("di_res_ret").innerHTML="";
   const pbTot=state.gastosInforme.filter(g=>normMes(g.mes)===sel.value && g.tipo==="negro").reduce((a,g)=>a+g.monto,0);
   if(pbTot)$("di_res_partb").innerHTML=`<div class="led" style="border-color:var(--gold)"><div class="l">Total parte B</div><div class="v">${money0(pbTot)}</div><div class="sub">guardado · Tipo B</div></div>`;
@@ -2802,7 +2838,8 @@ function mostrarResRet(r){
   $("di_res_ret").innerHTML=
     `<div class="led"><div class="l">Ret. IVA</div><div class="v">${money0(r.retIVA)}</div></div>
      <div class="led"><div class="l">Ret. IIBB</div><div class="v">${money0(r.retIIBB)}</div></div>
-     <div class="led"><div class="l">Ret. Ganancias</div><div class="v">${money0(r.retGan)}</div><div class="sub">informativo</div></div>`;
+     <div class="led"><div class="l">Ret. Ganancias</div><div class="v">${money0(r.retGan)}</div><div class="sub">informativo</div></div>
+     <div class="led"><div class="l">Ret. SUSS</div><div class="v">${money0(r.suss||0)}</div><div class="sub">informativo</div></div>`;
 }
 function mostrarResPartB(r){
   $("di_res_partb").innerHTML=
@@ -2904,7 +2941,7 @@ $("di_calc_ret").onclick=()=>{
   const txt=$("di_ret").value;
   if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de retenciones.");return;}
   const r=parseRetenciones(txt);
-  if(!r.retIVA && !r.retIIBB && !r.retGan){showMsg("di_msg","learn","No encontré retenciones. Copiá el listado completo.");return;}
+  if(!r.retIVA && !r.retIIBB && !r.retGan && !r.suss){showMsg("di_msg","learn","No encontré retenciones. Copiá el listado completo.");return;}
   diarioTmp.ret=r; mostrarResRet(r); hideMsg("di_msg");
 };
 $("di_calc_partb").onclick=()=>{
@@ -2920,7 +2957,7 @@ $("di_guardar").onclick=async ()=>{
   const dPrev=state.impuestos[mes]||{};
   const compras=c||{ivaTotal:dPrev.ivaCompras||0,percIVA:dPrev.percIVACompras||0,percIIBB:dPrev.percIIBBCompras||0,neto:dPrev.netoCompras||0,ivaExcluido:dPrev.ivaExcluido||0,ivaCompNeto:dPrev.ivaCompNeto||0};
   const ventas=v||{ivaTotal:dPrev.ivaVentas||0,neto:dPrev.netoVentas||0};
-  const ret=rt||{retIVA:dPrev.retIVAClientes||0,retIIBB:dPrev.retIIBBClientes||0,retGan:dPrev.retGanancias||0};
+  const ret=rt||{retIVA:dPrev.retIVAClientes||0,retIIBB:dPrev.retIIBBClientes||0,retGan:dPrev.retGanancias||0,suss:dPrev.retSUSSClientes||0};
   if(!compras.ivaTotal && !ventas.ivaTotal && !ret.retIVA && !diarioTmp.partb){showMsg("di_msg","learn","Leé al menos un informe antes de guardar.");return;}
   const yaExiste=(dPrev.ivaCompras||dPrev.ivaVentas)?" (ya había datos en este mes; se van a actualizar)":"";
   const partes=[];
@@ -2944,12 +2981,12 @@ $("di_guardar").onclick=async ()=>{
     ivaVentas:ventas.ivaTotal,netoVentas:ventas.neto,
     ivaCompras:compras.ivaTotal,ivaCompNeto:compras.ivaCompNeto,ivaExcluido:compras.ivaExcluido,
     percIVACompras:compras.percIVA,percIIBBCompras:compras.percIIBB,netoCompras:compras.neto,
-    retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,mesPagoIVA:mesPago});
+    retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,retSUSSClientes:ret.suss,mesPagoIVA:mesPago});
   state.impuestos[mes]=imp;
   await apiPost({action:"setDiarioIVA",mes,ivaVentas:ventas.ivaTotal,netoVentas:ventas.neto,
     ivaCompras:compras.ivaTotal,ivaCompNeto:compras.ivaCompNeto,ivaExcluido:compras.ivaExcluido,
     percIVACompras:compras.percIVA,percIIBBCompras:compras.percIIBB,netoCompras:compras.neto,
-    retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,mesPagoIVA:mesPago});
+    retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,retSUSSClientes:ret.suss,mesPagoIVA:mesPago});
   // gastos al balance: una fila por proveedor (el rubro se sigue usando para agrupar)
   const items=[]; let sinRubro=0;
   const itemsDeProv=(provNeto,tipo)=>{
