@@ -2753,8 +2753,16 @@ function rubroDeProveedor(nombre){
 function parseDiarioCompras(txt){
   const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
   const ivaTotal=tot(/TOTAL I\.V\.A\.\s*\.+;?\s*([\d.,-]+)/);
-  const percIVA=tot(/PERCEPCION\s+IVA[^\n;]*;?\s*([\d.,-]+)/i);
-  const percIIBB=tot(/PERCEPCION\s+INGRESOS\s+BRUTOS[^\n;]*;?\s*([\d.,-]+)/i);
+  // percepciones: el importe es el ÚLTIMO número argentino de la línea de la etiqueta.
+  // (Antes un [^\n;]* voraz se comía el número y, al hacer backtracking, el grupo
+  //  capturaba un solo dígito cuando no había ';' que lo frenara —formato de julio—.)
+  const percDe=(re)=>{
+    const ln=(txt.split(/\r\n|\r|\n/).find(l=>re.test(l)))||"";
+    const nums=ln.match(/-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+(?:,\d+)?/g);
+    return nums?parseNumAr(nums[nums.length-1]):0;
+  };
+  const percIVA=percDe(/PERCEPCION\s+IVA/i);
+  const percIIBB=percDe(/PERCEPCION\s+INGRESOS\s+BRUTOS/i);
   const neto=tot(/NETO\s*\.+;?\s*([\d.,-]+)/);
   const excl=(state.exclusionesIVA||[]).map(x=>x.toUpperCase());
   let ivaExcluido=0;
