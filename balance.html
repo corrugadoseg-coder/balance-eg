@@ -1558,10 +1558,19 @@ function applyFilters(){
   const desde=$("i_desde").value, hasta=$("i_hasta").value;
   const fr=$("i_rubro").value, fp=$("i_prov").value, fbn=$("i_bn").value;
   const inRange=k=>(!desde||k>=desde)&&(!hasta||k<=hasta);
-  // gastos filtrados
-  let g=state.gastos.filter(x=>inRange(ym(x.fecha)));
+  // gastos del informe (compras=blanco, parte B=negro) normalizados a la forma de un gasto.
+  // Son filas aparte de state.gastos (no se duplican). Fecha = 1° del mes para filtrar por período.
+  const infoComoGastos=state.gastosInforme.map(x=>({
+    fecha:(normMes(x.mes)||x.mes)+"-01",
+    prov:x.prov||"", rubro:x.rubro,
+    sub:x.tipo==="negro"?"Parte B":"Compras",
+    bn:x.tipo==="negro"?"negro":"blanco",
+    monto:x.monto||0, iva:0, piva:0, piibb:0
+  }));
+  // gastos filtrados (a mano + informe)
+  let g=state.gastos.concat(infoComoGastos).filter(x=>inRange(ym(x.fecha)));
   if(fr)g=g.filter(x=>x.rubro===fr);
-  if(fp)g=g.filter(x=>x.prov.toLowerCase()===fp);
+  if(fp)g=g.filter(x=>(x.prov||"").toLowerCase()===fp);
   if(fbn)g=g.filter(x=>x.bn===fbn);
   // meses del rango
   let meses=mesesConDatos().filter(inRange);
@@ -3032,22 +3041,27 @@ $("di_guardar").onclick=async ()=>{
 function aniosConDatos(){
   const s=new Set();
   state.gastos.forEach(g=>{const a=fechaCorta(g.fecha).slice(0,4); if(a)s.add(a);});
+  state.gastosInforme.forEach(g=>{const a=(normMes(g.mes)||"").slice(0,4); if(a)s.add(a);});
   Object.keys(state.ventas).forEach(k=>s.add(k.slice(0,4)));
   if(!s.size)s.add(String(new Date().getFullYear()));
   return [...s].sort();
 }
 function datosAnio(anio){
   const gs=state.gastos.filter(g=>fechaCorta(g.fecha).slice(0,4)===anio);
-  const gastos=gs.reduce((s,x)=>s+(x.monto||0),0);
+  // gastos que vienen de los informes (compras + parte B); son filas aparte de state.gastos, no se duplican
+  const gi=state.gastosInforme.filter(g=>(normMes(g.mes)||"").slice(0,4)===anio);
+  const gastos=gs.reduce((s,x)=>s+(x.monto||0),0)+gi.reduce((s,x)=>s+(x.monto||0),0);
   let ventas=0;
   Object.keys(state.ventas).forEach(k=>{ if(k.slice(0,4)===anio){const v=state.ventas[k];ventas+=(v.blanco||0)+(v.negro||0);} });
   // por mes
   const vMes=Array(12).fill(0), gMes=Array(12).fill(0);
   gs.forEach(x=>{const m=+fechaCorta(x.fecha).slice(5,7)-1; if(m>=0&&m<12)gMes[m]+=x.monto||0;});
+  gi.forEach(x=>{const m=+(normMes(x.mes)||"").slice(5,7)-1; if(m>=0&&m<12)gMes[m]+=x.monto||0;});
   Object.keys(state.ventas).forEach(k=>{ if(k.slice(0,4)===anio){const m=+k.slice(5,7)-1; const v=state.ventas[k]; if(m>=0&&m<12)vMes[m]+=(v.blanco||0)+(v.negro||0);} });
   // por rubro
   const rubros={};
   gs.forEach(x=>{rubros[x.rubro]=(rubros[x.rubro]||0)+(x.monto||0);});
+  gi.forEach(x=>{rubros[x.rubro]=(rubros[x.rubro]||0)+(x.monto||0);});
   // impuestos acumulados
   let ivaVent=0,ivaComp=0,iibb=0,cheque=0;
   Object.keys(state.impuestos).forEach(k=>{ if(k.slice(0,4)===anio){const im=state.impuestos[k]; ivaComp+=im.ivaExtracto||0;} });
@@ -3072,10 +3086,13 @@ function drawResumen(){
   const d1=datosAnio(a1), d2=a2?datosAnio(a2):null;
   // Totales
   const ledTot=(lbl,v1,v2,cls)=>`<div class="led"><div class="l">${lbl}</div><div class="v ${cls||''}">${money0(v1)}</div>${d2?`<div class="sub">${a2}: ${money0(v2)}</div>`:''}</div>`;
+  // margen del año = resultado / ventas × 100, debajo del Resultado
+  const margen=d1.ventas>0?(d1.resultado/d1.ventas*100).toFixed(1)+"% margen":"—";
+  const subRes=d2?`${margen} · ${a2}: ${money0(d2.resultado)}`:margen;
   $("r_totales").innerHTML=
     ledTot(`Ventas ${a1}`, d1.ventas, d2&&d2.ventas)+
     ledTot(`Gastos ${a1}`, d1.gastos, d2&&d2.gastos)+
-    ledTot(`Resultado ${a1}`, d1.resultado, d2&&d2.resultado, d1.resultado>=0?'pos':'neg');
+    `<div class="led"><div class="l">Resultado ${a1}</div><div class="v ${d1.resultado>=0?'pos':'neg'}">${money0(d1.resultado)}</div><div class="sub">${subRes}</div></div>`;
   // Gráfico mes a mes
   const ds=[
     {label:`Ventas ${a1}`,data:d1.vMes,borderColor:"#3f6b4f",backgroundColor:"transparent",tension:.3},
@@ -3105,6 +3122,7 @@ function drawResumen(){
 function initInformeSelectors(){
   const mapa={};
   state.gastos.forEach(g=>{ const k=capProv(g.prov); if(k)mapa[k]=true; });
+  state.gastosInforme.forEach(g=>{ const k=capProv(g.prov); if(k)mapa[k]=true; });   // proveedores del informe
   const provs=Object.keys(mapa).sort((a,b)=>a.localeCompare(b));
   const cur=$("i_prov").value;
   $("i_prov").innerHTML='<option value="">Todos</option>'+provs.map(p=>`<option value="${p.toLowerCase()}">${p}</option>`).join("");
@@ -3207,7 +3225,7 @@ function renderInformeTable(g){
   const list=g.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
   if(!list.length){tb.innerHTML=`<tr><td colspan="5"><div class="empty">Sin movimientos para los filtros elegidos.</div></td></tr>`;return;}
   let h=`<tr><th class="l">Fecha</th><th class="l">Proveedor</th><th class="l">Rubro</th><th class="l">Subcat.</th><th>Tipo</th><th class="num">Monto</th></tr>`;
-  list.slice(0,200).forEach(x=>{h+=`<tr><td class="l">${fechaLinda(x.fecha)}</td><td class="l">${x.prov}</td><td class="l"><span class="chip rubro">${x.rubro}</span></td><td class="l">${x.sub||"—"}</td><td>${bnChip(x.bn)}</td><td class="num">${money(x.monto)}</td></tr>`;});
+  list.slice(0,200).forEach(x=>{h+=`<tr><td class="l">${fechaLinda(x.fecha)}</td><td class="l">${x.prov||'<span style="color:var(--faint)">sin proveedor</span>'}</td><td class="l"><span class="chip rubro">${x.rubro}</span></td><td class="l">${x.sub||"—"}</td><td>${bnChip(x.bn)}</td><td class="num">${money(x.monto)}</td></tr>`;});
   if(list.length>200)h+=`<tr><td colspan="6"><small class="note">Mostrando 200 de ${list.length} movimientos. Exportá a Excel para verlos todos.</small></td></tr>`;
   tb.innerHTML=h;
 }
