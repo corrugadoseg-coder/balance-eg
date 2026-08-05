@@ -68,6 +68,19 @@ tr.rowB:hover > td{background:var(--bgB2)}
 #home .quick button:hover{border-color:var(--gold);background:var(--paper2);transform:translateY(-1px)}
 #home .quick button .qn{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:4px}
 
+/* estado de carga del mes en curso (pantalla de inicio) */
+#home .est{width:100%;max-width:480px;margin:30px auto 0}
+#home .est-tit{display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);font-weight:600;margin-bottom:12px}
+#home .est-tit select{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);font-weight:600;background:transparent;border:none;border-bottom:1px solid var(--lineA);border-radius:0;padding:2px 4px;width:auto;cursor:pointer}
+#home .est-tit select:focus{outline:none;box-shadow:none;border-color:var(--gold)}
+#home .est-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:7px}
+#home .est-item{display:flex;align-items:center;gap:9px;font-family:'Spectral',serif;font-size:14px;padding:7px 11px;border:1px solid var(--edge);border-radius:8px;background:var(--card);text-align:left}
+#home .est-item .est-ic{width:17px;height:17px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:11px;font-weight:700;line-height:1}
+#home .est-item.ok{color:var(--ink)}
+#home .est-item.ok .est-ic{background:var(--greenL);color:var(--green)}
+#home .est-item.no{color:var(--faint)}
+#home .est-item.no .est-ic{background:var(--redL);color:var(--red)}
+
 /* ===== Layout con menú lateral ===== */
 .layout{display:flex;gap:28px;align-items:flex-start}
 .sidebar{width:230px;flex-shrink:0;position:sticky;top:16px}
@@ -247,6 +260,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <button data-go="gasto"><span class="qn">01 · Registro</span>Cargar factura a mano</button>
     <button data-go="balance"><span class="qn">03 · Análisis</span>Ver balance del mes</button>
   </div>
+  <div id="home_estado" class="est"></div>
   <div style="margin-top:24px"><button class="btn ghost sm" id="home_menu">Ver todas las opciones</button></div>
   <div style="margin-top:28px;font-size:11px;color:var(--faint);letter-spacing:.06em">Desarrollado por Raquel · EG Corrugados · 2026</div>
 </div>
@@ -1100,6 +1114,7 @@ function irAInicio(){
   $("layout").style.display="none";
   $("topbar").style.display="none";
   $$(".view").forEach(x=>x.classList.remove("on"));
+  renderHomeEstado();   // refresca el panorama del mes al volver al inicio
   window.scrollTo(0,0);
 }
 $$(".mitem").forEach(t=>t.onclick=()=>irA(t.dataset.v));
@@ -3279,7 +3294,39 @@ function renderStats(){
   $("d_conn").textContent=apiConfigurada()?"Conectada a tu planilla de Google.":"⚠ Falta pegar la URL de la planilla (más arriba, en “Conexión con la planilla”).";
 }
 
-function renderAll(){ renderGastos(); renderVentas(); renderBalance(); renderStats(); }
+/* Panorama de carga de un mes (pantalla de inicio).
+   El desplegable lista los meses con datos (misma fuente que Balance) MÁS el mes
+   actual aunque esté vacío, del más reciente al más viejo. Abre por defecto en el
+   más reciente CON datos. Muestra los 7 items SIEMPRE (✓ cargado / ✗ falta). */
+function renderHomeEstado(preferido){
+  const box=$("home_estado"); if(!box)return;
+  const conDatos=mesesConDatos();                 // ascendente, meses con datos (igual que Balance)
+  const hoy=curMonthISO();
+  // lista = meses con datos + mes actual (para empezar a cargar el mes nuevo), sin repetir
+  const meses=[...new Set([...conDatos,hoy])].filter(m=>/^\d{4}-\d{2}$/.test(m)).sort().reverse();
+  // mes elegido: el pedido explícitamente en el desplegable (si es válido);
+  // en cualquier otro caso, el más reciente CON datos; si no hay datos, el mes actual.
+  const mes = (preferido && meses.includes(preferido)) ? preferido
+            : (conDatos.length ? conDatos[conDatos.length-1] : hoy);
+  const imp=state.impuestos[mes]||{};
+  const v=state.ventas[mes]||{};
+  const items=[
+    ["Informe de compras", (imp.ivaCompras||0)>0],
+    ["Informe de ventas",  (imp.ivaVentas||0)>0],
+    ["Retenciones",        (imp.retIVAClientes||0)>0||(imp.retIIBBClientes||0)>0||(imp.retGanancias||0)>0||(imp.retSUSSClientes||0)>0],
+    ["Parte B",            state.gastosInforme.some(g=>normMes(g.mes)===mes && g.tipo==="negro")],
+    ["Ventas del mes",     (v.blanco||0)>0||(v.negro||0)>0],
+    // solo cuenta si hay un sueldo del mes con importe real (no una fila vacía autogenerada)
+    ["Sueldos",            state.sueldos.some(s=>normMes(s.mes)===mes && ((totA(s)+totB(s))>0||(s.monto||0)>0))],
+    ["Impuesto al cheque", ((state.cheque[mes]||{}).total||0)>0]
+  ];
+  const fila=(txt,ok)=>`<div class="est-item ${ok?'ok':'no'}"><span class="est-ic">${ok?'✓':'✗'}</span>${txt}</div>`;
+  const opts=meses.map(m=>`<option value="${m}"${m===mes?" selected":""}>${ymLabel(m).toLowerCase()}</option>`).join("");
+  box.innerHTML=`<div class="est-tit">Carga de <select id="he_mes">${opts}</select></div>
+    <div class="est-grid">${items.map(it=>fila(it[0],it[1])).join("")}</div>`;
+  $("he_mes").onchange=()=>renderHomeEstado($("he_mes").value);   // el cambio manual manda el mes elegido
+}
+function renderAll(){ renderGastos(); renderVentas(); renderBalance(); renderStats(); renderHomeEstado(); }
 
 /* ---- boot ---- */
 initSelects();
