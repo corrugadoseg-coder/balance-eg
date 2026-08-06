@@ -949,6 +949,8 @@ const RUBROS=["MATERIA PRIMA","GASTOS DE FABRICACIÓN","BIENES DE CAMBIO","FLETE
 "LOCACION, ABL Y SERVICIOS","GASTOS DE ADMINISTRACIÓN","GASTOS VS Y MANTENIMIENTO",
 "GASTOS PERSONAL","HONORARIOS","CCSS, SIND Y SUELDOS","IMPOSITIVO","RETIROS","PERSONAL / NO GASTO"];
 const RUBROS_NO_GASTO=["PERSONAL / NO GASTO"];  // suman al IVA pero no al gasto del mes
+// rubro sintético que solo aparece en el Balance mensual (no en la carga de gastos ni en la asignación de proveedores)
+const RUBROS_BAL=RUBROS.concat("Impuestos del mes");
 const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 // conceptos fijos de CCSS y cargas sindicales (select del formulario + indicador de inicio)
 const CCSS_CONCEPTOS=["CCSS","Sindicato","Federación - Capacitación Técnica","Federación - Aporte Solidario"];
@@ -1066,7 +1068,7 @@ async function apiPost(payload){
 /* ---- init UI ---- */
 function initSelects(){
   $("g_rubro").innerHTML=RUBROS.map(r=>`<option>${r}</option>`).join("");
-  $("i_rubro").innerHTML='<option value="">Todos</option>'+RUBROS.map(r=>`<option>${r}</option>`).join("");
+  $("i_rubro").innerHTML='<option value="">Todos</option>'+RUBROS_BAL.map(r=>`<option>${r}</option>`).join("");
   $("g_fecha").value=todayISO();
   $("v_mes").value=curMonthISO();
 }
@@ -1444,11 +1446,21 @@ function drawBalance(){
     if(!g.prov)return;
     (detByR[g.rubro]=detByR[g.rubro]||[]).push(g);
   });
+  // 2c) "Impuestos del mes": el IVA al contador de ese mes (state.impuestos[mes].ivaContador).
+  //     No es un gasto cargado ni viene del informe, así que no se duplica. Cuenta como Tipo A.
+  const impMes=(state.impuestos[normMes(mes)]||{}).ivaContador||0;
+  const mostrarImp=impMes>0 && bn!=="negro";
+  if(mostrarImp){ gByR["Impuestos del mes"]=(gByR["Impuestos del mes"]||0)+impMes; gTot+=impMes; }
   // flecha sólo si el rubro tiene detalle; si no, un hueco del mismo ancho para no desalinear
   const caret=det=>det
     ? `<span class="caret" style="color:var(--gold);margin-right:7px;display:inline-block;width:9px">▸</span>`
     : `<span style="margin-right:7px;display:inline-block;width:9px"></span>`;
   const filaDetalle=(r,cols)=>{
+    if(r==="Impuestos del mes"){
+      const val=gByR["Impuestos del mes"]||0; if(!val)return "";
+      return `<tr class="det" style="display:none"><td colspan="${cols}" style="background:var(--paper2);padding:10px 10px 14px 30px">
+        <table style="width:100%;max-width:540px"><tr><td class="l" style="border:none;padding:4px 8px">IVA (al contador)</td><td class="num" style="border:none;padding:4px 8px">${money(val)}</td></tr></table></td></tr>`;
+    }
     const d=(detByR[r]||[]).slice().sort((a,b)=>b.monto-a.monto);
     if(!d.length)return "";
     const sub=d.reduce((s,x)=>s+(x.monto||0),0);
@@ -1484,10 +1496,11 @@ function drawBalance(){
       if(g.tipo==="negro")gB[g.rubro]=(gB[g.rubro]||0)+g.monto;
       else gA[g.rubro]=(gA[g.rubro]||0)+g.monto;
     });
+    if(mostrarImp)gA["Impuestos del mes"]=(gA["Impuestos del mes"]||0)+impMes;   // el IVA al contador va en Tipo A
     const totA=Object.values(gA).reduce((a,b)=>a+b,0);
     const totB=Object.values(gB).reduce((a,b)=>a+b,0);
     h=`<tr><th class="l">Rubro</th><th class="num">Tipo A</th><th class="num">Tipo B</th><th class="num">Total</th><th class="num">%</th></tr>`;
-    RUBROS.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a]).forEach(r=>{
+    RUBROS_BAL.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a]).forEach(r=>{
       const det=filaDetalle(r,5);
       h+=`<tr class="${det?'rub':''}"><td class="l">${caret(det)}${r}</td>
         <td class="num" style="background:var(--bgA)">${gA[r]?money(gA[r]):'·'}</td>
@@ -1500,7 +1513,7 @@ function drawBalance(){
       <td class="num"><b>${money(gTot)}</b></td><td class="num">100%</td></tr>`;
   } else {
     h=`<tr><th class="l">Rubro</th><th class="num">Monto</th><th class="num">% de gastos</th></tr>`;
-    RUBROS.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a]).forEach(r=>{
+    RUBROS_BAL.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a]).forEach(r=>{
       const det=filaDetalle(r,3);
       h+=`<tr class="${det?'rub':''}"><td class="l">${caret(det)}${r}</td><td class="num">${money(gByR[r])}</td><td class="num">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`+det;});
     h+=`<tr class="tot"><td class="l">TOTAL GASTOS</td><td class="num">${money(gTot)}</td><td class="num">100%</td></tr>`;
@@ -1524,7 +1537,7 @@ function drawBalance(){
 function imprimirBalance(mes,gByR,gTot,vTot,res,bn){
   const fmt=n=>"$"+(Math.round((n||0)*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
   const lbl=bn==="total"?"Total (A+B)":(bn==="blanco"?"Tipo A (blanco)":"Tipo B (negro)");
-  const filas=RUBROS.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a])
+  const filas=RUBROS_BAL.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a])
     .map(r=>`<tr><td>${r}</td><td style="text-align:right">${fmt(gByR[r])}</td><td style="text-align:right">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`).join("");
   const margen=vTot>0?(res/vTot*100).toFixed(1)+"%":"—";
   const w=window.open("","_blank");
@@ -1574,8 +1587,16 @@ function applyFilters(){
     bn:x.tipo==="negro"?"negro":"blanco",
     monto:x.monto||0, iva:0, piva:0, piibb:0
   }));
-  // gastos filtrados (a mano + informe)
-  let g=state.gastos.concat(infoComoGastos).filter(x=>inRange(ym(x.fecha)));
+  // "Impuestos del mes": IVA al contador de cada mes (state.impuestos[mes].ivaContador), como gasto Tipo A.
+  // No está en state.gastos ni en gastosInforme, así que no se duplica.
+  const impComoGastos=Object.keys(state.impuestos).map(k=>({
+    fecha:(normMes(k)||k)+"-01",
+    prov:"IVA (al contador)", rubro:"Impuestos del mes",
+    sub:"IVA al contador", bn:"blanco",
+    monto:(state.impuestos[k].ivaContador||0), iva:0, piva:0, piibb:0
+  })).filter(x=>x.monto>0);
+  // gastos filtrados (a mano + informe + impuestos del mes)
+  let g=state.gastos.concat(infoComoGastos,impComoGastos).filter(x=>inRange(ym(x.fecha)));
   if(fr)g=g.filter(x=>x.rubro===fr);
   if(fp)g=g.filter(x=>(x.prov||"").toLowerCase()===fp);
   if(fbn)g=g.filter(x=>x.bn===fbn);
@@ -3075,18 +3096,25 @@ function datosAnio(anio){
   const gs=state.gastos.filter(g=>fechaCorta(g.fecha).slice(0,4)===anio);
   // gastos que vienen de los informes (compras + parte B); son filas aparte de state.gastos, no se duplican
   const gi=state.gastosInforme.filter(g=>(normMes(g.mes)||"").slice(0,4)===anio);
-  const gastos=gs.reduce((s,x)=>s+(x.monto||0),0)+gi.reduce((s,x)=>s+(x.monto||0),0);
+  // "Impuestos del mes": IVA al contador de cada mes; vive en state.impuestos, no se duplica
+  const imp=Object.keys(state.impuestos)
+    .filter(k=>(normMes(k)||"").slice(0,4)===anio)
+    .map(k=>({mes:normMes(k),monto:state.impuestos[k].ivaContador||0}))
+    .filter(x=>x.monto>0);
+  const gastos=gs.reduce((s,x)=>s+(x.monto||0),0)+gi.reduce((s,x)=>s+(x.monto||0),0)+imp.reduce((s,x)=>s+x.monto,0);
   let ventas=0;
   Object.keys(state.ventas).forEach(k=>{ if(k.slice(0,4)===anio){const v=state.ventas[k];ventas+=(v.blanco||0)+(v.negro||0);} });
   // por mes
   const vMes=Array(12).fill(0), gMes=Array(12).fill(0);
   gs.forEach(x=>{const m=+fechaCorta(x.fecha).slice(5,7)-1; if(m>=0&&m<12)gMes[m]+=x.monto||0;});
   gi.forEach(x=>{const m=+(normMes(x.mes)||"").slice(5,7)-1; if(m>=0&&m<12)gMes[m]+=x.monto||0;});
+  imp.forEach(x=>{const m=+x.mes.slice(5,7)-1; if(m>=0&&m<12)gMes[m]+=x.monto;});
   Object.keys(state.ventas).forEach(k=>{ if(k.slice(0,4)===anio){const m=+k.slice(5,7)-1; const v=state.ventas[k]; if(m>=0&&m<12)vMes[m]+=(v.blanco||0)+(v.negro||0);} });
   // por rubro
   const rubros={};
   gs.forEach(x=>{rubros[x.rubro]=(rubros[x.rubro]||0)+(x.monto||0);});
   gi.forEach(x=>{rubros[x.rubro]=(rubros[x.rubro]||0)+(x.monto||0);});
+  imp.forEach(x=>{rubros["Impuestos del mes"]=(rubros["Impuestos del mes"]||0)+x.monto;});
   // impuestos acumulados
   let ivaVent=0,ivaComp=0,iibb=0,cheque=0;
   Object.keys(state.impuestos).forEach(k=>{ if(k.slice(0,4)===anio){const im=state.impuestos[k]; ivaComp+=im.ivaExtracto||0;} });
