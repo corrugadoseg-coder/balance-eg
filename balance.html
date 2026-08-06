@@ -759,7 +759,12 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   <div id="succ_overlay" style="display:none;position:fixed;inset:0;background:rgba(35,32,26,.55);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px">
     <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:520px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
       <h2 style="margin-top:0">Concepto CCSS / sindicato</h2>
-      <div class="f"><label>Concepto</label><input id="succ_nombre" list="succ_list" placeholder="CCSS, Federación, Sindicato…"><datalist id="succ_list"><option value="CCSS"><option value="Federación"><option value="Sindicato"></datalist></div>
+      <div class="f"><label>Concepto</label><select id="succ_nombre">
+        <option value="CCSS">CCSS</option>
+        <option value="Sindicato">Sindicato</option>
+        <option value="Federación - Capacitación Técnica">Federación - Capacitación Técnica</option>
+        <option value="Federación - Aporte Solidario">Federación - Aporte Solidario</option>
+      </select></div>
       <div class="f" style="margin-top:14px"><label>Monto</label><input id="succ_monto" class="mono" inputmode="decimal" placeholder="0"></div>
       <label style="display:flex;gap:8px;align-items:center;cursor:pointer;margin-top:14px;text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-size:14px">
         <input type="checkbox" id="succ_albalance" checked> Enviar al análisis de gastos del mes
@@ -945,6 +950,8 @@ const RUBROS=["MATERIA PRIMA","GASTOS DE FABRICACIÓN","BIENES DE CAMBIO","FLETE
 "GASTOS PERSONAL","HONORARIOS","CCSS, SIND Y SUELDOS","IMPOSITIVO","RETIROS","PERSONAL / NO GASTO"];
 const RUBROS_NO_GASTO=["PERSONAL / NO GASTO"];  // suman al IVA pero no al gasto del mes
 const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+// conceptos fijos de CCSS y cargas sindicales (select del formulario + indicador de inicio)
+const CCSS_CONCEPTOS=["CCSS","Sindicato","Federación - Capacitación Técnica","Federación - Aporte Solidario"];
 
 /* =====================================================================
    CONEXIÓN CON LA PLANILLA (Google Apps Script)
@@ -2521,7 +2528,17 @@ $("sum_save").onclick=async ()=>{
 function abrirEditCCSS(id){
   const s=state.sueldos.find(x=>x.id===id); if(!s)return;
   $("succ_id").value=s.id;
-  $("succ_nombre").value=s.nombre||"";
+  const sel=$("succ_nombre");
+  // sacar cualquier opción de "texto libre" agregada en una edición anterior
+  [...sel.options].forEach(o=>{ if(o.dataset.libre)sel.removeChild(o); });
+  const nombre=(s.nombre||"").trim();
+  // un concepto viejo cargado a mano (que no está entre los fijos) se agrega para no romperse
+  if(nombre && ![...sel.options].some(o=>o.value===nombre)){
+    const op=document.createElement("option");
+    op.value=nombre; op.textContent=nombre+" (cargado antes)"; op.dataset.libre="1";
+    sel.appendChild(op);
+  }
+  sel.value=nombre||"CCSS";
   $("succ_monto").value=s.monto||"";
   $("succ_albalance").checked=true;
   hideMsg("succ_msg");
@@ -3343,7 +3360,9 @@ function renderHomeEstado(preferido){
     ["Parte B",            state.gastosInforme.some(g=>normMes(g.mes)===mes && g.tipo==="negro")],
     ["Ventas del mes",     (v.blanco||0)>0||(v.negro||0)>0],
     // solo cuenta si hay un sueldo del mes con importe real (no una fila vacía autogenerada)
-    ["Sueldos",            state.sueldos.some(s=>normMes(s.mes)===mes && ((totA(s)+totB(s))>0||(s.monto||0)>0))],
+    ["Sueldos",            state.sueldos.some(s=>normMes(s.mes)===mes && s.tipo==="empleado" && ((totA(s)+totB(s))>0||(s.monto||0)>0))],
+    // tilde solo si están cargados los CUATRO conceptos (con importe) para el mes
+    ["CCSS y Cargas Sindicales", CCSS_CONCEPTOS.every(c=>state.sueldos.some(s=>normMes(s.mes)===mes && s.tipo==="ccss" && (s.monto||0)>0 && (s.nombre||"").trim()===c))],
     ["Impuesto al cheque", ((state.cheque[mes]||{}).total||0)>0]
   ];
   const fila=(txt,ok)=>`<div class="est-item ${ok?'ok':'no'}"><span class="est-ic">${ok?'✓':'✗'}</span>${txt}</div>`;
