@@ -584,6 +584,14 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div id="di_res_partb" class="ledger" style="margin:12px 0"></div>
     <div id="di_rubros_b" style="margin:12px 0"></div>
 
+    <div class="sectlabel" style="margin-top:20px">Desglose GT Cargas (flete) <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px;margin-left:6px">reparte el gasto por fecha de viaje</span></div>
+    <p class="lead" style="margin-bottom:8px">Pegá el desglose de viajes del PDF de GT Cargas. El gasto neto se reparte al mes de cada viaje; el IVA sigue en la factura (se computa en IVA Compras).</p>
+    <div class="f">
+      <textarea id="di_gt" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el desglose de viajes (cada línea: fecha dd/mm/aa … importe; al final TOTALES CLIENTE)."></textarea>
+    </div>
+    <div class="row-actions"><button class="btn gold" id="di_calc_gt">Leer desglose GT Cargas</button></div>
+    <div id="di_res_gt" class="ledger" style="margin:12px 0"></div>
+
     <div class="row-actions" style="margin-top:16px"><button class="btn" id="di_guardar">Guardar informes del mes</button></div>
     <div class="msg" id="di_msg"></div>
   </div>
@@ -981,7 +989,7 @@ function olvidarApiUrl(){
 }
 /* ===================================================================== */
 
-let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[], chequesEmit:[], sueldos:[], exclusionesIVA:["EDESUR","AYSA","METROGAS"], gastosInforme:[], svInforme:{} };  // impuestos: {"2026-01":{...}}
+let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[], chequesEmit:[], sueldos:[], exclusionesIVA:["EDESUR","AYSA","METROGAS"], gastosInforme:[], svInforme:{}, gtCargas:{} };  // impuestos: {"2026-01":{...}} · gtCargas: {"2026-08":{total,porMes}}
 let balView="total";
 const $=id=>document.getElementById(id);
 /* Normaliza proveedor: saca espacios extra y pone Mayúscula Inicial en cada palabra */
@@ -1043,6 +1051,10 @@ async function apiGet(){
   }
   if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; state.chequesEmit=j.data.chequesEmit||[]; state.sueldos=j.data.sueldos||[]; state.gastosInforme=j.data.gastosInforme||[]; if(j.data.config&&j.data.config.exclusionesIVA){try{state.exclusionesIVA=JSON.parse(j.data.config.exclusionesIVA);}catch(e){}}
     if(j.data.config&&j.data.config.svInforme){try{state.svInforme=JSON.parse(j.data.config.svInforme);}catch(e){}}
+    // GT Cargas: desgloses de flete keyed por N° de comprobante ({comprobante:{comprobante,facturaMes,total,porMes}});
+    // tolera valores como string JSON
+    state.gtCargas={}; const gtRaw=j.data.gtCargas||{};
+    Object.keys(gtRaw).forEach(k=>{ let v=gtRaw[k]; if(typeof v==="string"){try{v=JSON.parse(v);}catch(e){v=null;}} if(v&&v.porMes){ v.comprobante=v.comprobante||k; if(v.facturaMes)v.facturaMes=normMes(v.facturaMes)||v.facturaMes; state.gtCargas[k]=v; } });
     // corregir claves de mes rotas en impuestos (ej. "Mon Jun 01 2026..." -> "2026-06")
     const impFix={};
     for(const k in state.impuestos){ const nk=normMes(k)||k; impFix[nk]=Object.assign({},impFix[nk]||{},state.impuestos[k]); }
@@ -1451,6 +1463,13 @@ function drawBalance(){
   const impMes=(state.impuestos[normMes(mes)]||{}).ivaContador||0;
   const mostrarImp=impMes>0 && bn!=="negro";
   if(mostrarImp){ gByR["Impuestos del mes"]=(gByR["Impuestos del mes"]||0)+impMes; gTot+=impMes; }
+  // 2d) GT Cargas: neto de flete repartido por fecha de viaje (state.gtCargas). Cuenta como Tipo A, rubro FLETE.
+  const gt=gtGastoMes(mes);
+  const mostrarGT=gt.monto>0 && bn!=="negro";
+  if(mostrarGT){
+    gByR[GT_RUBRO]=(gByR[GT_RUBRO]||0)+gt.monto; gTot+=gt.monto;
+    (detByR[GT_RUBRO]=detByR[GT_RUBRO]||[]).push({prov:GT_NOMBRE+" ("+gt.viajes+" viaje/s)",monto:gt.monto,tipo:"blanco"});
+  }
   // flecha sólo si el rubro tiene detalle; si no, un hueco del mismo ancho para no desalinear
   const caret=det=>det
     ? `<span class="caret" style="color:var(--gold);margin-right:7px;display:inline-block;width:9px">▸</span>`
@@ -1497,6 +1516,7 @@ function drawBalance(){
       else gA[g.rubro]=(gA[g.rubro]||0)+g.monto;
     });
     if(mostrarImp)gA["Impuestos del mes"]=(gA["Impuestos del mes"]||0)+impMes;   // el IVA al contador va en Tipo A
+    if(mostrarGT)gA[GT_RUBRO]=(gA[GT_RUBRO]||0)+gt.monto;                         // GT Cargas (flete) va en Tipo A
     const totA=Object.values(gA).reduce((a,b)=>a+b,0);
     const totB=Object.values(gB).reduce((a,b)=>a+b,0);
     h=`<tr><th class="l">Rubro</th><th class="num">Tipo A</th><th class="num">Tipo B</th><th class="num">Total</th><th class="num">%</th></tr>`;
@@ -1595,8 +1615,11 @@ function applyFilters(){
     sub:"IVA al contador", bn:"blanco",
     monto:(state.impuestos[k].ivaContador||0), iva:0, piva:0, piibb:0
   })).filter(x=>x.monto>0);
-  // gastos filtrados (a mano + informe + impuestos del mes)
-  let g=state.gastos.concat(infoComoGastos,impComoGastos).filter(x=>inRange(ym(x.fecha)));
+  // GT Cargas: neto de flete repartido por mes de viaje (state.gtCargas), como gasto Tipo A.
+  const gtComoGastos=[];
+  Object.values(state.gtCargas||{}).forEach(f=>{ if(!f||!f.porMes)return; Object.keys(f.porMes).forEach(m=>{ const mo=f.porMes[m].monto||0; if(mo>0)gtComoGastos.push({fecha:(normMes(m)||m)+"-01",prov:GT_NOMBRE,rubro:GT_RUBRO,sub:"Flete (por viaje)",bn:"blanco",monto:mo,iva:0,piva:0,piibb:0}); }); });
+  // gastos filtrados (a mano + informe + impuestos del mes + GT Cargas)
+  let g=state.gastos.concat(infoComoGastos,impComoGastos,gtComoGastos).filter(x=>inRange(ym(x.fecha)));
   if(fr)g=g.filter(x=>x.rubro===fr);
   if(fp)g=g.filter(x=>(x.prov||"").toLowerCase()===fp);
   if(fbn)g=g.filter(x=>x.bn===fbn);
@@ -2787,6 +2810,62 @@ function rubroDeProveedor(nombre){
   for(const k in state.memoria){ if(normProv(k)===n)return state.memoria[k]; }
   return "";
 }
+/* ===== GT CARGAS (flete): el gasto neto se reparte por fecha de viaje =====
+   El IVA sigue a la factura (mes de emisión, vía IVA Compras). El gasto neto
+   se reparte al mes de cada viaje mediante el desglose (PDF de GT Cargas). */
+const GT_CUIT="30716561859";
+const GT_NOMBRE="GT CARGAS";
+const GT_RUBRO="FLETE Y NAFTA";
+// ¿la línea del informe de compras es de GT Cargas? (por CUIT en cualquier campo, o por nombre)
+function esLineaGT(campos, razonUp){
+  if(razonUp && /GT\s*CARGAS/.test(razonUp))return true;
+  return campos.some(f=>String(f).replace(/\D/g,"")===GT_CUIT);
+}
+// número del desglose GT: punto decimal, sin separador de miles (ej. 63000.00). Tolera formato AR.
+function parseGTNum(s){
+  if(!s)return 0;
+  let t=String(s).trim();
+  if(t.includes(",")&&t.includes(".")) t=t.replace(/\./g,"").replace(",",".");  // AR 1.234,56
+  else if(t.includes(",")) t=t.replace(",",".");                                // 1234,56
+  else t=t.replace(/,/g,"");                                                    // 63000.00 (punto = decimal)
+  const n=parseFloat(t.replace(/[^0-9.\-]/g,""));
+  return isNaN(n)?0:n;
+}
+// parsea el desglose: cada línea de viaje empieza con dd/mm/aa y termina con el importe.
+// agrupa por mes de viaje; lee "TOTALES CLIENTE $" para verificar.
+function parseGTCargas(txt){
+  const lines=txt.split(/\r\n|\r|\n/);
+  const porMes={}; let total=0, totalCliente=null;
+  // número de comprobante (clave para no duplicar): línea "COMPROBANTE N° : 00005270"
+  const mc=txt.match(/COMPROBANTE[^\d\n]*(\d+)/i);
+  const comprobante=mc?mc[1]:"";
+  lines.forEach(ln=>{
+    if(/TOTALES?\s+CLIENTE/i.test(ln)){
+      const nums=ln.match(/\d[\d.,]*/g);
+      if(nums)totalCliente=parseGTNum(nums[nums.length-1]);
+      return;
+    }
+    const md=ln.match(/^\s*(\d{2})\/(\d{2})\/(\d{2})\b/);   // empieza con dd/mm/aa
+    if(!md)return;
+    const nums=ln.match(/\d[\d.,]*/g);
+    if(!nums||nums.length<2)return;              // fecha (partida) + importe al menos
+    const monto=parseGTNum(nums[nums.length-1]); // último número = importe del viaje
+    if(!monto)return;
+    const mesKey="20"+md[3]+"-"+md[2];
+    if(!porMes[mesKey])porMes[mesKey]={monto:0,viajes:0};
+    porMes[mesKey].monto=Math.round((porMes[mesKey].monto+monto)*100)/100;
+    porMes[mesKey].viajes++;
+    total=Math.round((total+monto)*100)/100;
+  });
+  return {porMes,total,totalCliente,comprobante};
+}
+// gasto de GT para un mes de viaje (suma de todas las facturas)
+function gtGastoMes(mes){
+  mes=normMes(mes); let monto=0, viajes=0;
+  Object.values(state.gtCargas||{}).forEach(f=>{ const p=f&&f.porMes&&f.porMes[mes]; if(p){ monto+=p.monto||0; viajes+=p.viajes||0; } });
+  return {monto:Math.round(monto*100)/100, viajes};
+}
+
 /* extrae totales del pie del informe de compras + neto por proveedor */
 function parseDiarioCompras(txt){
   const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
@@ -2803,7 +2882,7 @@ function parseDiarioCompras(txt){
   const percIIBB=percDe(/PERCEPCION\s+INGRESOS\s+BRUTOS/i);
   const neto=tot(/NETO\s*\.+;?\s*([\d.,-]+)/);
   const excl=(state.exclusionesIVA||[]).map(x=>x.toUpperCase());
-  let ivaExcluido=0;
+  let ivaExcluido=0, gtDetectado=false;
   const provNeto={};
   txt.split("\n").forEach(ln=>{
     const c=ln.split(";");
@@ -2813,10 +2892,12 @@ function parseDiarioCompras(txt){
     const razonUp=razon.toUpperCase();
     const importe=parseNumAr(c[9]||"");
     const ivaLinea=parseNumAr(c[10]||"");
+    // GT Cargas: su gasto NO entra acá (se reparte por el desglose). Su IVA queda en el total del pie.
+    if(esLineaGT(c,razonUp)){ gtDetectado=true; return; }
     if(excl.some(ex=>razonUp.includes(ex))){ ivaExcluido+=ivaLinea; }
     if(importe){ provNeto[razon]=(provNeto[razon]||0)+importe; }
   });
-  return {ivaTotal,percIVA,percIIBB,neto,ivaExcluido,ivaCompNeto:ivaTotal-ivaExcluido,provNeto};
+  return {ivaTotal,percIVA,percIIBB,neto,ivaExcluido,ivaCompNeto:ivaTotal-ivaExcluido,provNeto,gtDetectado};
 }
 function parseDiarioVentas(txt){
   const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
@@ -2871,7 +2952,7 @@ function parseParteB(txt){
   return {neto:sumaProv, provNeto, sumaProv};
 }
 function mesMasTres(mes){ const [y,m]=normMes(mes).split("-").map(Number); const d=new Date(y,m-1+3,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
-let diarioTmp={compras:null,ventas:null,ret:null,partb:null};
+let diarioTmp={compras:null,ventas:null,ret:null,partb:null,gt:null};
 function renderDiarioIVA(){
   const sel=$("di_mes");
   const arr=mesesSelector(Object.keys(state.impuestos));
@@ -2890,6 +2971,13 @@ function renderDiarioIVA(){
   const pbTot=state.gastosInforme.filter(g=>normMes(g.mes)===sel.value && g.tipo==="negro").reduce((a,g)=>a+g.monto,0);
   if(pbTot)$("di_res_partb").innerHTML=`<div class="led" style="border-color:var(--gold)"><div class="l">Total parte B</div><div class="v">${money0(pbTot)}</div><div class="sub">guardado · Tipo B</div></div>`;
   else $("di_res_partb").innerHTML="";
+  // GT Cargas guardado para el mes de la factura seleccionada (puede haber varios comprobantes)
+  const gtDeMes=Object.values(state.gtCargas||{}).filter(f=>normMes(f.facturaMes)===sel.value);
+  if(gtDeMes.length){
+    const comb={porMes:{},total:0,totalCliente:null,comprobantes:gtDeMes.length};
+    gtDeMes.forEach(f=>{ Object.keys(f.porMes||{}).forEach(m=>{ if(!comb.porMes[m])comb.porMes[m]={monto:0,viajes:0}; comb.porMes[m].monto=Math.round((comb.porMes[m].monto+(f.porMes[m].monto||0))*100)/100; comb.porMes[m].viajes+=f.porMes[m].viajes||0; }); comb.total=Math.round((comb.total+(f.total||0))*100)/100; });
+    mostrarResGT(comb);
+  } else $("di_res_gt").innerHTML="";
   $("di_rubros_box").innerHTML=""; $("di_rubros_b").innerHTML="";
   hideMsg("di_msg");
 }
@@ -2998,7 +3086,13 @@ $("di_calc_compras").onclick=()=>{
   if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de compras.");return;}
   const r=parseDiarioCompras(txt);
   if(!r.ivaTotal){showMsg("di_msg","learn","No encontré el TOTAL I.V.A. Copiá hasta el final (los totales).");return;}
-  diarioTmp.compras=r; mostrarResCompras(r); drawRubrosInforme(r.provNeto||{}); hideMsg("di_msg");
+  diarioTmp.compras=r; mostrarResCompras(r); drawRubrosInforme(r.provNeto||{});
+  // GT Cargas detectado: su gasto va por el desglose, no por acá. Avisamos si falta cargarlo.
+  const mesFac=normMes($("di_mes").value);
+  const yaHayGT=Object.values(state.gtCargas||{}).some(f=>normMes(f.facturaMes)===mesFac);
+  if(r.gtDetectado && !diarioTmp.gt && !yaHayGT)
+    showMsg("di_msg","learn","Detecté <b>GT Cargas</b> en estas compras. Su gasto se reparte por fecha de viaje: pegá también el <b>desglose GT Cargas</b> más abajo (si no, entra su IVA pero no su gasto).");
+  else hideMsg("di_msg");
 };
 $("di_calc_ventas").onclick=()=>{
   const txt=$("di_ventas").value;
@@ -3021,6 +3115,29 @@ $("di_calc_partb").onclick=()=>{
   if(!r.neto && !Object.keys(r.provNeto).length){showMsg("di_msg","learn","No pude leer el informe de parte B.");return;}
   diarioTmp.partb=r; mostrarResPartB(r); drawRubrosB(r.provNeto||{}); hideMsg("di_msg");
 };
+$("di_calc_gt").onclick=()=>{
+  const txt=$("di_gt").value;
+  if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el desglose de GT Cargas.");return;}
+  const r=parseGTCargas(txt);
+  if(!Object.keys(r.porMes).length){showMsg("di_msg","learn","No encontré líneas de viaje (cada una empieza con dd/mm/aa y termina con el importe).");return;}
+  diarioTmp.gt=r; mostrarResGT(r);
+  if(!r.comprobante)
+    showMsg("di_msg","learn","No encontré el <b>COMPROBANTE N°</b> en el desglose. Sin ese número no puedo guardarlo (es la clave para no duplicar). Pegá el desglose completo, incluida esa línea.");
+  else if(r.totalCliente!=null && Math.abs(r.total-r.totalCliente)>=0.5)
+    showMsg("di_msg","learn",`OJO: la suma de los viajes (${money(r.total)}) no coincide con TOTALES CLIENTE (${money(r.totalCliente)}). Revisá que hayas pegado el desglose completo.`);
+  else hideMsg("di_msg");
+};
+function mostrarResGT(r){
+  if(!r||!r.porMes||!Object.keys(r.porMes).length){$("di_res_gt").innerHTML="";return;}
+  const meses=Object.keys(r.porMes).sort();
+  const cajas=meses.map(m=>`<div class="led"><div class="l">${ymLabel(m)}</div><div class="v">${money0(r.porMes[m].monto)}</div><div class="sub">${r.porMes[m].viajes} viaje(s)</div></div>`).join("");
+  let check=`<div class="sub">guardado${r.comprobantes>1?` · ${r.comprobantes} comprobantes`:""}</div>`;
+  if(r.totalCliente!=null){
+    const ok=Math.abs(r.total-r.totalCliente)<0.5;
+    check=ok?`<div class="sub" style="color:var(--green)">= TOTALES CLIENTE ✓${r.comprobante?" · N° "+r.comprobante:""}</div>`:`<div class="sub" style="color:var(--red)">✗ TOTALES CLIENTE ${money0(r.totalCliente)}</div>`;
+  }
+  $("di_res_gt").innerHTML=cajas+`<div class="led" style="border-color:var(--gold)"><div class="l">Total desglose</div><div class="v">${money0(r.total)}</div>${check}</div>`;
+}
 $("di_guardar").onclick=async ()=>{
   const mes=normMes($("di_mes").value);
   const c=diarioTmp.compras, v=diarioTmp.ventas, rt=diarioTmp.ret;
@@ -3028,13 +3145,14 @@ $("di_guardar").onclick=async ()=>{
   const compras=c||{ivaTotal:dPrev.ivaCompras||0,percIVA:dPrev.percIVACompras||0,percIIBB:dPrev.percIIBBCompras||0,neto:dPrev.netoCompras||0,ivaExcluido:dPrev.ivaExcluido||0,ivaCompNeto:dPrev.ivaCompNeto||0};
   const ventas=v||{ivaTotal:dPrev.ivaVentas||0,neto:dPrev.netoVentas||0};
   const ret=rt||{retIVA:dPrev.retIVAClientes||0,retIIBB:dPrev.retIIBBClientes||0,retGan:dPrev.retGanancias||0,suss:dPrev.retSUSSClientes||0};
-  if(!compras.ivaTotal && !ventas.ivaTotal && !ret.retIVA && !diarioTmp.partb){showMsg("di_msg","learn","Leé al menos un informe antes de guardar.");return;}
+  if(!compras.ivaTotal && !ventas.ivaTotal && !ret.retIVA && !diarioTmp.partb && !diarioTmp.gt){showMsg("di_msg","learn","Leé al menos un informe antes de guardar.");return;}
   const yaExiste=(dPrev.ivaCompras||dPrev.ivaVentas)?" (ya había datos en este mes; se van a actualizar)":"";
   const partes=[];
   if(compras.ivaTotal)partes.push("IVA compras "+money(compras.ivaCompNeto));
   if(ventas.ivaTotal)partes.push("IVA ventas "+money(ventas.ivaTotal));
   if(ret.retIVA)partes.push("Ret. IVA "+money(ret.retIVA));
   if(diarioTmp.partb)partes.push("Parte B "+money(diarioTmp.partb.neto));
+  if(diarioTmp.gt)partes.push("GT Cargas "+money(diarioTmp.gt.total));
   if(!confirm(`Vas a guardar los informes en el mes:\n\n➡ ${ymLabel(mes).toUpperCase()}${yaExiste}\n\n${partes.join(" · ")}\n\n¿Es el mes correcto?`))return;
   // al guardar compras se reescriben TODOS los rubros del mes: si no se leyó la parte B,
   // los rubros Tipo B que ya estaban guardados se pierden. Avisamos antes.
@@ -3075,11 +3193,25 @@ $("di_guardar").onclick=async ()=>{
     items.forEach(it=>state.gastosInforme.push({mes,rubro:it.rubro,prov:it.prov,monto:it.monto,tipo:it.tipo}));
     await apiPost({action:"setGastosInforme",mes,items:JSON.stringify(items)});
   }
-  diarioTmp={compras:null,ventas:null,ret:null,partb:null};
+  // GT Cargas: guardamos el desglose de ESTA factura, keyed por N° de comprobante
+  // (reemplaza el mismo comprobante; dos facturas distintas del mismo mes no se pisan).
+  let gtMsg="";
+  if(diarioTmp.gt){
+    const comp=(diarioTmp.gt.comprobante||"").trim();
+    if(!comp){
+      gtMsg=" El desglose GT no se guardó: falta el N° de comprobante.";
+    } else {
+      const gt={comprobante:comp,facturaMes:mes,total:diarioTmp.gt.total,porMes:diarioTmp.gt.porMes};
+      state.gtCargas[comp]=gt;
+      await apiPost({action:"setGTCargas",comprobante:comp,facturaMes:mes,data:JSON.stringify(gt)});
+    }
+  }
+  diarioTmp={compras:null,ventas:null,ret:null,partb:null,gt:null};
   renderDiarioIVA();
   let msg=`Informes de ${ymLabel(mes)} guardados. El IVA se paga en ${ymLabel(mesPago)}.`;
   if(sinRubro)msg+=` Ojo: ${sinRubro} proveedor(es) sin rubro no suman al balance.`;
-  showMsg("di_msg","ok",msg);
+  if(gtMsg)msg+=gtMsg;
+  showMsg("di_msg",gtMsg?"learn":"ok",msg);
 };
 
 
@@ -3101,7 +3233,10 @@ function datosAnio(anio){
     .filter(k=>(normMes(k)||"").slice(0,4)===anio)
     .map(k=>({mes:normMes(k),monto:state.impuestos[k].ivaContador||0}))
     .filter(x=>x.monto>0);
-  const gastos=gs.reduce((s,x)=>s+(x.monto||0),0)+gi.reduce((s,x)=>s+(x.monto||0),0)+imp.reduce((s,x)=>s+x.monto,0);
+  // GT Cargas: neto de flete repartido por mes de viaje (state.gtCargas); vive aparte, no se duplica
+  const gt=[];
+  Object.values(state.gtCargas||{}).forEach(f=>{ if(!f||!f.porMes)return; Object.keys(f.porMes).forEach(m=>{ if((normMes(m)||"").slice(0,4)!==anio)return; gt.push({mes:normMes(m),monto:f.porMes[m].monto||0}); }); });
+  const gastos=gs.reduce((s,x)=>s+(x.monto||0),0)+gi.reduce((s,x)=>s+(x.monto||0),0)+imp.reduce((s,x)=>s+x.monto,0)+gt.reduce((s,x)=>s+x.monto,0);
   let ventas=0;
   Object.keys(state.ventas).forEach(k=>{ if(k.slice(0,4)===anio){const v=state.ventas[k];ventas+=(v.blanco||0)+(v.negro||0);} });
   // por mes
@@ -3109,12 +3244,14 @@ function datosAnio(anio){
   gs.forEach(x=>{const m=+fechaCorta(x.fecha).slice(5,7)-1; if(m>=0&&m<12)gMes[m]+=x.monto||0;});
   gi.forEach(x=>{const m=+(normMes(x.mes)||"").slice(5,7)-1; if(m>=0&&m<12)gMes[m]+=x.monto||0;});
   imp.forEach(x=>{const m=+x.mes.slice(5,7)-1; if(m>=0&&m<12)gMes[m]+=x.monto;});
+  gt.forEach(x=>{const m=+x.mes.slice(5,7)-1; if(m>=0&&m<12)gMes[m]+=x.monto;});
   Object.keys(state.ventas).forEach(k=>{ if(k.slice(0,4)===anio){const m=+k.slice(5,7)-1; const v=state.ventas[k]; if(m>=0&&m<12)vMes[m]+=(v.blanco||0)+(v.negro||0);} });
   // por rubro
   const rubros={};
   gs.forEach(x=>{rubros[x.rubro]=(rubros[x.rubro]||0)+(x.monto||0);});
   gi.forEach(x=>{rubros[x.rubro]=(rubros[x.rubro]||0)+(x.monto||0);});
   imp.forEach(x=>{rubros["Impuestos del mes"]=(rubros["Impuestos del mes"]||0)+x.monto;});
+  gt.forEach(x=>{rubros[GT_RUBRO]=(rubros[GT_RUBRO]||0)+x.monto;});
   // impuestos acumulados
   let ivaVent=0,ivaComp=0,iibb=0,cheque=0;
   Object.keys(state.impuestos).forEach(k=>{ if(k.slice(0,4)===anio){const im=state.impuestos[k]; ivaComp+=im.ivaExtracto||0;} });
@@ -3176,6 +3313,7 @@ function initInformeSelectors(){
   const mapa={};
   state.gastos.forEach(g=>{ const k=capProv(g.prov); if(k)mapa[k]=true; });
   state.gastosInforme.forEach(g=>{ const k=capProv(g.prov); if(k)mapa[k]=true; });   // proveedores del informe
+  if(Object.keys(state.gtCargas||{}).length)mapa[capProv(GT_NOMBRE)]=true;           // GT Cargas (flete por viaje)
   const provs=Object.keys(mapa).sort((a,b)=>a.localeCompare(b));
   const cur=$("i_prov").value;
   $("i_prov").innerHTML='<option value="">Todos</option>'+provs.map(p=>`<option value="${p.toLowerCase()}">${p}</option>`).join("");
