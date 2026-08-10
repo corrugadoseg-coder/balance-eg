@@ -941,6 +941,18 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     </div>
     <div class="msg" id="d_api_msg"></div>
 
+    <div class="sectlabel" style="margin-top:26px">Email de la contadora</div>
+    <p class="lead" style="margin-bottom:12px">Para "Enviar por email" en Imp. al cheque. No se guarda en el archivo: queda en este navegador.</p>
+    <div class="grid" style="grid-template-columns:1fr auto auto;gap:10px;align-items:end;max-width:760px">
+      <div class="f">
+        <label>Email de la contadora</label>
+        <input id="d_email" type="email" placeholder="nombre@dominio.com">
+      </div>
+      <div class="row-actions" style="margin:0"><button class="btn sm" id="d_email_save" type="button">Guardar email</button></div>
+      <div class="row-actions" style="margin:0"><button class="btn ghost sm" id="d_email_clear" type="button">Borrar</button></div>
+    </div>
+    <div class="msg" id="d_email_msg"></div>
+
     <div class="sectlabel" style="margin-top:26px">Estado</div>
     <table style="max-width:480px">
       <tbody id="d_stats"></tbody>
@@ -965,6 +977,19 @@ const RUBROS_BAL=RUBROS.concat("Impuestos del mes");
 const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 // conceptos fijos de CCSS y cargas sindicales (select del formulario + indicador de inicio)
 const CCSS_CONCEPTOS=["CCSS","Sindicato","Federación - Capacitación Técnica","Federación - Aporte Solidario"];
+// email de la contadora (destino del desglose del extracto). NO va en el código:
+// se guarda en este navegador (localStorage), como la URL de la planilla.
+const EMAIL_LS="eg_balance_email_contadora";
+let EMAIL_CONTADORA=""; try{ EMAIL_CONTADORA=localStorage.getItem(EMAIL_LS)||""; }catch(e){ EMAIL_CONTADORA=""; }
+const EMAIL_RX=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function guardarEmailContadora(e){
+  e=String(e||"").trim();
+  if(!EMAIL_RX.test(e))return false;
+  EMAIL_CONTADORA=e;
+  try{ localStorage.setItem(EMAIL_LS,e); }catch(err){}
+  return true;
+}
+function olvidarEmailContadora(){ EMAIL_CONTADORA=""; try{ localStorage.removeItem(EMAIL_LS); }catch(e){} }
 
 /* =====================================================================
    CONEXIÓN CON LA PLANILLA (Google Apps Script)
@@ -1993,6 +2018,36 @@ function imprimirDesglose(mes,grupos,total,ley,sircreb,ivaCom){
     </body></html>`);
   w.document.close();
 }
+/* abre el cliente de correo (mailto) con el desglose del extracto ya redactado, para la contadora */
+function enviarDesglosePorEmail(mes,grupos,total,ley,sircreb,ivaCom){
+  if(!grupos || !Object.keys(grupos).length){ showMsg("ch_msg","learn","Primero calculá el extracto."); return; }
+  // el email de la contadora no está en el código: se guarda en este navegador. Si falta, se pide.
+  if(!EMAIL_RX.test(EMAIL_CONTADORA)){
+    const e=prompt("Email de la contadora (se guarda en este navegador, no en el archivo):", EMAIL_CONTADORA||"");
+    if(e===null)return;
+    if(!guardarEmailContadora(e)){ showMsg("ch_msg","learn","Ese email no es válido. Podés configurarlo también en Datos."); return; }
+    if($("d_email"))$("d_email").value=EMAIL_CONTADORA;
+  }
+  const fmt=n=>"$"+(Math.round((n||0)*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const mesLbl=ymLabel(mes);
+  const asunto=`Desglose extracto bancario - ${mesLbl}`;
+  const L=[];
+  L.push(`Desglose del extracto bancario - ${mesLbl}`);
+  L.push(`EG Corrugados`);
+  L.push(``);
+  L.push(`Conceptos del banco:`);
+  Object.keys(grupos).sort().forEach(k=>L.push(`  ${k}: ${fmt(grupos[k])}`));
+  L.push(``);
+  L.push(`Subtotal detectado: ${fmt(total)}`);
+  L.push(``);
+  L.push(`Ley 25413 (1,2 por mil): ${fmt(ley)}`);
+  L.push(`Retencion SIRCREB: ${fmt(sircreb)}`);
+  L.push(`IVA comisiones: ${fmt(ivaCom)}`);
+  L.push(``);
+  L.push(`(Adjunto el extracto bancario.)`);
+  const cuerpo=L.join("\r\n");
+  window.location.href=`mailto:${EMAIL_CONTADORA}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+}
 $("ch_calc").onclick=()=>{
   const texto=$("ch_texto").value;
   if(!texto.trim()){showMsg("ch_msg","learn","Pegá primero el texto del extracto.");return;}
@@ -2024,7 +2079,7 @@ $("ch_calc").onclick=()=>{
       <div class="led"><div class="l">Ret. SIRCREB</div><div class="v">${money0(sircreb)}</div><div class="sub">→ IIBB</div></div>
       <div class="led"><div class="l">IVA comisiones</div><div class="v">${money0(ivaCom)}</div></div>
     </div>
-    <div class="row-actions"><button class="btn" id="ch_save">Guardar ${ymLabel($("ch_mes").value)}</button><button class="btn ghost" id="ch_print">🖨 Imprimir desglose</button></div>
+    <div class="row-actions"><button class="btn" id="ch_save">Guardar ${ymLabel($("ch_mes").value)}</button><button class="btn ghost" id="ch_print">🖨 Imprimir desglose</button><button class="btn ghost" id="ch_email">✉ Enviar por email a la contadora</button></div>
     <small class="note">Al guardar: el 1,2‰ va al registro de abajo (para Ganancias) y las retenciones SIRCREB se cargan como "Retenciones bancarias IIBB" del mes en Impuestos. El desglose completo es informativo, para que lo compares con tu planilla.</small>`;
   // clic en un concepto: abre/cierra la fila de detalle que va justo abajo
   $("ch_result").querySelectorAll("tr.chrub").forEach(tr=>{
@@ -2038,6 +2093,7 @@ $("ch_calc").onclick=()=>{
     };
   });
   $("ch_print").onclick=()=>imprimirDesglose($("ch_mes").value,grupos,total,ley,sircreb,ivaCom);
+  $("ch_email").onclick=()=>enviarDesglosePorEmail($("ch_mes").value,grupos,total,ley,sircreb,ivaCom);
   $("ch_save").onclick=async ()=>{
     const mes=normMes($("ch_mes").value);
     const prevComp=(state.cheque[mes]||{}).compensado||false;
@@ -3450,7 +3506,17 @@ $("i_export").onclick=()=>{
 /* ---- URL de la planilla: se pega una vez y queda en este navegador ---- */
 function pintarApiUrl(){
   const i=$("d_api"); if(i)i.value=API||"";
+  const e=$("d_email"); if(e)e.value=EMAIL_CONTADORA||"";
 }
+if($("d_email_save"))$("d_email_save").onclick=()=>{
+  if(!guardarEmailContadora($("d_email").value)){ showMsg("d_email_msg","learn","Ese email no parece válido. Ej: nombre@dominio.com"); return; }
+  $("d_email").value=EMAIL_CONTADORA;
+  showMsg("d_email_msg","ok","Email guardado en este navegador.");
+};
+if($("d_email_clear"))$("d_email_clear").onclick=()=>{
+  olvidarEmailContadora(); if($("d_email"))$("d_email").value="";
+  showMsg("d_email_msg","ok","Email borrado de este navegador.");
+};
 $("d_api_save").onclick=async ()=>{
   const u=$("d_api").value;
   if(!guardarApiUrl(u)){
