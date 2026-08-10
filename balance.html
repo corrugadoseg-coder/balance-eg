@@ -1486,6 +1486,14 @@ function drawBalance(){
     if(!g.prov)return;
     (detByR[g.rubro]=detByR[g.rubro]||[]).push(g);
   });
+  // 2b-bis) también los gastos cargados a mano (facturas, sueldos, CCSS, servicios, impositivos)
+  //         componen el detalle de su rubro, para poder desplegarlo (ej. CCSS, SIND Y SUELDOS).
+  state.gastos.filter(g=>ym(g.fecha)===mes).forEach(g=>{
+    const esNegro=(g.bn==="negro");
+    if(bn!=="total" && ((bn==="blanco")===esNegro))return;
+    const nombre=(g.prov||g.sub||"(sin nombre)");
+    (detByR[g.rubro]=detByR[g.rubro]||[]).push({prov:nombre, monto:g.monto||0, tipo:esNegro?"negro":"blanco"});
+  });
   // 2c) "Impuestos del mes": el IVA al contador de ese mes (state.impuestos[mes].ivaContador).
   //     No es un gasto cargado ni viene del informe, así que no se duplica. Cuenta como Tipo A.
   const impMes=(state.impuestos[normMes(mes)]||{}).ivaContador||0;
@@ -1515,7 +1523,7 @@ function drawBalance(){
       <td class="l" style="border:none;padding:4px 8px">${x.prov}${bn==="total"?` <span class="chipTipo ${x.tipo==="negro"?"b":"a"}">${x.tipo==="negro"?"B":"A"}</span>`:""}</td>
       <td class="num" style="border:none;padding:4px 8px">${money(x.monto)}</td></tr>`).join("");
     return `<tr class="det" style="display:none"><td colspan="${cols}" style="background:var(--paper2);padding:10px 10px 14px 30px">
-      <div class="sectlabel" style="margin-bottom:8px">${d.length} proveedor(es) · ${money(sub)}</div>
+      <div class="sectlabel" style="margin-bottom:8px">${d.length} ítem(s) · ${money(sub)}</div>
       <table style="width:100%;max-width:540px">${filas}</table></td></tr>`;
   };
   const vTot=ventaVal(mes,bn);
