@@ -74,7 +74,10 @@ tr.rowB:hover > td{background:var(--bgB2)}
 #home .est-tit select{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);font-weight:600;background:transparent;border:none;border-bottom:1px solid var(--lineA);border-radius:0;padding:2px 4px;width:auto;cursor:pointer}
 #home .est-tit select:focus{outline:none;box-shadow:none;border-color:var(--gold)}
 #home .est-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:7px}
-#home .est-item{display:flex;align-items:center;gap:9px;font-family:'Spectral',serif;font-size:14px;padding:7px 11px;border:1px solid var(--edge);border-radius:8px;background:var(--card);text-align:left}
+#home .est-item{display:flex;align-items:center;gap:9px;font-family:'Spectral',serif;font-size:14px;padding:7px 11px;border:1px solid var(--edge);border-radius:8px;background:var(--card);text-align:left;cursor:pointer;transition:.13s}
+#home .est-item:hover{border-color:var(--gold);background:var(--paper2);transform:translateY(-1px)}
+#home .est-item:hover .est-go{opacity:1}
+#home .est-item .est-go{margin-left:auto;color:var(--gold);opacity:.35;font-weight:700;transition:.13s}
 #home .est-item .est-ic{width:17px;height:17px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:11px;font-weight:700;line-height:1}
 #home .est-item.ok{color:var(--ink)}
 #home .est-item.ok .est-ic{background:var(--greenL);color:var(--green)}
@@ -711,7 +714,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div id="su_detalle_box" style="margin-top:14px;display:none"></div>
   </div>
 
-  <div class="card">
+  <div class="card" id="ccss_card">
     <h3>CCSS y sindicato</h3>
     <p class="lead">Cargas sociales y boletas sindicales del mes.</p>
     <div style="overflow-x:auto"><table id="su_ccss_tbl"><tbody></tbody></table></div>
@@ -3519,23 +3522,33 @@ function renderHomeEstado(preferido){
             : (conDatos.length ? conDatos[conDatos.length-1] : hoy);
   const imp=state.impuestos[mes]||{};
   const v=state.ventas[mes]||{};
+  // cada item: [texto, cargado?, pestaña destino, ancla dentro de la pestaña (id) o ""]
   const items=[
-    ["Informe de compras", (imp.ivaCompras||0)>0],
-    ["Informe de ventas",  (imp.ivaVentas||0)>0],
-    ["Retenciones",        (imp.retIVAClientes||0)>0||(imp.retIIBBClientes||0)>0||(imp.retGanancias||0)>0||(imp.retSUSSClientes||0)>0],
-    ["Parte B",            state.gastosInforme.some(g=>normMes(g.mes)===mes && g.tipo==="negro")],
-    ["Ventas del mes",     (v.blanco||0)>0||(v.negro||0)>0],
+    ["Informe de compras", (imp.ivaCompras||0)>0, "diarioiva", "di_compras"],
+    ["Informe de ventas",  (imp.ivaVentas||0)>0,  "diarioiva", "di_ventas"],
+    ["Retenciones",        (imp.retIVAClientes||0)>0||(imp.retIIBBClientes||0)>0||(imp.retGanancias||0)>0||(imp.retSUSSClientes||0)>0, "diarioiva", "di_ret"],
+    ["Parte B",            state.gastosInforme.some(g=>normMes(g.mes)===mes && g.tipo==="negro"), "diarioiva", "di_partb"],
+    ["Ventas del mes",     (v.blanco||0)>0||(v.negro||0)>0, "venta", ""],
     // solo cuenta si hay un sueldo del mes con importe real (no una fila vacía autogenerada)
-    ["Sueldos",            state.sueldos.some(s=>normMes(s.mes)===mes && s.tipo==="empleado" && ((totA(s)+totB(s))>0||(s.monto||0)>0))],
+    ["Sueldos",            state.sueldos.some(s=>normMes(s.mes)===mes && s.tipo==="empleado" && ((totA(s)+totB(s))>0||(s.monto||0)>0)), "sueldos", ""],
     // tilde solo si están cargados los CUATRO conceptos (con importe) para el mes
-    ["CCSS y Cargas Sindicales", CCSS_CONCEPTOS.every(c=>state.sueldos.some(s=>normMes(s.mes)===mes && s.tipo==="ccss" && (s.monto||0)>0 && (s.nombre||"").trim()===c))],
-    ["Impuesto al cheque", ((state.cheque[mes]||{}).total||0)>0]
+    ["CCSS y Cargas Sindicales", CCSS_CONCEPTOS.every(c=>state.sueldos.some(s=>normMes(s.mes)===mes && s.tipo==="ccss" && (s.monto||0)>0 && (s.nombre||"").trim()===c)), "sueldos", "ccss_card"],
+    ["Impuesto al cheque", ((state.cheque[mes]||{}).total||0)>0, "cheque", ""]
   ];
-  const fila=(txt,ok)=>`<div class="est-item ${ok?'ok':'no'}"><span class="est-ic">${ok?'✓':'✗'}</span>${txt}</div>`;
+  const fila=(it)=>`<div class="est-item ${it[1]?'ok':'no'}" data-tab="${it[2]}" data-anchor="${it[3]||''}" title="Ir a cargar / revisar"><span class="est-ic">${it[1]?'✓':'✗'}</span>${it[0]}<span class="est-go">›</span></div>`;
   const opts=meses.map(m=>`<option value="${m}"${m===mes?" selected":""}>${ymLabel(m).toLowerCase()}</option>`).join("");
   box.innerHTML=`<div class="est-tit">Carga de <select id="he_mes">${opts}</select></div>
-    <div class="est-grid">${items.map(it=>fila(it[0],it[1])).join("")}</div>`;
+    <div class="est-grid">${items.map(fila).join("")}</div>`;
   $("he_mes").onchange=()=>renderHomeEstado($("he_mes").value);   // el cambio manual manda el mes elegido
+  // navegación: tocar un item lleva a su pantalla y, si tiene, posiciona en su recuadro
+  box.querySelectorAll(".est-item").forEach(el=>{
+    el.onclick=()=>{
+      const tab=el.dataset.tab, anchor=el.dataset.anchor;
+      if(!tab)return;
+      irA(tab);
+      if(anchor)setTimeout(()=>{ const a=$(anchor); if(a)a.scrollIntoView({behavior:"auto",block:"center"}); },60);
+    };
+  });
 }
 function renderAll(){ renderGastos(); renderVentas(); renderBalance(); renderStats(); renderHomeEstado(); }
 
