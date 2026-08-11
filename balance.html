@@ -2797,7 +2797,8 @@ $("che_add").onclick=()=>{
 };
 function drawChequesTabla(){
   const f=$("che_filtro").value;
-  let list=state.chequesEmit.slice().sort((a,b)=>(a.fechaPago||"").localeCompare(b.fechaPago||""));
+  // orden por fecha de pago, más reciente arriba (descendente); los sin fecha van al fondo
+  let list=state.chequesEmit.slice().sort((a,b)=>(b.fechaPago||"").localeCompare(a.fechaPago||""));
   if(f==="No cobrado"||f==="Cobrado")list=list.filter(c=>c.estado===f);
   if(f==="electronico"||f==="fisico")list=list.filter(c=>c.tipo===f);
   const tb=$("che_tbl").querySelector("tbody");
