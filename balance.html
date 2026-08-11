@@ -631,18 +631,17 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   </div>
 
   <div class="card">
-    <h2>Registro mensual del 1,2‰</h2>
-    <p class="lead">Desde junio 2026 se usa hasta el 30% del impuesto al cheque del mes para compensar CCSS; el resto queda disponible para anticipos de Ganancias. Marcá "Compensado" cuando uses un mes contra Ganancias.</p>
+    <h2>Registro mensual del impuesto al cheque</h2>
+    <p class="lead">Cargá a mano el cómputo que la contadora toma como pago a cuenta cada mes (puede ser 0, si ese mes no computa nada). El saldo restante queda acumulado. Marcá "Compensado" cuando ya lo hayas usado.</p>
     <div id="ch_acum" style="margin-bottom:16px"></div>
     <div style="overflow-x:auto"><table id="ch_tbl"><tbody></tbody></table></div>
     <div class="sectlabel" style="margin-top:20px">Cargar un mes a mano</div>
-    <p class="lead" style="margin-bottom:10px">Si ya tenés el total del 1,2‰ de un mes (sin el extracto), cargalo acá.</p>
-    <div class="grid" style="grid-template-columns:1fr 1fr auto auto;gap:10px;align-items:end;max-width:640px">
+    <p class="lead" style="margin-bottom:10px">Si ya tenés el total del impuesto del mes (sin el extracto), cargalo acá. El cómputo también lo podés editar en la tabla de arriba.</p>
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;max-width:900px">
       <div class="f"><label>Mes</label><select id="chm_mes"></select></div>
-      <div class="f"><label>Total 1,2‰</label><input id="chm_total" class="mono" inputmode="decimal" placeholder="0,00"></div>
-      <label style="display:flex;gap:6px;align-items:center;cursor:pointer;text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-size:13px;padding-bottom:9px">
-        <input type="checkbox" id="chm_comp"> Ya compensado
-      </label>
+      <div class="f"><label>Total impuesto</label><input id="chm_total" class="mono" inputmode="decimal" placeholder="0,00"></div>
+      <div class="f"><label>Cómputo CCSS <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">manual · opcional</span></label><input id="chm_computo" class="mono" inputmode="decimal" placeholder="0,00"></div>
+      <div class="f"><label>Compensado Ganancias <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">manual · opcional</span></label><input id="chm_cgan" class="mono" inputmode="decimal" placeholder="0,00"></div>
       <div class="row-actions" style="margin:0"><button class="btn sm" id="chm_add">Guardar mes</button></div>
     </div>
     <div class="msg" id="chm_msg"></div>
@@ -1090,6 +1089,8 @@ async function apiGet(){
     const chFix={};
     for(const k in state.cheque){ const nk=normMes(k)||k; chFix[nk]=Object.assign({},chFix[nk]||{},state.cheque[k]); }
     state.cheque=chFix;
+    // "compensado" pasó de tilde a MONTO compensado a Ganancias: migramos datos viejos (true -> total del mes)
+    Object.keys(state.cheque).forEach(k=>{ const c=state.cheque[k]; if(typeof c.compensado!=="number") c.compensado=(c.compensado===true||c.compensado==="true"||c.compensado==="TRUE"||c.compensado==="VERDADERO")?(c.total||0):0; });
     // normalizar mes de sueldos en memoria (claves rotas "Mon Jun 01 2026..." -> "2026-06")
     state.sueldos.forEach(s=>{ const nk=normMes(s.mes); if(nk)s.mes=nk; });
   }
@@ -2017,7 +2018,7 @@ function imprimirDesglose(mes,grupos,total,ley,sircreb,ivaCom){
     <table><thead><tr><th>Concepto (nombre del banco)</th><th style="text-align:right">Importe</th></tr></thead>
     <tbody>${filas}<tr class="tot"><td>Subtotal detectado</td><td style="text-align:right">${fmt(total)}</td></tr></tbody></table>
     <div class="destac">
-      <div class="box"><div class="lab">1,2‰ (Ley 25413)</div><div class="val">${fmt(ley)}</div><div style="font-size:11px;color:#666">para Ganancias</div></div>
+      <div class="box"><div class="lab">Impuesto al cheque (Ley 25413)</div><div class="val">${fmt(ley)}</div><div style="font-size:11px;color:#666">total del mes</div></div>
       <div class="box"><div class="lab">Ret. SIRCREB</div><div class="val">${fmt(sircreb)}</div><div style="font-size:11px;color:#666">para IIBB</div></div>
       <div class="box"><div class="lab">IVA comisiones</div><div class="val">${fmt(ivaCom)}</div><div style="font-size:11px;color:#666">crédito fiscal</div></div>
     </div>
@@ -2083,12 +2084,12 @@ $("ch_calc").onclick=()=>{
       <tr class="tot"><td class="l"><b>Subtotal detectado</b></td><td class="num"><b>${money(total)}</b></td></tr>
     </tbody></table>
     <div class="ledger" style="margin:8px 0 14px">
-      <div class="led"><div class="l">1,2‰ (Ley 25413)</div><div class="v">${money0(ley)}</div><div class="sub">→ Ganancias</div></div>
+      <div class="led"><div class="l">Impuesto al cheque (Ley 25413)</div><div class="v">${money0(ley)}</div><div class="sub">total del mes</div></div>
       <div class="led"><div class="l">Ret. SIRCREB</div><div class="v">${money0(sircreb)}</div><div class="sub">→ IIBB</div></div>
       <div class="led"><div class="l">IVA comisiones</div><div class="v">${money0(ivaCom)}</div></div>
     </div>
     <div class="row-actions"><button class="btn" id="ch_save">Guardar ${ymLabel($("ch_mes").value)}</button><button class="btn ghost" id="ch_print">🖨 Imprimir desglose</button><button class="btn ghost" id="ch_email">✉ Enviar por email a la contadora</button></div>
-    <small class="note">Al guardar: el 1,2‰ va al registro de abajo (para Ganancias) y las retenciones SIRCREB se cargan como "Retenciones bancarias IIBB" del mes en Impuestos. El desglose completo es informativo, para que lo compares con tu planilla.</small>`;
+    <small class="note">Al guardar: el impuesto al cheque va al registro de abajo (ahí cargás a mano el cómputo del mes) y las retenciones SIRCREB se cargan como "Retenciones bancarias IIBB" del mes en Impuestos. El desglose completo es informativo, para que lo compares con tu planilla.</small>`;
   // clic en un concepto: abre/cierra la fila de detalle que va justo abajo
   $("ch_result").querySelectorAll("tr.chrub").forEach(tr=>{
     const det=tr.nextElementSibling;
@@ -2104,9 +2105,12 @@ $("ch_calc").onclick=()=>{
   $("ch_email").onclick=()=>enviarDesglosePorEmail($("ch_mes").value,grupos,total,ley,sircreb,ivaCom);
   $("ch_save").onclick=async ()=>{
     const mes=normMes($("ch_mes").value);
-    const prevComp=(state.cheque[mes]||{}).compensado||false;
-    const ccss=(mes>=CCSS_DESDE)?Math.round(ley*CCSS_PCT*100)/100:0;
-    state.cheque[mes]={total:ley,compensado:prevComp,usadoCCSS:ccss};
+    const prev=state.cheque[mes]||{};
+    // los montos manuales (cómputo CCSS y compensado Ganancias) NO se calculan solos:
+    // se conservan los que ya estaban (o 0). Se cargan a mano en la tabla.
+    const computo=(prev.usadoCCSS!==undefined && prev.usadoCCSS!==null)?prev.usadoCCSS:0;
+    const compGanV=compGanDe(prev);
+    state.cheque[mes]={total:ley,compensado:compGanV,usadoCCSS:computo};
     const imp=state.impuestos[mes]||{};
     imp.retBancIIBB=sircreb;
     imp.ivaExtracto=ivaCom;
@@ -2115,26 +2119,27 @@ $("ch_calc").onclick=()=>{
     if(!imp.coefBsAs)imp.coefBsAs=DEF_CB;
     state.impuestos[mes]=imp;
     renderChequeTabla();
-    showMsg("ch_msg","ok",`Guardado ${ymLabel(mes)}: 1,2‰ <b>${money(ley)}</b>${ccss?` · 30% a CCSS <b>${money(ccss)}</b> · queda para Ganancias <b>${money(ley-ccss)}</b>`:""} · SIRCREB <b>${money(sircreb)}</b> · IVA banco <b>${money(ivaCom)}</b>.`);
+    showMsg("ch_msg","ok",`Guardado ${ymLabel(mes)}: impuesto <b>${money(ley)}</b> · SIRCREB <b>${money(sircreb)}</b> · IVA banco <b>${money(ivaCom)}</b>. Cargá el cómputo CCSS y el compensado a Ganancias en la tabla de abajo.`);
     $("ch_result").innerHTML="";$("ch_texto").value="";
-    await apiPost({action:"setCheque",mes,total:ley,compensado:prevComp,usadoCCSS:ccss});
+    await apiPost({action:"setCheque",mes,total:ley,compensado:compGanV,usadoCCSS:computo});
     await apiPost({action:"setImpuestos",mes,ivaContador:imp.ivaContador||0,retBancIIBB:sircreb,iibbContador:imp.iibbContador||0,alicIIBB:imp.alicIIBB,coefCABA:imp.coefCABA,coefBsAs:imp.coefBsAs,ivaExtracto:ivaCom});
   };
 };
 $("ch_clear").onclick=()=>{$("ch_texto").value="";$("ch_result").innerHTML="";hideMsg("ch_msg");};
 
-/* Desde junio 2026 se puede usar hasta el 30% del imp. al cheque del mes para compensar CCSS.
-   Ese 30% se descuenta del saldo que queda disponible para anticipos de Ganancias. */
-const CCSS_DESDE="2026-06";
-const CCSS_PCT=0.30;
+/* El cómputo del mes (pago a cuenta que toma la contadora) NO se calcula solo:
+   se carga a mano. usadoCCSS devuelve lo guardado, o 0 si no se cargó nada. */
 function usadoCCSS(mes,total){
-  const m=normMes(mes);
-  if(!m || m<CCSS_DESDE)return 0;
-  const c=state.cheque[m]||{};
-  // si hay un valor guardado lo usamos; si no, el 30% (el tope, que se usa completo)
-  return c.usadoCCSS!==undefined && c.usadoCCSS!==null ? c.usadoCCSS : Math.round(total*CCSS_PCT*100)/100;
+  const c=state.cheque[normMes(mes)]||{};
+  return c.usadoCCSS!==undefined && c.usadoCCSS!==null ? c.usadoCCSS : 0;
 }
-/* cargar un mes del 1,2‰ a mano (sin extracto) */
+/* monto compensado a Ganancias (manual). Tolera datos viejos: tilde true = mes entero. */
+function compGanDe(c){
+  const v=(c||{}).compensado;
+  if(typeof v==="number")return v;
+  return (v===true||v==="true"||v==="TRUE"||v==="VERDADERO")?((c&&c.total)||0):0;
+}
+/* cargar un mes del impuesto al cheque a mano (sin extracto) */
 function renderChmSelector(){
   const sel=$("chm_mes"); if(!sel)return;
   const arr=mesesSelector(Object.keys(state.cheque));
@@ -2145,56 +2150,69 @@ function renderChmSelector(){
 if($("chm_add"))$("chm_add").onclick=async ()=>{
   const mes=normMes($("chm_mes").value);
   const total=parseNum($("chm_total").value)||0;
-  const comp=$("chm_comp").checked;
-  if(!total){showMsg("chm_msg","learn","Poné el total del 1,2‰ del mes.");return;}
-  const ccss=(mes>=CCSS_DESDE)?Math.round(total*CCSS_PCT*100)/100:0;
+  const computo=parseNum($("chm_computo").value)||0;   // cómputo CCSS manual (puede quedar en 0)
+  const compGanV=parseNum($("chm_cgan").value)||0;     // compensado Ganancias manual (puede quedar en 0)
+  if(!total){showMsg("chm_msg","learn","Poné el total del impuesto del mes.");return;}
   const yaEstaba=!!state.cheque[mes];
   if(yaEstaba && !confirm(`${ymLabel(mes)} ya tenía ${money(state.cheque[mes].total)}. ¿Lo reemplazo por ${money(total)}?`))return;
-  state.cheque[mes]={total,compensado:comp,usadoCCSS:ccss};
-  $("chm_total").value=""; $("chm_comp").checked=false;
+  state.cheque[mes]={total,compensado:compGanV,usadoCCSS:computo};
+  $("chm_total").value=""; $("chm_computo").value=""; $("chm_cgan").value="";
   renderChequeTabla(); renderChmSelector();
-  showMsg("chm_msg","ok",`${ymLabel(mes)} guardado: ${money(total)}${ccss?` · 30% a CCSS ${money(ccss)}`:""}${comp?" · compensado":""}.`);
-  await apiPost({action:"setCheque",mes,total,compensado:comp,usadoCCSS:ccss});
+  showMsg("chm_msg","ok",`${ymLabel(mes)} guardado: ${money(total)}${computo?` · cómputo CCSS ${money(computo)}`:""}${compGanV?` · Ganancias ${money(compGanV)}`:""}.`);
+  await apiPost({action:"setCheque",mes,total,compensado:compGanV,usadoCCSS:computo});
 };
 
 function renderChequeTabla(){
   const tb=$("ch_tbl").querySelector("tbody");
   const keys=Object.keys(state.cheque).sort();
   if(!keys.length){tb.innerHTML=`<tr><td colspan="6"><div class="empty">Todavía no guardaste ningún mes.</div></td></tr>`;return;}
-  let h=`<tr><th class="l">Mes</th><th class="num">Total 1,2‰</th><th class="num">30% a CCSS</th><th class="num">Queda p/ Ganancias</th><th>Compensado</th><th></th></tr>`;
-  let acum=0, totGeneral=0, totCCSS=0;
+  let h=`<tr><th class="l">Mes</th><th class="num">Total impuesto</th><th class="num">Cómputo CCSS (manual)</th><th class="num">Compensado Ganancias (manual)</th><th class="num">Saldo restante</th><th></th></tr>`;
+  const fmtInp=n=>n?n.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2}):'';
+  let totGeneral=0, totComputo=0, totCompGan=0, totResto=0;
   keys.forEach(k=>{
     const c=state.cheque[k];
-    const ccss=usadoCCSS(k,c.total);
-    const paraGan=c.total-ccss;
-    totGeneral+=c.total; totCCSS+=ccss;
-    if(!c.compensado)acum+=paraGan;   // solo los NO compensados suman al acumulado disponible
-    h+=`<tr${c.compensado?' style="opacity:.55"':''}>
+    const computo=usadoCCSS(k,c.total);
+    const cgan=compGanDe(c);
+    const resto=c.total-computo-cgan;   // saldo restante = total − cómputo CCSS − compensado Ganancias
+    totGeneral+=c.total; totComputo+=computo; totCompGan+=cgan; totResto+=resto;
+    h+=`<tr>
       <td class="l">${ymLabel(k)}</td>
       <td class="num">${money(c.total)}</td>
-      <td class="num">${ccss?money(ccss):'—'}</td>
-      <td class="num">${money(paraGan)}</td>
-      <td><button class="bndot btn-dot ${c.compensado?'ng':'bl'}" data-comp="${k}" title="${c.compensado?'Ya compensado contra Ganancias':'Sin compensar'}"></button></td>
+      <td class="num"><input class="mono ch-comp" data-mes="${k}" inputmode="decimal" placeholder="0,00" value="${fmtInp(computo)}" style="width:130px;text-align:right;padding:5px 7px"></td>
+      <td class="num"><input class="mono ch-cgan" data-mes="${k}" inputmode="decimal" placeholder="0,00" value="${fmtInp(cgan)}" style="width:130px;text-align:right;padding:5px 7px"></td>
+      <td class="num">${money(resto)}</td>
       <td><button class="del" data-delch="${k}">✕</button></td></tr>`;
   });
-  h+=`<tr class="tot"><td class="l"><b>Totales</b></td><td class="num"><b>${money(totGeneral)}</b></td><td class="num"><b>${money(totCCSS)}</b></td><td class="num"></td><td colspan="2"></td></tr>`;
+  h+=`<tr class="tot"><td class="l"><b>Totales</b></td><td class="num"><b>${money(totGeneral)}</b></td><td class="num"><b>${money(totComputo)}</b></td><td class="num"><b>${money(totCompGan)}</b></td><td class="num"><b>${money(totResto)}</b></td><td></td></tr>`;
   tb.innerHTML=h;
-  // ledger con el acumulado disponible
+  // ledger resumen
   const box=$("ch_acum");
   if(box){
     box.innerHTML=`<div class="ledger">
-      <div class="led" style="border-color:var(--gold)"><div class="l">Disponible para Ganancias</div><div class="v">${money0(acum)}</div><div class="sub">acumulado sin compensar</div></div>
-      <div class="led"><div class="l">Usado en CCSS</div><div class="v">${money0(totCCSS)}</div><div class="sub">30% desde jun-2026</div></div>
+      <div class="led" style="border-color:var(--gold)"><div class="l">Saldo restante acumulado</div><div class="v">${money0(totResto)}</div><div class="sub">impuesto aún sin usar</div></div>
+      <div class="led"><div class="l">Total cómputo CCSS</div><div class="v">${money0(totComputo)}</div><div class="sub">cargado a mano</div></div>
+      <div class="led"><div class="l">Total compensado Ganancias</div><div class="v">${money0(totCompGan)}</div><div class="sub">cargado a mano</div></div>
     </div>`;
   }
-  tb.querySelectorAll("[data-comp]").forEach(b=>b.onclick=async ()=>{
-    const k=b.dataset.comp; state.cheque[k].compensado=!state.cheque[k].compensado;
+  // cómputo CCSS editable a mano por mes
+  tb.querySelectorAll(".ch-comp").forEach(inp=>inp.onchange=async ()=>{
+    const k=inp.dataset.mes; if(!state.cheque[k])return;
+    const v=parseNum(inp.value)||0;
+    state.cheque[k].usadoCCSS=v;
     renderChequeTabla();
-    await apiPost({action:"setCheque",mes:k,total:state.cheque[k].total,compensado:state.cheque[k].compensado,usadoCCSS:usadoCCSS(k,state.cheque[k].total)});
+    await apiPost({action:"setCheque",mes:k,total:state.cheque[k].total,compensado:compGanDe(state.cheque[k]),usadoCCSS:v});
+  });
+  // compensado a Ganancias editable a mano por mes (reemplaza al tilde; es un monto, puede ser parcial)
+  tb.querySelectorAll(".ch-cgan").forEach(inp=>inp.onchange=async ()=>{
+    const k=inp.dataset.mes; if(!state.cheque[k])return;
+    const v=parseNum(inp.value)||0;
+    state.cheque[k].compensado=v;
+    renderChequeTabla();
+    await apiPost({action:"setCheque",mes:k,total:state.cheque[k].total,compensado:v,usadoCCSS:usadoCCSS(k,state.cheque[k].total)});
   });
   tb.querySelectorAll("[data-delch]").forEach(b=>b.onclick=async ()=>{
     const k=b.dataset.delch;
-    if(confirm("¿Borrar el registro de "+ymLabel(k)+"?")){ delete state.cheque[k]; renderChequeTabla(); await apiPost({action:"setCheque",mes:k,total:0,compensado:false,usadoCCSS:0}); }
+    if(confirm("¿Borrar el registro de "+ymLabel(k)+"?")){ delete state.cheque[k]; renderChequeTabla(); await apiPost({action:"setCheque",mes:k,total:0,compensado:0,usadoCCSS:0}); }
   });
 }
 
@@ -3372,7 +3390,7 @@ function drawResumen(){
   $("r_impuestos").innerHTML=`<table style="max-width:560px"><tbody>
     <tr><td class="l">IVA débito (ventas)</td><td class="num">${money(d1.ivaVent)}</td></tr>
     <tr><td class="l">IVA crédito (compras + banco)</td><td class="num">${money(d1.ivaComp)}</td></tr>
-    <tr><td class="l">Impuesto al cheque (1,2‰)</td><td class="num">${money(d1.cheque)}</td></tr>
+    <tr><td class="l">Impuesto al cheque (Ley 25413)</td><td class="num">${money(d1.cheque)}</td></tr>
   </tbody></table><small class="note">Valores acumulados del año, estimativos. La liquidación oficial la hace tu contador.</small>`;
 }
 
