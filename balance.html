@@ -232,8 +232,8 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 .venc-rojo .alerta-chip{background:#a3402f}
 .venc-amar .alerta-chip{background:#9a7a1e}
 .estado-btn{font-family:inherit;font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid var(--edge);cursor:pointer;transition:.15s}
-.estado-btn.pend{background:var(--paper2);color:var(--ink2)}
-.estado-btn.pagado{background:#3f6b4f;color:#fff;border-color:#3f6b4f}
+.estado-btn.pend{background:#c47f1a;color:#fff;border-color:#c47f1a}
+.estado-btn.pagado{background:var(--paper2);color:var(--ink2);border-color:var(--edge)}
 </style>
 </head>
 <body>
@@ -2806,9 +2806,10 @@ function drawChequesTabla(){
   if(f==="electronico"||f==="fisico")list=list.filter(c=>c.tipo===f);
   const tb=$("che_tbl").querySelector("tbody");
   if(!list.length){tb.innerHTML=`<tr><td colspan="7"><div class="empty">No hay cheques${f?" con ese filtro":" cargados"}.</div></td></tr>`;return;}
-  let h=`<tr><th class="l">Tipo</th><th class="l">N°</th><th class="l">Beneficiario</th><th class="l">Pago</th><th class="num">Monto</th><th>Estado</th><th></th></tr>`;
-  list.forEach(c=>{
-    h+=`<tr>
+  // Acumulado que puede entrar al banco a una fecha: suma de TODOS los cheques no cobrados con fecha de pago <= esa fecha
+  // (cualquier no cobrado puede presentarse cualquier día; ignora filtros de tipo/estado; los cobrados no suman).
+  const acumDe=(dia)=> state.chequesEmit.reduce((s,c)=> s + ((c.estado!=="Cobrado" && c.fechaPago && c.fechaPago<=dia) ? (c.monto||0) : 0), 0);
+  const filaHTML=(c)=>`<tr>
       <td class="l"><span style="font-size:11px">${c.tipo==="fisico"?"Físico":"Electrónico"}</span></td>
       <td class="l">${c.nro||"—"}</td>
       <td class="l">${c.beneficiario||'<span style="color:var(--faint)">—</span>'}</td>
@@ -2817,7 +2818,17 @@ function drawChequesTabla(){
       <td><button class="estado-btn ${c.estado==="Cobrado"?'pagado':'pend'}" data-estch="${c.id}">${c.estado}</button></td>
       <td style="white-space:nowrap"><button class="del" data-edch="${c.id}" title="Editar">✎</button> <button class="del" data-delche="${c.id}" title="Borrar">✕</button></td>
     </tr>`;
-  });
+  let h=`<tr><th class="l">Tipo</th><th class="l">N°</th><th class="l">Beneficiario</th><th class="l">Pago</th><th class="num">Monto</th><th>Estado</th><th></th></tr>`;
+  let i=0;
+  while(i<list.length){
+    const dia=list[i].fechaPago||"";
+    let filas="";
+    while(i<list.length && (list[i].fechaPago||"")===dia){ filas+=filaHTML(list[i]); i++; }
+    h+=filas;
+    if(dia){
+      h+=`<tr class="sub-dia"><td class="l" colspan="4" style="text-align:right;font-style:italic;color:var(--ink2)">Puede entrar al banco al ${fechaLinda(dia)} · acumulado no cobrado</td><td class="num" style="font-weight:700;color:#c47f1a">${money(acumDe(dia))}</td><td colspan="2"></td></tr>`;
+    }
+  }
   tb.innerHTML=h;
   tb.querySelectorAll("[data-estch]").forEach(b=>b.onclick=async ()=>{
     const c=state.chequesEmit.find(x=>x.id===b.dataset.estch); if(!c)return;
