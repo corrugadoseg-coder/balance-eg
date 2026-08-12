@@ -655,7 +655,6 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <p class="lead">Agenda informativa de qué pagar y cuándo. No suma al balance (los gastos salen del informe y del cierre de mes). Cargá importe, vencimiento y si es débito automático.</p>
     <div class="monthpick" style="margin-bottom:14px"><select id="sv_mes"></select></div>
     <div id="sv_resumen" class="ledger" style="margin-bottom:16px"></div>
-    <div id="sv_calendario" style="margin-bottom:16px"></div>
     <div style="overflow-x:auto"><table id="sv_tbl"><tbody></tbody></table></div>
     <div class="row-actions" style="margin-top:14px">
       <button class="btn ghost sm" id="sv_add">+ Agregar servicio</button>
@@ -2282,27 +2281,31 @@ function diasAlVenc(venc){
 function drawServicios(){
   const mes=$("sv_mes").value;
   const items=state.servicios.filter(s=>s.mes===mes);
-  items.sort((a,b)=>{ if(!a.venc&&!b.venc)return (a.servicio||"").localeCompare(b.servicio||""); if(!a.venc)return 1; if(!b.venc)return -1; return a.venc.localeCompare(b.venc); });
+  // pendientes arriba, pagados abajo; dentro de cada grupo por vencimiento ascendente (más próximo arriba), sin fecha al fondo
+  items.sort((a,b)=>{
+    if(!!a.pagado!==!!b.pagado)return a.pagado?1:-1;
+    if(!a.venc&&!b.venc)return (a.servicio||"").localeCompare(b.servicio||"");
+    if(!a.venc)return 1; if(!b.venc)return -1;
+    return a.venc.localeCompare(b.venc);
+  });
   const tb=$("sv_tbl").querySelector("tbody");
   if(!items.length){
     tb.innerHTML=`<tr><td colspan="6"><div class="empty">No hay servicios cargados para ${ymLabel(mes)}. Tocá "+ Agregar servicio".</div></td></tr>`;
-    $("sv_resumen").innerHTML=""; $("sv_calendario").innerHTML="";
+    $("sv_resumen").innerHTML="";
     return;
   }
-  let h=`<tr><th class="l">Servicio</th><th class="l">Vencimiento</th><th class="num">Importe</th><th>Débito</th><th>Pagado</th><th></th></tr>`;
   let total=0, pendiente=0;
-  items.forEach(s=>{
-    total+=(s.monto||0);
-    if(!s.pagado)pendiente+=(s.monto||0);
+  items.forEach(s=>{ total+=(s.monto||0); if(!s.pagado)pendiente+=(s.monto||0); });
+  // una fila de servicio
+  const filaHTML=(s)=>{
     const dias=diasAlVenc(s.venc);
-    let vencTxt=s.venc?fechaLinda(s.venc):"—";
-    let color="";
+    let vencTxt=s.venc?fechaLinda(s.venc):"—", color="";
     if(s.venc && !s.pagado){
       if(dias<0){color="color:var(--red);font-weight:600";vencTxt+=" (vencido)";}
       else if(dias===0){color="color:var(--red);font-weight:600";vencTxt+=" (hoy)";}
       else if(dias<=3){color="color:var(--gold);font-weight:600";vencTxt+=` (en ${dias}d)`;}
     }
-    h+=`<tr${s.pagado?' style="opacity:.5"':''}>
+    return `<tr${s.pagado?' style="opacity:.5"':''}>
       <td class="l">${s.servicio}${s.obs?`<div style="font-size:11px;color:var(--faint)">${s.obs}</div>`:""}</td>
       <td class="l" style="${color}">${vencTxt}</td>
       <td class="num">${money(s.monto)}</td>
@@ -2310,27 +2313,27 @@ function drawServicios(){
       <td style="text-align:center"><button class="bndot btn-dot ${s.pagado?'ng':'bl'}" data-pag="${s.id}" title="${s.pagado?'Pagado':'Pendiente'}"></button></td>
       <td style="white-space:nowrap"><button class="del" data-eds="${s.id}" title="Editar">✎</button> <button class="del" data-dels="${s.id}" title="Borrar">✕</button></td>
     </tr>`;
-  });
+  };
+  // agrupa por día de vencimiento (los items ya vienen ordenados por venc) con un subtotal por día
+  const grupoHTML=(arr)=>{
+    let out="", i=0;
+    while(i<arr.length){
+      const venc=arr[i].venc||""; let sub=0, filas="";
+      while(i<arr.length && (arr[i].venc||"")===venc){ filas+=filaHTML(arr[i]); sub+=(arr[i].monto||0); i++; }
+      out+=filas+`<tr class="sub-dia"><td class="l" style="text-align:right;font-style:italic;color:var(--ink2)">Subtotal ${venc?fechaLinda(venc):"sin fecha"}</td><td></td><td class="num" style="font-weight:700">${money(sub)}</td><td colspan="3"></td></tr>`;
+    }
+    return out;
+  };
+  const pend=items.filter(s=>!s.pagado), pag=items.filter(s=>s.pagado);
+  let h=`<tr><th class="l">Servicio</th><th class="l">Vencimiento</th><th class="num">Importe</th><th>Débito</th><th>Pagado</th><th></th></tr>`;
+  if(pend.length) h+=`<tr><td colspan="6" class="l" style="background:var(--goldL);font-family:'IBM Plex Mono';font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a6420;font-weight:600;padding:6px 10px">A pagar (${pend.length}) · ${money(pendiente)}</td></tr>`+grupoHTML(pend);
+  if(pag.length) h+=`<tr><td colspan="6" class="l" style="background:var(--paper2);font-family:'IBM Plex Mono';font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:600;padding:6px 10px">Pagados (${pag.length}) · ${money(total-pendiente)}</td></tr>`+grupoHTML(pag);
   h+=`<tr class="tot"><td class="l"><b>Total del mes</b></td><td></td><td class="num"><b>${money(total)}</b></td><td colspan="3"></td></tr>`;
   tb.innerHTML=h;
   // resumen: total mes + pendiente
   $("sv_resumen").innerHTML=
     `<div class="led" style="border-color:var(--gold)"><div class="l">Total del mes</div><div class="v">${money0(total)}</div><div class="sub">todos los servicios</div></div>
      <div class="led"><div class="l">Falta pagar</div><div class="v">${money0(pendiente)}</div><div class="sub">pendientes</div></div>`;
-  // calendario: total por día de vencimiento
-  const porDia={};
-  items.forEach(s=>{ if(!s.venc)return; if(!porDia[s.venc])porDia[s.venc]={total:0,items:[],pend:0}; porDia[s.venc].total+=(s.monto||0); if(!s.pagado)porDia[s.venc].pend+=(s.monto||0); porDia[s.venc].items.push(s); });
-  const dias=Object.keys(porDia).sort();
-  if(dias.length){
-    let c=`<div class="sectlabel">Qué pagar cada día</div><table style="width:100%"><tbody>`;
-    dias.forEach(d=>{
-      const info=porDia[d];
-      c+=`<tr style="background:var(--paper2)"><td class="l"><b>${fechaLinda(d)}</b> <span style="font-size:11px;color:var(--faint)">(${info.items.length})</span></td><td class="num"><b>${money(info.total)}</b>${info.pend<info.total?`<div style="font-size:11px;color:var(--faint)">falta ${money(info.pend)}</div>`:""}</td></tr>`;
-      info.items.forEach(s=>{ c+=`<tr><td class="l" style="padding-left:16px;font-size:13px">${s.servicio}${s.debito?' <span style="font-size:10px;color:var(--blue)">⇄auto</span>':''}${s.pagado?' <span style="font-size:10px;color:var(--green)">✓pagado</span>':''}</td><td class="num" style="font-size:13px">${money(s.monto)}</td></tr>`; });
-    });
-    c+=`</tbody></table>`;
-    $("sv_calendario").innerHTML=c;
-  } else $("sv_calendario").innerHTML="";
   // handlers
   tb.querySelectorAll("[data-pag]").forEach(b=>b.onclick=async ()=>{
     const s=state.servicios.find(x=>x.id===b.dataset.pag); if(!s)return;
