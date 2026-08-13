@@ -484,6 +484,22 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div style="overflow-x:auto"><table id="b_tbl"><tbody></tbody></table></div>
     <div class="row-actions" style="margin-top:14px"><button class="btn ghost" id="b_print">🖨 Imprimir balance del mes</button></div>
   </div>
+
+  <div id="bp_overlay" style="display:none;position:fixed;inset:0;background:rgba(35,32,26,.55);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px">
+    <div style="background:var(--paper);border:1px solid var(--edge);border-radius:14px;max-width:520px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+      <h2 style="margin-top:0">¿Qué querés imprimir?</h2>
+      <p class="lead" style="margin-bottom:14px">El resumen (rubros + ventas / gastos / resultado) va siempre. Tildá los rubros de los que además quieras el desglose.</p>
+      <div class="row-actions" style="margin:0 0 6px">
+        <button class="btn ghost sm" id="bp_todos" type="button">Todos</button>
+        <button class="btn ghost sm" id="bp_ninguno" type="button">Ninguno</button>
+      </div>
+      <div id="bp_list" style="margin:8px 0 4px"></div>
+      <div class="row-actions" style="margin-top:18px">
+        <button class="btn" id="bp_print" type="button">Imprimir</button>
+        <button class="btn ghost" id="bp_cancel" type="button">Cancelar</button>
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- ===== 04 IMPUESTOS ===== -->
@@ -858,6 +874,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
       <div class="f"><label>Año</label><select id="r_anio1"></select></div>
       <div class="f"><label>Comparar con <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">opcional</span></label><select id="r_anio2"><option value="">— ninguno —</option></select></div>
     </div>
+    <div class="row-actions" style="margin-top:14px"><button class="btn ghost" id="r_print">🖨 Imprimir resumen anual</button></div>
   </div>
 
   <div class="ledger" id="r_totales"></div>
@@ -912,7 +929,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   <div class="card">
     <h2>Detalle del período</h2>
     <div style="overflow-x:auto"><table id="i_tbl"><tbody></tbody></table></div>
-    <div class="row-actions"><button class="btn ghost sm" id="i_export">Exportar este informe a Excel</button></div>
+    <div class="row-actions"><button class="btn ghost sm" id="i_export">Exportar este informe a Excel</button><button class="btn ghost sm" id="i_print">🖨 Imprimir informe</button></div>
   </div>
 </section>
 
@@ -1586,20 +1603,37 @@ function drawBalance(){
       const c=tr.querySelector(".caret"); if(c)c.textContent=abierto?"▸":"▾";
     };
   });
-  // botón imprimir
+  // desglose imprimible por rubro (para el panel de impresión selectiva)
+  const desgloseByR={};
+  Object.keys(detByR).forEach(r=>{
+    desgloseByR[r]=detByR[r].slice().sort((a,b)=>b.monto-a.monto).map(x=>({nombre:x.prov,monto:x.monto||0,tipo:x.tipo}));
+  });
+  if(mostrarImp)desgloseByR["Impuestos del mes"]=[{nombre:"IVA (al contador)",monto:gByR["Impuestos del mes"]||0,tipo:"blanco"}];
+  _balancePrintCtx={mes,gByR,gTot,vTot,res,bn,desgloseByR};
+  // botón imprimir → abre el panel "¿Qué querés imprimir?"
   const btn=$("b_print");
-  if(btn)btn.onclick=()=>imprimirBalance(mes,gByR,gTot,vTot,res,bn);
+  if(btn)btn.onclick=abrirPanelImprimirBalance;
 }
-function imprimirBalance(mes,gByR,gTot,vTot,res,bn){
-  const fmt=n=>"$"+(Math.round((n||0)*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
-  const lbl=bn==="total"?"Total (A+B)":(bn==="blanco"?"Tipo A (blanco)":"Tipo B (negro)");
-  const filas=RUBROS_BAL.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a])
-    .map(r=>`<tr><td>${r}</td><td style="text-align:right">${fmt(gByR[r])}</td><td style="text-align:right">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`).join("");
-  const margen=vTot>0?(res/vTot*100).toFixed(1)+"%":"—";
+/* ===== Impresión: ventana común para todos los impresos =====
+   imprimirVentana(titulo, cuerpoHTML, {ancho, css}) arma el <html> con el
+   <style> compartido y el botón "Imprimir". El cuerpo lo pone cada llamador.
+   opts.ancho = max-width del body (px). opts.css = reglas extra (se anexan). */
+function imprimirVentana(titulo, cuerpoHTML, opts){
+  opts=opts||{};
+  const ancho=opts.ancho||640;
+  const cssExtra=opts.css||"";
+  // Los <canvas> (Chart.js) no viajan al copiar el HTML a la ventana de impresión.
+  // Cada marcador {{canvas:ID}} se reemplaza por una imagen PNG del gráfico ya renderizado.
+  cuerpoHTML=String(cuerpoHTML).replace(/\{\{canvas:([^}]+)\}\}/g,(m,id)=>{
+    const cv=document.getElementById(id.trim());
+    if(!cv||typeof cv.toDataURL!=="function")return "";
+    let url=""; try{ url=cv.toDataURL("image/png"); }catch(e){ return ""; }
+    return `<img class="chartimg" src="${url}" alt="">`;
+  });
   const w=window.open("","_blank");
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Balance ${ymLabel(mes)}</title>
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titulo}</title>
     <style>
-      body{font-family:Georgia,'Times New Roman',serif;color:#23201a;max-width:640px;margin:30px auto;padding:0 20px}
+      body{font-family:Georgia,'Times New Roman',serif;color:#23201a;max-width:${ancho}px;margin:30px auto;padding:0 20px}
       h1{font-size:22px;margin-bottom:2px} .sub{color:#666;font-size:13px;margin-bottom:20px}
       table{width:100%;border-collapse:collapse;margin:14px 0}
       td,th{padding:7px 10px;border-bottom:1px solid #ddd;font-size:14px}
@@ -1610,8 +1644,42 @@ function imprimirBalance(mes,gByR,gTot,vTot,res,bn){
       .box .lab{font-size:11px;color:#666;text-transform:uppercase} .box .val{font-size:18px;font-weight:bold}
       .pos{color:#1a7a3a} .neg{color:#b02a2a}
       .foot{margin-top:24px;font-size:11px;color:#888;border-top:1px solid #eee;padding-top:10px}
+      .sect{margin-top:26px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#555;border-bottom:1px solid #ddd;padding-bottom:4px}
+      .chartimg{display:block;width:100%;max-width:100%;margin:12px 0;page-break-inside:avoid}
       @media print{button{display:none}}
+      ${cssExtra}
     </style></head><body>
+    ${cuerpoHTML}
+    <button onclick="window.print()" style="margin-top:20px;padding:10px 20px;font-size:14px;cursor:pointer">Imprimir</button>
+    </body></html>`);
+  w.document.close();
+}
+/* encabezado común de los impresos nuevos: EG Corrugados + título + período + fecha de impresión */
+function encabezadoImpreso(titulo, periodo){
+  return `<h1>${titulo}</h1><div class="sub">EG Corrugados${periodo?" · "+periodo:""} · impreso ${new Date().toLocaleDateString("es-AR")}</div>`;
+}
+
+let _balancePrintCtx=null;   // contexto del balance en pantalla, para el panel de impresión selectiva
+/* Imprime el balance del mes: siempre el resumen (cajas + tabla de rubros);
+   debajo, el desglose de los rubros tildados (rubrosSel). Sin tildados = solo resumen. */
+function imprimirBalance(mes,gByR,gTot,vTot,res,bn,desgloseByR,rubrosSel){
+  const fmt=n=>"$"+(Math.round((n||0)*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const lbl=bn==="total"?"Total (A+B)":(bn==="blanco"?"Tipo A (blanco)":"Tipo B (negro)");
+  const filas=RUBROS_BAL.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a])
+    .map(r=>`<tr><td>${r}</td><td style="text-align:right">${fmt(gByR[r])}</td><td style="text-align:right">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`).join("");
+  const margen=vTot>0?(res/vTot*100).toFixed(1)+"%":"—";
+  // desglose de los rubros tildados; los que no existan este mes (o sin detalle) se ignoran sin romper
+  desgloseByR=desgloseByR||{}; rubrosSel=rubrosSel||[];
+  let desgloseHTML="";
+  RUBROS_BAL.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a]).forEach(r=>{
+    if(rubrosSel.indexOf(r)<0)return;
+    const d=(desgloseByR[r]||[]).slice().sort((a,b)=>b.monto-a.monto);
+    if(!d.length)return;
+    const filasD=d.map(x=>`<tr><td>${x.nombre}${bn==="total"&&x.tipo?` (${x.tipo==="negro"?"B":"A"})`:""}</td><td style="text-align:right">${fmt(x.monto)}</td></tr>`).join("");
+    desgloseHTML+=`<div class="sect">${r} — ${fmt(gByR[r])}</div>
+      <table><tbody>${filasD}</tbody></table>`;
+  });
+  const cuerpo=`
     <h1>Balance del mes — ${lbl}</h1>
     <div class="sub">EG Corrugados · ${ymLabel(mes)}</div>
     <div class="destac">
@@ -1621,11 +1689,40 @@ function imprimirBalance(mes,gByR,gTot,vTot,res,bn){
     </div>
     <table><thead><tr><th>Rubro</th><th style="text-align:right">Monto</th><th style="text-align:right">% gastos</th></tr></thead>
     <tbody>${filas}<tr class="tot"><td>TOTAL GASTOS</td><td style="text-align:right">${fmt(gTot)}</td><td style="text-align:right">100%</td></tr></tbody></table>
-    <div class="foot">Generado por Balance Interno — ${new Date().toLocaleDateString("es-AR")}. Valores para control interno.</div>
-    <button onclick="window.print()" style="margin-top:20px;padding:10px 20px;font-size:14px;cursor:pointer">Imprimir</button>
-    </body></html>`);
-  w.document.close();
+    ${desgloseHTML}
+    <div class="foot">Generado por Balance Interno — ${new Date().toLocaleDateString("es-AR")}. Valores para control interno.</div>`;
+  imprimirVentana(`Balance ${ymLabel(mes)}`, cuerpo, {ancho:640});
 }
+/* Panel "¿Qué querés imprimir?": elegir de qué rubros incluir el desglose. */
+const PRINT_RUBROS_LS="eg_balance_print_rubros";
+function getPrintRubros(){ try{ return JSON.parse(localStorage.getItem(PRINT_RUBROS_LS)||"[]")||[]; }catch(e){ return []; } }
+function setPrintRubros(arr){ try{ localStorage.setItem(PRINT_RUBROS_LS,JSON.stringify(arr)); }catch(e){} }
+function abrirPanelImprimirBalance(){
+  const ctx=_balancePrintCtx; if(!ctx)return;
+  const rubros=RUBROS_BAL.filter(r=>ctx.gByR[r] && (ctx.desgloseByR[r]||[]).length).sort((a,b)=>ctx.gByR[b]-ctx.gByR[a]);
+  const guard=getPrintRubros();   // selección guardada; los rubros que no estén este mes se ignoran
+  const lista=$("bp_list");
+  if(!rubros.length){
+    lista.innerHTML=`<p class="lead" style="margin:0">Este mes no tiene rubros con desglose disponible. Se imprime solo el resumen.</p>`;
+  } else {
+    lista.innerHTML=rubros.map(r=>`<label style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--lineA);cursor:pointer">
+      <input type="checkbox" class="bp-chk" value="${r}" ${guard.indexOf(r)>=0?"checked":""} style="width:auto;margin:0">
+      <span style="flex:1">${r}</span>
+      <span class="num" style="color:var(--ink2)">${money(ctx.gByR[r])}</span></label>`).join("");
+  }
+  $("bp_overlay").style.display="flex";
+}
+if($("bp_todos"))$("bp_todos").onclick=()=>$$("#bp_list .bp-chk").forEach(c=>c.checked=true);
+if($("bp_ninguno"))$("bp_ninguno").onclick=()=>$$("#bp_list .bp-chk").forEach(c=>c.checked=false);
+if($("bp_cancel"))$("bp_cancel").onclick=()=>$("bp_overlay").style.display="none";
+if($("bp_overlay"))$("bp_overlay").addEventListener("click",e=>{ if(e.target===$("bp_overlay"))$("bp_overlay").style.display="none"; });
+if($("bp_print"))$("bp_print").onclick=()=>{
+  const sel=[...$$("#bp_list .bp-chk")].filter(c=>c.checked).map(c=>c.value);
+  setPrintRubros(sel);
+  $("bp_overlay").style.display="none";
+  const c=_balancePrintCtx; if(!c)return;
+  imprimirBalance(c.mes,c.gByR,c.gTot,c.vTot,c.res,c.bn,c.desgloseByR,sel);
+};
 
 /* ---- informes / filtros ---- */
 let charts={};
@@ -1997,21 +2094,7 @@ function parseCheque(texto){
 function imprimirDesglose(mes,grupos,total,ley,sircreb,ivaCom){
   const fmt=n=>"$"+(Math.round((n||0)*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
   const filas=Object.keys(grupos).sort().map(k=>`<tr><td>${k}</td><td style="text-align:right">${fmt(grupos[k])}</td></tr>`).join("");
-  const w=window.open("","_blank");
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Desglose extracto ${ymLabel(mes)}</title>
-    <style>
-      body{font-family:Georgia,'Times New Roman',serif;color:#23201a;max-width:640px;margin:30px auto;padding:0 20px}
-      h1{font-size:22px;margin-bottom:2px} .sub{color:#666;font-size:13px;margin-bottom:20px}
-      table{width:100%;border-collapse:collapse;margin:14px 0}
-      td,th{padding:7px 10px;border-bottom:1px solid #ddd;font-size:14px}
-      th{text-align:left;background:#f5f2ec}
-      .tot td{border-top:2px solid #333;font-weight:bold}
-      .destac{margin-top:20px;display:flex;gap:20px;flex-wrap:wrap}
-      .box{border:1px solid #ccc;border-radius:8px;padding:12px 16px;min-width:150px}
-      .box .lab{font-size:11px;color:#666;text-transform:uppercase} .box .val{font-size:18px;font-weight:bold}
-      .foot{margin-top:24px;font-size:11px;color:#888;border-top:1px solid #eee;padding-top:10px}
-      @media print{button{display:none}}
-    </style></head><body>
+  const cuerpo=`
     <h1>Impuesto al cheque — Desglose del extracto</h1>
     <div class="sub">EG Corrugados · ${ymLabel(mes)}</div>
     <table><thead><tr><th>Concepto (nombre del banco)</th><th style="text-align:right">Importe</th></tr></thead>
@@ -2021,10 +2104,8 @@ function imprimirDesglose(mes,grupos,total,ley,sircreb,ivaCom){
       <div class="box"><div class="lab">Ret. SIRCREB</div><div class="val">${fmt(sircreb)}</div><div style="font-size:11px;color:#666">para IIBB</div></div>
       <div class="box"><div class="lab">IVA comisiones</div><div class="val">${fmt(ivaCom)}</div><div style="font-size:11px;color:#666">crédito fiscal</div></div>
     </div>
-    <div class="foot">Generado por Balance Interno — ${new Date().toLocaleDateString("es-AR")}. Valores estimativos para control interno.</div>
-    <button onclick="window.print()" style="margin-top:20px;padding:10px 20px;font-size:14px;cursor:pointer">Imprimir</button>
-    </body></html>`);
-  w.document.close();
+    <div class="foot">Generado por Balance Interno — ${new Date().toLocaleDateString("es-AR")}. Valores estimativos para control interno.</div>`;
+  imprimirVentana(`Desglose extracto ${ymLabel(mes)}`, cuerpo, {ancho:640});
 }
 /* abre el cliente de correo (mailto) con el desglose del extracto ya redactado, para la contadora */
 function enviarDesglosePorEmail(mes,grupos,total,ley,sircreb,ivaCom){
@@ -2548,24 +2629,18 @@ if($("su_detalle"))$("su_detalle").onclick=()=>{
 };
 if($("su_print"))$("su_print").onclick=()=>{
   const mes=$("su_mes").value;
-  const w=window.open("","_blank");
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sueldos ${ymLabel(mes)}</title>
-    <style>
-      body{font-family:Georgia,serif;color:#23201a;max-width:900px;margin:24px auto;padding:0 16px}
-      h1{font-size:20px;margin-bottom:2px} .sub{color:#666;font-size:12px;margin-bottom:16px}
-      table{width:100%;border-collapse:collapse;margin-top:10px}
-      td,th{padding:6px 8px;border-bottom:1px solid #ddd;font-size:12px;text-align:right}
-      td.l,th.l{text-align:left} th{background:#f0ece4}
-      .tot td{border-top:2px solid #333;font-weight:bold}
+  const cuerpo=`
+    <h1 style="font-size:20px">Detalle de sueldos — ${ymLabel(mes)}</h1>
+    <div class="sub" style="font-size:12px;margin-bottom:16px">EG Corrugados · generado ${new Date().toLocaleDateString("es-AR")}</div>
+    ${sueldoDetalleHTML(mes,true)}`;
+  imprimirVentana(`Sueldos ${ymLabel(mes)}`, cuerpo, {ancho:900, css:`
+      body{font-family:Georgia,serif;margin:24px auto;padding:0 16px}
+      table{margin:10px 0 0 0}
+      td,th{padding:6px 8px;font-size:12px;text-align:right}
+      td.l,th.l{text-align:left}
+      th{background:#f0ece4}
       .sectlabel{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-top:16px}
-      @media print{button{display:none}}
-    </style></head><body>
-    <h1>Detalle de sueldos — ${ymLabel(mes)}</h1>
-    <div class="sub">EG Corrugados · generado ${new Date().toLocaleDateString("es-AR")}</div>
-    ${sueldoDetalleHTML(mes,true)}
-    <button onclick="window.print()" style="margin-top:18px;padding:9px 18px;cursor:pointer">Imprimir</button>
-    </body></html>`);
-  w.document.close();
+  `});
 };
 if($("su_limpiar"))$("su_limpiar").onclick=async ()=>{
   const mes=$("su_mes").value;
@@ -3408,6 +3483,46 @@ function drawResumen(){
     <tr><td class="l">Impuesto al cheque (Ley 25413)</td><td class="num">${money(d1.cheque)}</td></tr>
   </tbody></table><small class="note">Valores acumulados del año, estimativos. La liquidación oficial la hace tu contador.</small>`;
 }
+if($("r_print"))$("r_print").onclick=()=>{
+  const a1=$("r_anio1").value, a2=$("r_anio2").value;
+  if(!a1){alert("No hay año para imprimir.");return;}
+  const d1=datosAnio(a1), d2=a2?datosAnio(a2):null;
+  const fmt=n=>"$"+(Math.round((n||0)*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const margen=d1.ventas>0?(d1.resultado/d1.ventas*100).toFixed(1)+"%":"—";
+  const box=(lab,val,extra)=>`<div class="box"><div class="lab">${lab}</div><div class="val">${fmt(val)}</div>${extra?`<div style="font-size:11px;color:#666">${extra}</div>`:""}</div>`;
+  const rub=Object.entries(d1.rubros).sort((a,b)=>b[1]-a[1]);
+  const totR=rub.reduce((s,x)=>s+x[1],0);
+  const filasR=rub.map(([r,v])=>`<tr><td>${r}</td><td style="text-align:right">${fmt(v)}</td><td style="text-align:right">${totR?Math.round(v/totR*100):0}%</td></tr>`).join("");
+  let comp="";
+  if(d2){
+    comp=`<div class="sect">Comparación con ${a2}</div>
+      <table><thead><tr><th></th><th style="text-align:right">${a1}</th><th style="text-align:right">${a2}</th></tr></thead><tbody>
+      <tr><td>Ventas</td><td style="text-align:right">${fmt(d1.ventas)}</td><td style="text-align:right">${fmt(d2.ventas)}</td></tr>
+      <tr><td>Gastos</td><td style="text-align:right">${fmt(d1.gastos)}</td><td style="text-align:right">${fmt(d2.gastos)}</td></tr>
+      <tr class="tot"><td>Resultado</td><td style="text-align:right">${fmt(d1.resultado)}</td><td style="text-align:right">${fmt(d2.resultado)}</td></tr>
+      </tbody></table>`;
+  }
+  const cuerpo=`${encabezadoImpreso("Resumen anual "+a1, a1+(a2?" vs "+a2:""))}
+    <div class="destac">
+      ${box("Ventas "+a1,d1.ventas)}
+      ${box("Gastos "+a1,d1.gastos)}
+      ${box("Resultado "+a1,d1.resultado,margen+" margen")}
+    </div>
+    <div class="sect">Evolución mes a mes</div>
+    {{canvas:r_chart}}
+    <div class="sect">Gastos por rubro del año</div>
+    <table><thead><tr><th>Rubro</th><th style="text-align:right">Monto</th><th style="text-align:right">%</th></tr></thead>
+    <tbody>${filasR}<tr class="tot"><td>Total gastos ${a1}</td><td style="text-align:right">${fmt(totR)}</td><td></td></tr></tbody></table>
+    <div class="sect">Impuestos acumulados del año</div>
+    <table><tbody>
+      <tr><td>IVA débito (ventas)</td><td style="text-align:right">${fmt(d1.ivaVent)}</td></tr>
+      <tr><td>IVA crédito (compras + banco)</td><td style="text-align:right">${fmt(d1.ivaComp)}</td></tr>
+      <tr><td>Impuesto al cheque (Ley 25413)</td><td style="text-align:right">${fmt(d1.cheque)}</td></tr>
+    </tbody></table>
+    ${comp}
+    <div class="foot">Generado por Balance Interno — ${new Date().toLocaleDateString("es-AR")}. Valores estimativos para control interno.</div>`;
+  imprimirVentana("Resumen anual "+a1, cuerpo, {ancho:640});
+};
 
 function initInformeSelectors(){
   const mapa={};
@@ -3425,7 +3540,7 @@ function initInformeSelectors(){
 $("i_apply").onclick=applyFilters;
 $("i_reset").onclick=()=>{$("i_desde").value="";$("i_hasta").value="";$("i_rubro").value="";$("i_prov").value="";$("i_bn").value="";applyFilters();};
 
-function mkChart(id,cfg){ if(charts[id])charts[id].destroy(); charts[id]=new Chart($(id),cfg); }
+function mkChart(id,cfg){ if(charts[id])charts[id].destroy(); cfg.options=cfg.options||{}; cfg.options.animation=false; charts[id]=new Chart($(id),cfg); }  // animation:false → el canvas queda completo para capturarlo al imprimir
 const PAL=["#b5842f","#3f6b4f","#37536b","#a3402f","#8a6db0","#5c8a6d","#c9a14a","#7b6b8a","#6b8aa3","#a38a5c","#4f6b5c","#8a5c4f"];
 function drawCharts(meses,V,G,R,gFiltered,fbn){
   Chart.defaults.font.family="'IBM Plex Sans',sans-serif";
@@ -3541,6 +3656,43 @@ $("i_export").onclick=()=>{
   });
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(imp),"Impuestos (estimado)");
   XLSX.writeFile(wb,"informe_balance.xlsx");
+};
+/* ---- imprimir informe: encabezado con filtros + resumen/totales + observaciones + gráficos (canvas→img).
+        Sin tablas de detalle. ---- */
+if($("i_print"))$("i_print").onclick=()=>{
+  let d=window._lastInforme; if(!d){applyFilters(); d=window._lastInforme;}
+  if(!d){alert("No hay datos para imprimir.");return;}
+  const fmt=n=>"$"+(Math.round((n||0)*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const desde=$("i_desde").value, hasta=$("i_hasta").value;
+  const fr=$("i_rubro").value, fp=$("i_prov").value, fbn=$("i_bn").value;
+  const periodo=(desde?ymLabel(desde):"inicio")+" a "+(hasta?ymLabel(hasta):"último");
+  let provTxt="Todos";
+  if(fp){ const o=[...$("i_prov").options].find(op=>op.value===fp); provTxt=o?o.textContent:fp; }
+  const filtros=["Período: "+periodo, "Rubro: "+(fr||"Todos"), "Proveedor: "+provTxt,
+                 "Tipo: "+(fbn==="blanco"?"Tipo A":fbn==="negro"?"Tipo B":"Todos")];
+  const totV=d.serV.reduce((a,b)=>a+b,0), totG=d.serG.reduce((a,b)=>a+b,0), totR=totV-totG;
+  const margen=totV?(totR/totV*100).toFixed(1)+"%":"—";
+  const obsHTML=$("i_obs")?$("i_obs").innerHTML:"";
+  const cuerpo=`${encabezadoImpreso("Informe / análisis", periodo)}
+    <div style="font-size:12px;color:#555;margin:-8px 0 16px;line-height:1.8">${filtros.map(f=>`<span style="display:inline-block;margin-right:16px">• ${f}</span>`).join("")}</div>
+    <div class="destac">
+      <div class="box"><div class="lab">Ventas del período</div><div class="val">${fmt(totV)}</div></div>
+      <div class="box"><div class="lab">Gastos del período</div><div class="val">${fmt(totG)}</div></div>
+      <div class="box"><div class="lab">Resultado</div><div class="val ${totR>=0?'pos':'neg'}">${fmt(totR)}</div><div style="font-size:11px;color:#666">${margen} margen</div></div>
+    </div>
+    ${obsHTML?`<div class="obsblock">${obsHTML}</div>`:""}
+    <div class="sect">Ventas vs Gastos</div>{{canvas:ch_vg}}
+    <div class="sect">Resultado mensual</div>{{canvas:ch_res}}
+    <div class="sect">Composición de gastos</div>{{canvas:ch_pie}}
+    <div class="sect">Tipo A vs Tipo B</div>{{canvas:ch_bn}}
+    <div class="foot">Generado por Balance Interno — ${new Date().toLocaleDateString("es-AR")}. Valores para control interno.</div>`;
+  imprimirVentana("Informe "+periodo, cuerpo, {ancho:820, css:`
+      .obsblock{margin-top:20px}
+      .obsblock h3{font-size:14px;margin:0 0 6px}
+      .obsblock ul{margin:6px 0;padding-left:20px}
+      .obsblock li{margin:4px 0;font-size:13px;line-height:1.5}
+      .obsblock .note{display:block;margin-top:8px;font-size:11px;color:#888;font-style:italic}
+  `});
 };
 
 /* ---- datos: recargar / export ---- */
