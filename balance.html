@@ -2041,6 +2041,29 @@ function renderChequeTab(){
   renderChmSelector();
   renderChequeTabla();
 }
+/* Comisiones del Banco Ciudad que se imputan como GASTO (rubro GASTOS DE ADMINISTRACIÓN).
+   El banco trunca las etiquetas → se matchea por PREFIJO, no por texto completo.
+   Cada comisión trae, en la línea siguiente, su "DEBITO FISCAL IVA" (21%); ese IVA ya
+   entra por ivaExtracto (IVA del banco), así que el gasto se imputa con iva:0. */
+const COMIS_EXTRACTO=[
+  {id:"MANTE", pref:"COMISION MANTE", prov:"Banco Ciudad — Comisión mantenimiento"},
+  {id:"CHEQU", pref:"COMISION CHEQU", prov:"Banco Ciudad — Comisión chequeras"},
+  {id:"PAGO",  pref:"COMISION PAGO",  prov:"Banco Ciudad — Comisión pagos de servicios"},
+  {id:"TRINM", pref:"COMISTRINM",     prov:"Banco Ciudad — Comisión transf. inmediatas"}
+];
+// Matcheo tolerante: saca el marcador "N/D" del inicio y compara SOLO letras
+// (ignora espacios, guiones tipo "-CO", puntos y números). No exige "COMISION".
+const soloLetras=s=>String(s).toUpperCase().replace(/[^A-Z]/g,"");
+function clasificarComision(conceptoUp){
+  const t=soloLetras(String(conceptoUp).replace(/^\s*N[^A-Z]*D\b/i,""));  // quita "N/D" inicial y deja letras
+  if(!t)return null;
+  return COMIS_EXTRACTO.find(c=>t.indexOf(soloLetras(c.pref))===0)||null;
+}
+function ultimoDiaMes(mes){
+  const n=normMes(mes)||mes; const p=String(n).split("-"); const y=+p[0], m=+p[1];
+  if(!y||!m)return n; const d=new Date(y,m,0);   // día 0 del mes siguiente = último del mes m
+  return y+"-"+String(m).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
 /* parsea el extracto: agrupa TODOS los cargos bancarios por concepto (nombre del banco).
    Excluye lo que no es gasto bancario (transferencias, sueldos, cheques, rescates, etc.) */
 function parseCheque(texto){
@@ -2048,6 +2071,9 @@ function parseCheque(texto){
   const lineas=texto.split(/\r\n|\r|\n/);   // tolera fin de línea de Windows, Mac viejo o Unix
   const grupos={}, detalle={};              // detalle[key] = [{fecha, importe, importeTxt}, ...]
   let total=0, sircreb=0, ley=0, ivaCom=0;
+  const comisiones={};                      // {MANTE:{neto,iva,count,prov}, ...} para imputar como gasto
+  const noClasificadas={};                  // líneas "COMIS…" que no matchearon ninguno de los 4 (diagnóstico)
+  let ultimaComis=null;                     // último concepto de comisión visto, para emparejarle su IVA
   // importe argentino: 1.234.567,89 · 70.000,54 · 123,45 · 1234,56
   const RE_IMP=/\d{1,3}(?:\.\d{3})+,\d{2}|\d+,\d{2}/;
   // marca de inicio de concepto: "N/D" (con o sin espacios en la barra) o "DEBITO FISCAL IVA"
@@ -2081,6 +2107,16 @@ function parseCheque(texto){
       if(esLey){ key="N/D LEY 25413"; ley+=val; }   // suma CRED y DEBIT en el mismo grupo
       if(esSirc){ sircreb+=val; }
       if(esIVA){ key="DEBITO FISCAL IVA"; ivaCom+=val; }
+      // comisiones a imputar como gasto: sumar el neto por concepto (prefijo) y
+      // emparejar el "DEBITO FISCAL IVA" que viene inmediatamente después.
+      const cc=(!esIVA && !esLey && !esSirc) ? clasificarComision(cu) : null;
+      if(cc){ (comisiones[cc.id]=comisiones[cc.id]||{neto:0,iva:0,count:0,prov:cc.prov}); comisiones[cc.id].neto+=val; comisiones[cc.id].count++; ultimaComis=cc.id; }
+      else if(esIVA){ if(ultimaComis&&comisiones[ultimaComis])comisiones[ultimaComis].iva+=val; ultimaComis=null; }
+      else {
+        // línea de comisión que no matcheó ninguno de los 4 conceptos → la registro para avisar
+        if(!esLey && !esSirc && /COMIS/.test(cu)){ noClasificadas[concepto]=(noClasificadas[concepto]||0)+val; }
+        ultimaComis=null;
+      }
       grupos[key]=(grupos[key]||0)+val;
       total+=val;
       // fecha = último token de fecha a la izquierda de este concepto en el renglón
@@ -2089,7 +2125,51 @@ function parseCheque(texto){
       (detalle[key]=detalle[key]||[]).push({fecha, importe:val, importeTxt:mi[0]});
     }
   });
-  return {grupos,detalle,total,ley,sircreb,ivaCom};
+  return {grupos,detalle,total,ley,sircreb,ivaCom,comisiones,noClasificadas};
+}
+/* Imputa las comisiones del extracto como gasto (una por concepto y por mes).
+   ID determinístico "EXT-AAAAMM-CONCEPTO" → upsert: si existe updateGasto, si no addGasto.
+   Reprocesar el mismo mes ACTUALIZA los renglones (no duplica). El IVA NO se agrega acá:
+   ya entra por ivaExtracto. Devuelve {imputados, netoTot}. */
+async function imputarComisionesExtracto(mes, comisiones){
+  comisiones=comisiones||{};
+  const m=normMes(mes)||mes;
+  const fecha=ultimoDiaMes(m);
+  let imputados=0, netoTot=0;
+  for(const c of COMIS_EXTRACTO){
+    const dat=comisiones[c.id];
+    const neto=dat?Math.round((dat.neto||0)*100)/100:0;
+    const id=`EXT-${String(m).replace("-","")}-${c.id}`;   // ej. EXT-202607-MANTE
+    const idx=state.gastos.findIndex(g=>g.id===id);
+    if(neto>0){
+      const g={id,fecha,prov:c.prov,rubro:"GASTOS DE ADMINISTRACIÓN",sub:"Comisión bancaria",bn:"blanco",monto:neto,iva:0,piva:0,piibb:0};
+      if(idx>=0){ state.gastos[idx]=Object.assign(state.gastos[idx],g); await apiPost({action:"updateGasto",id,fecha,prov:g.prov,rubro:g.rubro,sub:g.sub,bn:g.bn,monto:neto,iva:0,piva:0,piibb:0}); }
+      else { state.gastos.push(g); await apiPost({action:"addGasto",id,fecha,prov:g.prov,rubro:g.rubro,sub:g.sub,bn:g.bn,monto:neto,iva:0,piva:0,piibb:0}); }
+      imputados++; netoTot+=neto;
+    } else if(idx>=0){
+      // el concepto ya no aparece este mes: quito el renglón viejo (solo toca ids EXT-*)
+      state.gastos.splice(idx,1); await apiPost({action:"deleteGasto",id});
+    }
+  }
+  return {imputados, netoTot};
+}
+/* vista previa de las comisiones a imputar (para verificar contra la planilla antes de guardar) */
+function comisPreviewHTML(comisiones, noClasificadas){
+  comisiones=comisiones||{}; noClasificadas=noClasificadas||{};
+  const rows=COMIS_EXTRACTO.map(c=>{ const d=comisiones[c.id]; if(!d||!(d.neto>0))return "";
+    return `<tr><td class="l">${c.prov}</td><td class="num" style="color:var(--faint)">${d.count} mov</td><td class="num">${money(d.neto)}</td><td class="num" style="color:var(--faint)">IVA ${money(d.iva)}</td></tr>`; }).filter(Boolean).join("");
+  // aviso: comisiones que aparecen en el extracto pero no matchearon ninguno de los 4 conceptos
+  const ncKeys=Object.keys(noClasificadas);
+  const aviso=ncKeys.length?`<div class="msg learn show" style="margin:8px 0">No reconocí como gasto ${ncKeys.length} línea(s) de comisión. Pasámelas para ajustar el prefijo:
+    <ul style="margin:6px 0 0;padding-left:18px">${ncKeys.map(k=>`<li><code>${k}</code> → ${money(noClasificadas[k])}</li>`).join("")}</ul></div>`:"";
+  if(!rows)return aviso;
+  let netoTot=0, ivaTot=0;
+  COMIS_EXTRACTO.forEach(c=>{ const d=comisiones[c.id]; if(d){netoTot+=d.neto||0; ivaTot+=d.iva||0;} });
+  return `<div class="sectlabel" style="margin-top:8px">Comisiones a imputar como gasto · GASTOS DE ADMINISTRACIÓN</div>
+    <table style="max-width:600px;margin:8px 0 6px"><tbody>${rows}
+    <tr class="tot"><td class="l"><b>Total comisiones</b></td><td></td><td class="num"><b>${money(netoTot)}</b></td><td class="num" style="color:var(--faint)"><b>IVA ${money(ivaTot)}</b></td></tr>
+    </tbody></table>
+    <small class="note">Se imputan como gasto por su <b>neto</b> (sin IVA — el IVA de estas comisiones ya está en el IVA del banco de arriba, no se duplica). Un renglón por concepto y por mes; al reprocesar el mes se actualizan, no se agregan otros.</small>${aviso}`;
 }
 function imprimirDesglose(mes,grupos,total,ley,sircreb,ivaCom){
   const fmt=n=>"$"+(Math.round((n||0)*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -2140,7 +2220,7 @@ function enviarDesglosePorEmail(mes,grupos,total,ley,sircreb,ivaCom){
 $("ch_calc").onclick=()=>{
   const texto=$("ch_texto").value;
   if(!texto.trim()){showMsg("ch_msg","learn","Pegá primero el texto del extracto.");return;}
-  const {grupos,detalle,total,ley,sircreb,ivaCom}=parseCheque(texto);
+  const {grupos,detalle,total,ley,sircreb,ivaCom,comisiones,noClasificadas}=parseCheque(texto);
   const claves=Object.keys(grupos);
   if(!claves.length){showMsg("ch_msg","learn","No encontré cargos bancarios en el texto. Verificá que pegaste el extracto completo.");$("ch_result").innerHTML="";return;}
   showMsg("ch_msg","ok",`Detecté <b>${claves.length}</b> concepto(s). Tocá cada uno para ver las líneas que sumó. Verificá el desglose contra tu planilla antes de guardar.`);
@@ -2168,6 +2248,7 @@ $("ch_calc").onclick=()=>{
       <div class="led"><div class="l">Ret. SIRCREB</div><div class="v">${money0(sircreb)}</div><div class="sub">→ IIBB</div></div>
       <div class="led"><div class="l">IVA comisiones</div><div class="v">${money0(ivaCom)}</div></div>
     </div>
+    ${comisPreviewHTML(comisiones, noClasificadas)}
     <div class="row-actions"><button class="btn" id="ch_save">Guardar ${ymLabel($("ch_mes").value)}</button><button class="btn ghost" id="ch_print">🖨 Imprimir desglose</button><button class="btn ghost" id="ch_email">✉ Enviar por email a la contadora</button></div>
     <small class="note">Al guardar: el impuesto al cheque va al registro de abajo (ahí cargás a mano el cómputo del mes) y las retenciones SIRCREB se cargan como "Retenciones bancarias IIBB" del mes en Impuestos. El desglose completo es informativo, para que lo compares con tu planilla.</small>`;
   // clic en un concepto: abre/cierra la fila de detalle que va justo abajo
@@ -2199,7 +2280,11 @@ $("ch_calc").onclick=()=>{
     if(!imp.coefBsAs)imp.coefBsAs=DEF_CB;
     state.impuestos[mes]=imp;
     renderChequeTabla();
-    showMsg("ch_msg","ok",`Guardado ${ymLabel(mes)}: impuesto <b>${money(ley)}</b> · SIRCREB <b>${money(sircreb)}</b> · IVA banco <b>${money(ivaCom)}</b>. Cargá el cómputo CCSS y el compensado a Ganancias en la tabla de abajo.`);
+    // imputar las 4 comisiones del banco como gasto (neto, sin IVA; upsert por mes+concepto)
+    const rc=await imputarComisionesExtracto(mes, comisiones);
+    renderGastos();
+    const comisMsg=rc.imputados?` · comisiones imputadas: <b>${money(rc.netoTot)}</b> (${rc.imputados} concepto/s) en GASTOS DE ADMINISTRACIÓN`:"";
+    showMsg("ch_msg","ok",`Guardado ${ymLabel(mes)}: impuesto <b>${money(ley)}</b> · SIRCREB <b>${money(sircreb)}</b> · IVA banco <b>${money(ivaCom)}</b>${comisMsg}. Cargá el cómputo CCSS y el compensado a Ganancias en la tabla de abajo.`);
     $("ch_result").innerHTML="";$("ch_texto").value="";
     await apiPost({action:"setCheque",mes,total:ley,compensado:compGanV,usadoCCSS:computo});
     await apiPost({action:"setImpuestos",mes,ivaContador:imp.ivaContador||0,retBancIIBB:sircreb,iibbContador:imp.iibbContador||0,alicIIBB:imp.alicIIBB,coefCABA:imp.coefCABA,coefBsAs:imp.coefBsAs,ivaExtracto:ivaCom});
