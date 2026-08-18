@@ -512,7 +512,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     </div>
     <div class="sectlabel">Retenciones de clientes <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px;margin-left:6px">Se carga automáticamente desde Carga de Informes</span></div>
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
-      <div class="f"><label>Retención IVA</label><input id="t_retcli" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
+      <div class="f"><label>Retención IVA <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">editable · corrige el informe</span></label><input id="t_retcli" class="mono" inputmode="decimal" placeholder="0,00"></div>
       <div class="f"><label>Retención IIBB</label><input id="t_retiibb" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
       <div class="f"><label>Retención Ganancias</label><input id="t_retgan" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
       <div class="f"><label>Retención SUSS <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">informativa</span></label><input id="t_retsuss" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
@@ -1841,16 +1841,16 @@ $("t_save").onclick=async ()=>{
     ivaExtracto:ivaExtractoPrev
   };
   const dPrev=state.impuestos[mes]||{};
-  const retCliManual=parseNum($("t_retcli")?$("t_retcli").value:"")||0;
-  // si ya hay retenciones del informe, no las pisamos con el campo manual
-  const yaHayInforme=(dPrev.retIVAClientes||0)>0 && (dPrev.ivaCompras>0||dPrev.ivaVentas>0);
-  const retCli=yaHayInforme? dPrev.retIVAClientes : retCliManual;
+  // Retención IVA (clientes) editable: se respeta lo que quedó en el campo (cargarFormImp
+  // lo llena con el valor actual, así que guardar sin tocarlo no cambia nada; si lo editás,
+  // esa corrección manual pisa el valor que trajo el informe).
+  const retCli=parseNum($("t_retcli")?$("t_retcli").value:"")||0;
   const sfav=parseNum($("t_sfav")?$("t_sfav").value:"")||0;
   state.impuestos[mes]=Object.assign({},dPrev,{ivaContador:payload.ivaContador,retBancIIBB:payload.retBancIIBB,iibbContador:payload.iibbContador,alicIIBB:payload.alicIIBB,coefCABA:payload.coefCABA,coefBsAs:payload.coefBsAs,ivaExtracto:ivaExtractoPrev,retIVAClientes:retCli,saldoFavorIIBB:sfav});
   showMsg("t_msg","ok",`Datos de impuestos de ${ymLabel(mes)} guardados.`);
   drawImpuestos();
   await apiPost({action:"setImpuestos",...payload});
-  await apiPost({action:"setDiarioIVA",mes,saldoFavorIIBB:sfav,...(yaHayInforme?{}:{retIVAClientes:retCli})});
+  await apiPost({action:"setDiarioIVA",mes,saldoFavorIIBB:sfav,retIVAClientes:retCli});
 };
 
 /* Relee la planilla y avisa si hay filas repetidas del mismo mes.
@@ -3176,20 +3176,29 @@ function parseDiarioVentas(txt){
 function parseRetenciones(txt){
   const lines=txt.split(/\r\n|\r|\n/);
   let retIVA=0,retIIBB=0,retGan=0,suss=0;
-  lines.forEach(ln=>{
-    // importe = último número argentino (con decimales) de la línea
-    const imps=ln.match(/\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2}/g);
-    if(!imps)return;
-    // código de retención: 202/204/205/206 como entero aislado (no parte de un importe ni de un año/CUIT)
-    const cm=ln.match(/(?:^|[^\d.,])(20[2456])(?:[^\d.,]|$)/);
-    if(!cm)return;
-    const val=parseNumAr(imps[imps.length-1]);
-    if(!val)return;
-    const cod=cm[1];
+  const sumar=(cod,val)=>{
     if(cod==="202")retIVA+=val;
     else if(cod==="204")retGan+=val;
     else if(cod==="205")retIIBB+=val;
     else if(cod==="206")suss+=val;   // S.U.S.S.: solo informativo, no entra en cálculos
+  };
+  lines.forEach(ln=>{
+    // importe = último número argentino (con decimales) de la línea
+    const imps=ln.match(/\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2}/g);
+    if(!imps)return;
+    const val=parseNumAr(imps[imps.length-1]);
+    if(!val)return;
+    // Formato del sistema: columnas separadas por ";". El CÓDIGO (202/204/205/206) está
+    // en su propia columna; se ignora la columna 0 (nº de fila), que si vale 202/204/205/206
+    // colisionaba con el código y hacía que la retención se sumara al tipo equivocado.
+    const celdas=ln.split(";");
+    if(celdas.length>=9){
+      const codCol=celdas.slice(1).map(c=>c.trim()).find(c=>/^20[2456]$/.test(c));
+      if(codCol){ sumar(codCol,val); return; }
+    }
+    // Fallback (informes sin columnas ";"): código como entero aislado en la línea.
+    const cm=ln.match(/(?:^|[^\d.,])(20[2456])(?:[^\d.,]|$)/);
+    if(cm)sumar(cm[1],val);
   });
   return {retIVA,retIIBB,retGan,suss};
 }
