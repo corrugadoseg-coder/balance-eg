@@ -523,8 +523,8 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
       <div class="f"><label>IVA al contador <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">cuando lo tengas</span></label><input id="t_ivacont" class="mono" inputmode="decimal" placeholder="0,00"></div>
     </div>
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
-      <div class="f"><label>Saldo a favor anterior (IIBB) <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">positivo = a favor tuyo</span></label><input id="t_sfav" class="mono" inputmode="decimal" placeholder="0,00"></div>
-      <div class="f"><label>IIBB al contador <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">cuando lo tengas</span></label><input id="t_iibbcont" class="mono" inputmode="decimal" placeholder="0,00"></div>
+      <div class="f"><label>Saldo a favor anterior (IIBB) <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">automático: del "al contador" del mes anterior</span></label><input id="t_sfav" class="mono" readonly style="background:var(--paper2);color:var(--ink2)" placeholder="0,00"></div>
+      <div class="f"><label>IIBB al contador <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">negativo = a favor</span></label><input id="t_iibbcont" class="mono" inputmode="decimal" placeholder="0,00"></div>
     </div>
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
       <div class="f"><label>Alícuota IIBB %</label><input id="t_alic" class="mono" inputmode="decimal" placeholder="3"></div>
@@ -1892,13 +1892,11 @@ function cargarFormImp(){
   if($("t_retiibb"))$("t_retiibb").value=f(im.retIIBBClientes||0);
   if($("t_retgan")) $("t_retgan").value =f(im.retGanancias||0);
   if($("t_retsuss"))$("t_retsuss").value=f(im.retSUSSClientes||0);
-  // saldo a favor de IIBB: si el mes no tiene nada guardado, lo proponemos con
-  // el saldo que quedó deducido el mes anterior (IIBB al contador negativo = a favor)
-  let sfav=(state.impuestos[mes]||{}).saldoFavorIIBB||0;
-  if(!sfav){
-    const iibbAnt=(state.impuestos[mesAnterior(mes)]||{}).iibbContador||0;
-    if(iibbAnt<0)sfav=-iibbAnt;
-  }
+  // saldo a favor de IIBB: SIEMPRE se toma del "IIBB al contador" del mes anterior
+  // (negativo = a favor). Es automático y de solo lectura; no depende de lo guardado
+  // en este mes ni de reabrir los meses en orden.
+  const iibbAnt=(state.impuestos[mesAnterior(mes)]||{}).iibbContador||0;
+  const sfav=iibbAnt<0?-iibbAnt:0;
   if($("t_sfav"))$("t_sfav").value=f(sfav);
   $("t_ivacont").value=f(d.ivaContador);
   $("t_iibbcont").value=f(d.iibbContador);
@@ -1924,7 +1922,10 @@ $("t_save").onclick=async ()=>{
   // lo llena con el valor actual, así que guardar sin tocarlo no cambia nada; si lo editás,
   // esa corrección manual pisa el valor que trajo el informe).
   const retCli=parseNum($("t_retcli")?$("t_retcli").value:"")||0;
-  const sfav=parseNum($("t_sfav")?$("t_sfav").value:"")||0;
+  // saldo a favor anterior: derivado del "al contador" del mes anterior (se guarda por registro,
+  // pero la app siempre lo recalcula al mostrar; no queda "congelado").
+  const iibbAntSave=(state.impuestos[mesAnterior(mes)]||{}).iibbContador||0;
+  const sfav=iibbAntSave<0?-iibbAntSave:0;
   state.impuestos[mes]=Object.assign({},dPrev,{ivaContador:payload.ivaContador,retBancIIBB:payload.retBancIIBB,iibbContador:payload.iibbContador,alicIIBB:payload.alicIIBB,coefCABA:payload.coefCABA,coefBsAs:payload.coefBsAs,ivaExtracto:ivaExtractoPrev,retIVAClientes:retCli,saldoFavorIIBB:sfav});
   showMsg("t_msg","ok",`Datos de impuestos de ${ymLabel(mes)} guardados.`);
   drawImpuestos();
@@ -2072,10 +2073,9 @@ function drawImpuestos(){
     </tbody></table>`;
   // ---- IIBB ----
   const ii=iibbMes(mes);
-  // saldo a favor anterior: primero el campo propio; si no está, el método viejo (contador anterior negativo)
-  const sfavCampo=d.saldoFavorIIBB||0;
+  // saldo a favor anterior: SIEMPRE del "IIBB al contador" del mes anterior (negativo = a favor)
   const saldoAntCont=(state.impuestos[mesAnterior(mes)]||{}).iibbContador||0;
-  const saldoFavorAnt = sfavCampo>0 ? sfavCampo : (saldoAntCont<0 ? -saldoAntCont : 0);
+  const saldoFavorAnt = saldoAntCont<0 ? -saldoAntCont : 0;
   const estimIIBB = ii.iibbBruto - ii.deducciones - saldoFavorAnt;
   const difIIBB = d.iibbContador? (estimIIBB-d.iibbContador):null;
   $("t_iibb").innerHTML=`
@@ -2097,7 +2097,7 @@ function drawImpuestos(){
       <tr><td class="l">Al contador</td><td class="num">${d.iibbContador?money(d.iibbContador):"—"}</td></tr>
       ${difIIBB!==null?`<tr><td class="l">Diferencia</td><td class="num" style="color:${Math.abs(difIIBB)<1?'var(--green)':'var(--red)'}">${money(difIIBB)}</td></tr>`:""}
     </tbody></table>
-    <small class="note">El IIBB se calcula con la alícuota sobre la porción de Bs As (coeficiente editable). El saldo a favor del mes anterior se toma del valor "Al contador" del mes previo (si fue negativo). Confirmá siempre con tu contador.</small>`;
+    <small class="note">El IIBB se calcula con la alícuota sobre la porción de Bs As (coeficiente editable). El saldo a favor del mes anterior se toma <b>automáticamente</b> del "IIBB al contador" del mes previo: cargalo en negativo cuando es a favor y se arrastra solo (no hay que reabrir los meses en orden). Confirmá siempre con tu contador.</small>`;
   drawPagosImp();
 }
 
