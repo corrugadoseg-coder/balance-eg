@@ -971,6 +971,12 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     </div>
     <div class="msg" id="d_email_msg"></div>
 
+    <div class="sectlabel" style="margin-top:26px">Reparto de gastos en cuotas</div>
+    <p class="lead" style="margin-bottom:12px">Facturas cuyo IVA va entero en el mes de emisión pero el gasto neto se imputa en cuotas. La regla es por proveedor y cada factura se reparte desde su propio mes. El IVA no se toca. Se guarda en la planilla (hoja Config), igual para todas las computadoras.</p>
+    <div style="overflow-x:auto"><table id="d_reparto_tbl" style="max-width:780px"><tbody></tbody></table></div>
+    <div class="row-actions" style="margin-top:6px"><button class="btn ghost sm" id="d_reparto_add" type="button">+ Agregar proveedor</button></div>
+    <div class="msg" id="d_reparto_msg"></div>
+
     <div class="sectlabel" style="margin-top:26px">Estado</div>
     <table style="max-width:480px">
       <tbody id="d_stats"></tbody>
@@ -1035,6 +1041,54 @@ function olvidarApiUrl(){
 }
 /* ===================================================================== */
 
+/* =====================================================================
+   REPARTO DE GASTOS EN CUOTAS (facturas diferidas)
+   Algunas facturas tienen el IVA en el mes de emisión (no se toca) pero el
+   gasto NETO se paga/imputa en cuotas. La regla es POR PROVEEDOR: cuántas
+   cuotas y si arranca el mes de la factura o el siguiente. Cada factura se
+   reparte desde SU propio mes de emisión.
+   El reparto se calcula al vuelo al armar el balance (NO se guarda como
+   filas), porque el informe de compras reescribe el mes al reprocesarse.
+   La config es criterio CONTABLE: vive en la planilla (hoja Config, clave
+   "repartoCuotas") para que sea igual en todas las computadoras. getAll la
+   trae en j.data.config.repartoCuotas (ver apiGet) y setConfig la guarda.
+   ===================================================================== */
+let repartoProv=[];   // [{prov, cuotas, desde:"factura"|"siguiente"}]
+const REPARTO_KEY="repartoCuotas";
+function guardarReparto(){
+  return apiPost({action:"setConfig", clave:REPARTO_KEY, valor:JSON.stringify(repartoProv)});
+}
+function reglaReparto(prov){
+  const p=String(prov||"").trim().toLowerCase();
+  if(!p)return null;
+  return repartoProv.find(r=>String(r.prov||"").trim().toLowerCase()===p && r.cuotas>1)||null;
+}
+/* expande una fila del informe en sus cuotas (o [ella misma] si no tiene regla).
+   Redondeo a 2 decimales; la diferencia va en la última cuota para que sume exacto. */
+function repartirInforme(g){
+  const base=normMes(g.mes)||g.mes;
+  const regla=reglaReparto(g.prov);
+  if(!regla)return [{mes:base, prov:g.prov, rubro:g.rubro, tipo:g.tipo, monto:g.monto||0, cuota:0, cuotas:0}];
+  const K=Math.max(2,Math.round(regla.cuotas));
+  const offset=(regla.desde==="siguiente")?1:0;
+  const total=g.monto||0;
+  const parte=Math.round((total/K)*100)/100;
+  const out=[];
+  for(let i=0;i<K;i++){
+    const monto=(i===K-1)? Math.round((total-parte*(K-1))*100)/100 : parte;
+    out.push({mes:mesMasN(base, offset+i), prov:g.prov, rubro:g.rubro, tipo:g.tipo, monto, cuota:i+1, cuotas:K});
+  }
+  return out;
+}
+/* todas las filas del informe ya repartidas en cuotas (para todos los meses) */
+function gastosInformeExpandido(){
+  const out=[];
+  (state.gastosInforme||[]).forEach(g=>{ repartirInforme(g).forEach(p=>out.push(p)); });
+  return out;
+}
+/* etiqueta del desglose: "Proveedor (1/3)" cuando es una cuota */
+function provCuotaLabel(p){ return (p&&p.cuota>0)?`${p.prov} (${p.cuota}/${p.cuotas})`:(p?p.prov:""); }
+
 let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[], chequesEmit:[], sueldos:[], exclusionesIVA:["EDESUR","AYSA","METROGAS"], gastosInforme:[], svInforme:{}, gtCargas:{} };  // impuestos: {"2026-01":{...}} · gtCargas: {"2026-08":{total,porMes}}
 let balView="total";
 const $=id=>document.getElementById(id);
@@ -1097,6 +1151,7 @@ async function apiGet(){
   }
   if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; state.chequesEmit=j.data.chequesEmit||[]; state.sueldos=j.data.sueldos||[]; state.gastosInforme=j.data.gastosInforme||[]; if(j.data.config&&j.data.config.exclusionesIVA){try{state.exclusionesIVA=JSON.parse(j.data.config.exclusionesIVA);}catch(e){}}
     if(j.data.config&&j.data.config.svInforme){try{state.svInforme=JSON.parse(j.data.config.svInforme);}catch(e){}}
+    if(j.data.config&&j.data.config.repartoCuotas){try{repartoProv=JSON.parse(j.data.config.repartoCuotas)||[];}catch(e){}}   // reglas de reparto en cuotas (criterio contable, compartido)
     // GT Cargas: desgloses de flete keyed por N° de comprobante ({comprobante:{comprobante,facturaMes,total,porMes}});
     // tolera valores como string JSON
     state.gtCargas={}; const gtRaw=j.data.gtCargas||{};
@@ -1490,8 +1545,10 @@ function drawBalance(){
   const gByR={}; let gTot=0;
   // 1) gastos cargados a mano (facturas, sueldos, servicios, impositivos)
   state.gastos.filter(g=>ym(g.fecha)===mes).forEach(g=>{const v=gastoVal(g,bn);gByR[g.rubro]=(gByR[g.rubro]||0)+v;gTot+=v;});
-  // 2) gastos que vienen de los informes (compras = Tipo A, parte B = Tipo B)
-  state.gastosInforme.filter(g=>normMes(g.mes)===normMes(mes)).forEach(g=>{
+  // 2) gastos que vienen de los informes (compras = Tipo A, parte B = Tipo B),
+  //    ya repartidos en cuotas para los proveedores con regla de reparto (IVA no se toca).
+  const infoMes=gastosInformeExpandido().filter(g=>normMes(g.mes)===normMes(mes));
+  infoMes.forEach(g=>{
     const esNegro=(g.tipo==="negro");
     if(bn==="total" || (bn==="blanco" && !esNegro) || (bn==="negro" && esNegro)){
       gByR[g.rubro]=(gByR[g.rubro]||0)+g.monto; gTot+=g.monto;
@@ -1499,12 +1556,13 @@ function drawBalance(){
   });
   // 2b) detalle por proveedor de esos mismos gastos, para poder desplegar cada rubro.
   //     Las filas viejas (guardadas antes de tener proveedor) no aportan detalle.
+  //     La cuota se muestra en el nombre, ej. "Proveedor SA (1/3)".
   const detByR={};
-  state.gastosInforme.filter(g=>normMes(g.mes)===normMes(mes)).forEach(g=>{
+  infoMes.forEach(g=>{
     const esNegro=(g.tipo==="negro");
     if(bn!=="total" && ((bn==="blanco")===esNegro))return;
     if(!g.prov)return;
-    (detByR[g.rubro]=detByR[g.rubro]||[]).push(g);
+    (detByR[g.rubro]=detByR[g.rubro]||[]).push({prov:provCuotaLabel(g), monto:g.monto, tipo:g.tipo});
   });
   // 2b-bis) también los gastos cargados a mano (facturas, sueldos, CCSS, servicios, impositivos)
   //         componen el detalle de su rubro, para poder desplegarlo (ej. CCSS, SIND Y SUELDOS).
@@ -1567,7 +1625,7 @@ function drawBalance(){
       if(g.bn==="negro")gB[g.rubro]=(gB[g.rubro]||0)+(g.monto||0);
       else gA[g.rubro]=(gA[g.rubro]||0)+(g.monto||0);
     });
-    state.gastosInforme.filter(g=>normMes(g.mes)===normMes(mes)).forEach(g=>{
+    infoMes.forEach(g=>{
       if(g.tipo==="negro")gB[g.rubro]=(gB[g.rubro]||0)+g.monto;
       else gA[g.rubro]=(gA[g.rubro]||0)+g.monto;
     });
@@ -1736,10 +1794,10 @@ function applyFilters(){
   const inRange=k=>(!desde||k>=desde)&&(!hasta||k<=hasta);
   // gastos del informe (compras=blanco, parte B=negro) normalizados a la forma de un gasto.
   // Son filas aparte de state.gastos (no se duplican). Fecha = 1° del mes para filtrar por período.
-  const infoComoGastos=state.gastosInforme.map(x=>({
+  const infoComoGastos=gastosInformeExpandido().map(x=>({
     fecha:(normMes(x.mes)||x.mes)+"-01",
-    prov:x.prov||"", rubro:x.rubro,
-    sub:x.tipo==="negro"?"Parte B":"Compras",
+    prov:x.prov||"", rubro:x.rubro,   // prov sin la cuota: el filtro de proveedor lo compara tal cual
+    sub:(x.tipo==="negro"?"Parte B":"Compras")+(x.cuota>0?` (cuota ${x.cuota}/${x.cuotas})`:""),
     bn:x.tipo==="negro"?"negro":"blanco",
     monto:x.monto||0, iva:0, piva:0, piibb:0
   }));
@@ -3491,7 +3549,7 @@ $("di_guardar").onclick=async ()=>{
 function aniosConDatos(){
   const s=new Set();
   state.gastos.forEach(g=>{const a=fechaCorta(g.fecha).slice(0,4); if(a)s.add(a);});
-  state.gastosInforme.forEach(g=>{const a=(normMes(g.mes)||"").slice(0,4); if(a)s.add(a);});
+  gastosInformeExpandido().forEach(g=>{const a=(normMes(g.mes)||"").slice(0,4); if(a)s.add(a);});   // cuotas pueden caer en otro año
   Object.keys(state.ventas).forEach(k=>s.add(k.slice(0,4)));
   if(!s.size)s.add(String(new Date().getFullYear()));
   return [...s].sort();
@@ -3499,7 +3557,7 @@ function aniosConDatos(){
 function datosAnio(anio){
   const gs=state.gastos.filter(g=>fechaCorta(g.fecha).slice(0,4)===anio);
   // gastos que vienen de los informes (compras + parte B); son filas aparte de state.gastos, no se duplican
-  const gi=state.gastosInforme.filter(g=>(normMes(g.mes)||"").slice(0,4)===anio);
+  const gi=gastosInformeExpandido().filter(g=>(normMes(g.mes)||"").slice(0,4)===anio);   // ya repartido en cuotas
   // "Impuestos del mes": IVA al contador de cada mes; vive en state.impuestos, no se duplica
   const imp=Object.keys(state.impuestos)
     .filter(k=>(normMes(k)||"").slice(0,4)===anio)
@@ -3798,6 +3856,43 @@ function pintarApiUrl(){
   const i=$("d_api"); if(i)i.value=API||"";
   const e=$("d_email"); if(e)e.value=EMAIL_CONTADORA||"";
 }
+/* ---- tabla de reparto de gastos en cuotas (editable, en localStorage) ---- */
+function refrescarPorReparto(){
+  if($("b_mes"))drawBalance();
+  if($("r_anio1"))renderResumen();
+  showMsg("d_reparto_msg","ok","Reparto actualizado. El balance se recalcula solo.");
+}
+function renderReparto(){
+  const tb=$("d_reparto_tbl"); if(!tb)return;
+  const body=tb.querySelector("tbody")||tb;
+  const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+  let h=`<tr><th class="l">Proveedor (igual que en el informe)</th><th>Cuotas</th><th>Arranca</th><th></th></tr>`;
+  if(!repartoProv.length){
+    h+=`<tr><td colspan="4"><div class="empty" style="padding:10px 4px">Sin proveedores con reparto. Agregá uno con “+ Agregar proveedor”.</div></td></tr>`;
+  } else {
+    repartoProv.forEach((r,i)=>{
+      h+=`<tr>
+        <td class="l"><input data-rep="prov" data-i="${i}" value="${esc(r.prov)}" placeholder="Ej. Proveedor SA (igual que en el informe)" style="min-width:240px"></td>
+        <td><input data-rep="cuotas" data-i="${i}" type="number" min="2" value="${r.cuotas||2}" style="width:80px"></td>
+        <td><select data-rep="desde" data-i="${i}"><option value="factura"${r.desde!=="siguiente"?" selected":""}>Mes de la factura</option><option value="siguiente"${r.desde==="siguiente"?" selected":""}>Mes siguiente</option></select></td>
+        <td style="text-align:center"><button class="del" data-repdel="${i}" title="Borrar">✕</button></td>
+      </tr>`;
+    });
+  }
+  body.innerHTML=h;
+  body.querySelectorAll("[data-rep]").forEach(el=>el.onchange=()=>{
+    const i=+el.dataset.i, campo=el.dataset.rep; if(!repartoProv[i])return;
+    if(campo==="cuotas")repartoProv[i].cuotas=Math.max(2,parseInt(el.value,10)||2);
+    else repartoProv[i][campo]=el.value;
+    guardarReparto(); refrescarPorReparto();
+  });
+  body.querySelectorAll("[data-repdel]").forEach(b=>b.onclick=()=>{
+    repartoProv.splice(+b.dataset.repdel,1); guardarReparto(); renderReparto(); refrescarPorReparto();
+  });
+}
+if($("d_reparto_add"))$("d_reparto_add").onclick=()=>{
+  repartoProv.push({prov:"",cuotas:3,desde:"factura"}); guardarReparto(); renderReparto();
+};
 if($("d_email_save"))$("d_email_save").onclick=()=>{
   if(!guardarEmailContadora($("d_email").value)){ showMsg("d_email_msg","learn","Ese email no parece válido. Ej: nombre@dominio.com"); return; }
   $("d_email").value=EMAIL_CONTADORA;
@@ -3906,7 +4001,7 @@ function renderHomeEstado(preferido){
     };
   });
 }
-function renderAll(){ renderGastos(); renderVentas(); renderBalance(); renderStats(); renderHomeEstado(); }
+function renderAll(){ renderGastos(); renderVentas(); renderBalance(); renderStats(); renderHomeEstado(); renderReparto(); }
 
 /* ---- boot ---- */
 initSelects();
