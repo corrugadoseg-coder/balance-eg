@@ -977,6 +977,14 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="row-actions" style="margin-top:6px"><button class="btn ghost sm" id="d_reparto_add" type="button">+ Agregar proveedor</button></div>
     <div class="msg" id="d_reparto_msg"></div>
 
+    <div class="sectlabel" style="margin-top:26px">Comisión sobre ventas a ACA</div>
+    <p class="lead" style="margin-bottom:12px">% de comisión sobre lo facturado (neto) a ACA. Al leer el informe de IVA Ventas del mes se registra como gasto negro (rubro GASTOS DE ADMINISTRACIÓN). Se guarda en la planilla. Cambiar el % rige al volver a leer el informe de cada mes.</p>
+    <div class="grid" style="grid-template-columns:auto auto;gap:10px;align-items:end;max-width:420px;justify-content:start">
+      <div class="f"><label>Comisión ACA (%)</label><input id="d_aca_pct" class="mono" inputmode="decimal" style="width:120px" placeholder="4"></div>
+      <div class="row-actions" style="margin:0"><button class="btn sm" id="d_aca_save" type="button">Guardar %</button></div>
+    </div>
+    <div class="msg" id="d_aca_msg"></div>
+
     <div class="sectlabel" style="margin-top:26px">Estado</div>
     <table style="max-width:480px">
       <tbody id="d_stats"></tbody>
@@ -1089,6 +1097,18 @@ function gastosInformeExpandido(){
 /* etiqueta del desglose: "Proveedor (1/3)" cuando es una cuota */
 function provCuotaLabel(p){ return (p&&p.cuota>0)?`${p.prov} (${p.cuota}/${p.cuotas})`:(p?p.prov:""); }
 
+/* =====================================================================
+   COMISIÓN SOBRE VENTAS A ACA (Asociación de Cooperativas Argentinas)
+   Sobre el NETO facturado a ACA (filtrado por CUIT) se paga una comisión
+   que se registra como GASTO EN NEGRO del mes (rubro GASTOS DE ADMIN.).
+   El % es configurable (hoja Config, clave "comisionACA"); el cálculo es
+   interno: NO se muestra en la pantalla de IVA Ventas. Upsert por mes
+   (id "ACA-AAAAMM") para que reprocesar el informe actualice, no duplique.
+   ===================================================================== */
+const ACA_CUIT="30500120882";                       // 30-50012088-2, sin separadores
+const ACA_NOMBRE="Gasto de comercialización ACA";
+let comisionACAPct=4;                                // %, se carga de la hoja Config
+
 let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[], chequesEmit:[], sueldos:[], exclusionesIVA:["EDESUR","AYSA","METROGAS"], gastosInforme:[], svInforme:{}, gtCargas:{} };  // impuestos: {"2026-01":{...}} · gtCargas: {"2026-08":{total,porMes}}
 let balView="total";
 const $=id=>document.getElementById(id);
@@ -1152,6 +1172,7 @@ async function apiGet(){
   if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; state.chequesEmit=j.data.chequesEmit||[]; state.sueldos=j.data.sueldos||[]; state.gastosInforme=j.data.gastosInforme||[]; if(j.data.config&&j.data.config.exclusionesIVA){try{state.exclusionesIVA=JSON.parse(j.data.config.exclusionesIVA);}catch(e){}}
     if(j.data.config&&j.data.config.svInforme){try{state.svInforme=JSON.parse(j.data.config.svInforme);}catch(e){}}
     if(j.data.config&&j.data.config.repartoCuotas){try{repartoProv=JSON.parse(j.data.config.repartoCuotas)||[];}catch(e){}}   // reglas de reparto en cuotas (criterio contable, compartido)
+    if(j.data.config&&j.data.config.comisionACA!==undefined){try{const p=JSON.parse(j.data.config.comisionACA); if(typeof p==="number"&&p>=0)comisionACAPct=p;}catch(e){}}   // % comisión ventas ACA
     // GT Cargas: desgloses de flete keyed por N° de comprobante ({comprobante:{comprobante,facturaMes,total,porMes}});
     // tolera valores como string JSON
     state.gtCargas={}; const gtRaw=j.data.gtCargas||{};
@@ -3224,7 +3245,33 @@ function parseDiarioVentas(txt){
   const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
   const ivaTotal=tot(/TOTAL I\.V\.A\.\s*\.+;?\s*([\d.,-]+)/);
   const neto=tot(/NETO\s*\.+;?\s*([\d.,-]+)/);
-  return {ivaTotal,neto};
+  // Neto facturado a ACA (por CUIT, no por nombre): base de la comisión de comercialización.
+  // Formato del sistema: columnas ";"  →  [7]=CUIT, [9]=neto gravado (las NCr vienen con signo −).
+  let netoACA=0;
+  txt.split(/\r\n|\r|\n/).forEach(ln=>{
+    const c=ln.split(";");
+    if(c.length<11)return;
+    if(c.some(x=>x.replace(/\D/g,"")===ACA_CUIT)) netoACA+=parseNumAr(c[9]||"");
+  });
+  return {ivaTotal,neto,netoACA};
+}
+/* Imputa la comisión sobre ventas a ACA como GASTO EN NEGRO del mes (upsert por mes).
+   El % sale de comisionACAPct (config). Devuelve el monto imputado (0 si no hay). */
+async function imputarComisionACA(mes, netoACA){
+  const m=normMes(mes)||mes;
+  const id=`ACA-${String(m).replace("-","")}`;                 // ej. ACA-202607
+  const idx=state.gastos.findIndex(g=>g.id===id);
+  const comision=Math.round((netoACA||0)*(comisionACAPct/100)*100)/100;
+  if(comision>0){
+    const fecha=ultimoDiaMes(m);
+    const g={id,fecha,prov:ACA_NOMBRE,rubro:"GASTOS DE ADMINISTRACIÓN",sub:`Comisión ${comisionACAPct}% ventas ACA`,bn:"negro",monto:comision,iva:0,piva:0,piibb:0};
+    if(idx>=0){ state.gastos[idx]=Object.assign(state.gastos[idx],g); await apiPost({action:"updateGasto",id,fecha,prov:g.prov,rubro:g.rubro,sub:g.sub,bn:g.bn,monto:comision,iva:0,piva:0,piibb:0}); }
+    else { state.gastos.push(g); await apiPost({action:"addGasto",id,fecha,prov:g.prov,rubro:g.rubro,sub:g.sub,bn:g.bn,monto:comision,iva:0,piva:0,piibb:0}); }
+    return comision;
+  } else if(idx>=0){
+    state.gastos.splice(idx,1); await apiPost({action:"deleteGasto",id});   // ese mes ya no factura a ACA
+  }
+  return 0;
 }
 /* retenciones sufridas por tipo */
 /* Clasifica cada retención por su CÓDIGO, que va en la MISMA línea que el importe:
@@ -3523,6 +3570,14 @@ $("di_guardar").onclick=async ()=>{
     items.forEach(it=>state.gastosInforme.push({mes,rubro:it.rubro,prov:it.prov,monto:it.monto,tipo:it.tipo}));
     await apiPost({action:"setGastosInforme",mes,items:JSON.stringify(items)});
   }
+  // Comisión sobre ventas a ACA: gasto NEGRO del mes (cálculo interno, no aparece en IVA Ventas).
+  // Solo si se leyó el informe de ventas en esta carga (v). Upsert por mes (no duplica).
+  let acaMsg="";
+  if(v){
+    const com=await imputarComisionACA(mes, v.netoACA||0);
+    renderGastos();
+    if(com>0)acaMsg=` Comisión ACA (${comisionACAPct}%): ${money(com)} como gasto negro.`;
+  }
   // GT Cargas: guardamos el desglose de ESTA factura, keyed por N° de comprobante
   // (reemplaza el mismo comprobante; dos facturas distintas del mismo mes no se pisan).
   let gtMsg="";
@@ -3540,6 +3595,7 @@ $("di_guardar").onclick=async ()=>{
   renderDiarioIVA();
   let msg=`Informes de ${ymLabel(mes)} guardados. El IVA se paga en ${ymLabel(mesPago)}.`;
   if(sinRubro)msg+=` Ojo: ${sinRubro} proveedor(es) sin rubro no suman al balance.`;
+  if(acaMsg)msg+=acaMsg;
   if(gtMsg)msg+=gtMsg;
   showMsg("di_msg",gtMsg?"learn":"ok",msg);
 };
@@ -3855,7 +3911,15 @@ if($("i_print"))$("i_print").onclick=()=>{
 function pintarApiUrl(){
   const i=$("d_api"); if(i)i.value=API||"";
   const e=$("d_email"); if(e)e.value=EMAIL_CONTADORA||"";
+  const a=$("d_aca_pct"); if(a)a.value=comisionACAPct;
 }
+if($("d_aca_save"))$("d_aca_save").onclick=()=>{
+  const p=parseFloat(String($("d_aca_pct").value).replace(",",".").trim());
+  if(!(p>=0)){ showMsg("d_aca_msg","learn","Poné un número válido, ej. 4"); return; }
+  comisionACAPct=p;
+  apiPost({action:"setConfig", clave:"comisionACA", valor:JSON.stringify(comisionACAPct)});
+  showMsg("d_aca_msg","ok",`Comisión ACA guardada: ${p}%. Rige al volver a leer el informe de ventas de cada mes.`);
+};
 /* ---- tabla de reparto de gastos en cuotas (editable, en localStorage) ---- */
 function refrescarPorReparto(){
   if($("b_mes"))drawBalance();
