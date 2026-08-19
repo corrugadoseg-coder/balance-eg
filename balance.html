@@ -3042,14 +3042,37 @@ $("che_add").onclick=()=>{
 };
 function drawChequesTabla(){
   const f=$("che_filtro").value;
-  // orden por fecha de pago, más reciente arriba (descendente); los sin fecha van al fondo
-  let list=state.chequesEmit.slice().sort((a,b)=>(b.fechaPago||"").localeCompare(a.fechaPago||""));
-  if(f==="No cobrado"||f==="Cobrado")list=list.filter(c=>c.estado===f);
-  if(f==="electronico"||f==="fisico")list=list.filter(c=>c.tipo===f);
   const tb=$("che_tbl").querySelector("tbody");
-  if(!list.length){tb.innerHTML=`<tr><td colspan="7"><div class="empty">No hay cheques${f?" con ese filtro":" cargados"}.</div></td></tr>`;return;}
-  // Acumulado que puede entrar al banco a una fecha: suma de TODOS los cheques no cobrados con fecha de pago <= esa fecha
-  // (cualquier no cobrado puede presentarse cualquier día; ignora filtros de tipo/estado; los cobrados no suman).
+  // corte de 30 días: fecha de hace 30 días (para ocultar cobrados viejos)
+  const [yy,mm,dd]=todayISO().split("-").map(Number);
+  const dcorte=new Date(yy,mm-1,dd-30);
+  const corte=dcorte.getFullYear()+"-"+String(dcorte.getMonth()+1).padStart(2,"0")+"-"+String(dcorte.getDate()).padStart(2,"0");
+
+  let base=state.chequesEmit.slice();
+  if(f==="electronico"||f==="fisico")base=base.filter(c=>c.tipo===f);
+  let pend=base.filter(c=>c.estado!=="Cobrado");
+  let cob =base.filter(c=>c.estado==="Cobrado");
+  // ocultar cobrados de hace más de 30 días (salvo que se pida ver "solo cobrados").
+  // La cuenta corre desde fechaCobrado (fecha en que se marcó); si no existe (datos viejos), se usa la fecha de pago.
+  const verTodosCob=(f==="Cobrado");
+  let cobOcultos=0;
+  if(!verTodosCob){
+    const antes=cob.length;
+    cob=cob.filter(c=>{ const ref=c.fechaCobrado||c.fechaPago||""; return !ref || ref>=corte; });
+    cobOcultos=antes-cob.length;
+  }
+  if(f==="No cobrado")cob=[];
+  if(f==="Cobrado")pend=[];
+
+  // pendientes: por fecha de pago ASCENDENTE (el que vence antes, arriba); sin fecha al fondo
+  pend.sort((a,b)=>{ const fa=a.fechaPago||"", fb=b.fechaPago||""; if(!fa&&!fb)return 0; if(!fa)return 1; if(!fb)return -1; return fa.localeCompare(fb); });
+  // cobrados: los cobrados más recientemente, arriba
+  cob.sort((a,b)=>(b.fechaCobrado||b.fechaPago||"").localeCompare(a.fechaCobrado||a.fechaPago||""));
+
+  if(!pend.length && !cob.length && !cobOcultos){ tb.innerHTML=`<tr><td colspan="7"><div class="empty">No hay cheques${f?" con ese filtro":" cargados"}.</div></td></tr>`; return; }
+
+  // Acumulado que puede entrar al banco a una fecha: TODOS los no cobrados con fecha de pago <= esa fecha
+  // (cualquier no cobrado puede presentarse cualquier día; ignora filtros; los cobrados no suman).
   const acumDe=(dia)=> state.chequesEmit.reduce((s,c)=> s + ((c.estado!=="Cobrado" && c.fechaPago && c.fechaPago<=dia) ? (c.monto||0) : 0), 0);
   const filaHTML=(c)=>`<tr>
       <td class="l"><span style="font-size:11px">${c.tipo==="fisico"?"Físico":"Electrónico"}</span></td>
@@ -3060,21 +3083,33 @@ function drawChequesTabla(){
       <td><button class="estado-btn ${c.estado==="Cobrado"?'pagado':'pend'}" data-estch="${c.id}">${c.estado}</button></td>
       <td style="white-space:nowrap"><button class="del" data-edch="${c.id}" title="Editar">✎</button> <button class="del" data-delche="${c.id}" title="Borrar">✕</button></td>
     </tr>`;
+  const cab=(txt,bg,col)=>`<tr><td colspan="7" class="l" style="background:${bg};font-family:'IBM Plex Mono';font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:${col};font-weight:600;padding:6px 10px">${txt}</td></tr>`;
   let h=`<tr><th class="l">Tipo</th><th class="l">N°</th><th class="l">Beneficiario</th><th class="l">Pago</th><th class="num">Monto</th><th>Estado</th><th></th></tr>`;
-  let i=0;
-  while(i<list.length){
-    const dia=list[i].fechaPago||"";
-    let filas="";
-    while(i<list.length && (list[i].fechaPago||"")===dia){ filas+=filaHTML(list[i]); i++; }
-    h+=filas;
-    if(dia){
-      h+=`<tr class="sub-dia"><td class="l" colspan="4" style="text-align:right;font-style:italic;color:var(--ink2)">Puede entrar al banco al ${fechaLinda(dia)} · acumulado no cobrado</td><td class="num" style="font-weight:700;color:#c47f1a">${money(acumDe(dia))}</td><td colspan="2"></td></tr>`;
+  // ---- NO COBRADOS (arriba, con acumulado por día) ----
+  if(pend.length){
+    h+=cab(`No cobrados (${pend.length})`,"var(--goldL)","#8a6420");
+    let i=0;
+    while(i<pend.length){
+      const dia=pend[i].fechaPago||"";
+      let filas="";
+      while(i<pend.length && (pend[i].fechaPago||"")===dia){ filas+=filaHTML(pend[i]); i++; }
+      h+=filas;
+      if(dia)h+=`<tr class="sub-dia"><td class="l" colspan="4" style="text-align:right;font-style:italic;color:var(--ink2)">Puede entrar al banco al ${fechaLinda(dia)} · acumulado no cobrado</td><td class="num" style="font-weight:700;color:#c47f1a">${money(acumDe(dia))}</td><td colspan="2"></td></tr>`;
     }
+  }
+  // ---- COBRADOS (debajo, sección propia) ----
+  if(cob.length){
+    h+=cab(`Cobrados (${cob.length})`,"var(--paper2)","var(--ink2)");
+    cob.forEach(c=>{ h+=filaHTML(c); });
+  }
+  if(cobOcultos>0){
+    h+=`<tr><td colspan="7" style="padding:8px 10px"><small class="note">${cobOcultos} cheque(s) cobrado(s) hace más de 30 días, ocultos. Elegí “Solo cobrados” en el filtro para verlos (no se borran de la planilla).</small></td></tr>`;
   }
   tb.innerHTML=h;
   tb.querySelectorAll("[data-estch]").forEach(b=>b.onclick=async ()=>{
     const c=state.chequesEmit.find(x=>x.id===b.dataset.estch); if(!c)return;
-    c.estado=c.estado==="Cobrado"?"No cobrado":"Cobrado";
+    if(c.estado==="Cobrado"){ c.estado="No cobrado"; c.fechaCobrado=""; }
+    else { c.estado="Cobrado"; c.fechaCobrado=todayISO(); }   // guardamos la fecha del cambio de estado
     drawChequesTabla(); drawAvisoCaja();
     await apiPost(Object.assign({action:"setChequeEmit"},c));
   });
