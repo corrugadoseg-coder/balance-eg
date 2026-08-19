@@ -125,6 +125,12 @@ tr.rowB:hover > td{background:var(--bgB2)}
 .sectlabel{font-family:'IBM Plex Mono';font-size:11px;letter-spacing:.2em;text-transform:uppercase;
   color:var(--gold);font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:10px}
 .sectlabel::after{content:"";flex:1;height:1px;background:var(--edge)}
+/* título grande y resaltado de cada informe (Carga de Informes) + pill de "cargado" */
+.informe-tit{font-family:'Spectral',serif;font-size:19px;font-weight:700;color:var(--ink);margin:0 0 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:6px;border-bottom:1px solid var(--edge)}
+.informe-tit .desc{font-family:'Spectral',serif;font-style:italic;font-weight:400;font-size:12px;color:var(--faint)}
+.flagcarga{font-family:'IBM Plex Sans',sans-serif;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 10px;border-radius:20px;white-space:nowrap;display:inline-block;vertical-align:middle}
+.flagcarga.ok{background:var(--greenL);color:var(--green)}
+.flagcarga.no{background:var(--paper2);color:var(--faint)}
 
 /* FORM */
 .grid{display:grid;gap:14px}
@@ -572,7 +578,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
       <div class="f"><label>Mes del informe</label><select id="di_mes"></select></div>
     </div>
 
-    <div class="sectlabel">Informe de IVA COMPRAS</div>
+    <div class="informe-tit">Informe de IVA Compras <span class="flagcarga no" id="di_flag_compras">Sin cargar</span></div>
     <div class="f">
       <textarea id="di_compras" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el Diario de IVA de Compras completo (con los totales del final)."></textarea>
     </div>
@@ -580,21 +586,21 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div id="di_res_compras" class="ledger" style="margin:12px 0"></div>
     <div id="di_rubros_box" style="margin:12px 0"></div>
 
-    <div class="sectlabel" style="margin-top:20px">Informe de IVA VENTAS</div>
+    <div class="informe-tit" style="margin-top:26px">Informe de IVA Ventas <span class="flagcarga no" id="di_flag_ventas">Sin cargar</span></div>
     <div class="f">
       <textarea id="di_ventas" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el Diario de IVA de Ventas completo (con los totales del final)."></textarea>
     </div>
     <div class="row-actions"><button class="btn gold" id="di_calc_ventas">Leer informe de ventas</button></div>
     <div id="di_res_ventas" class="ledger" style="margin:12px 0"></div>
 
-    <div class="sectlabel" style="margin-top:20px">Informe de RETENCIONES SUFRIDAS (clientes)</div>
+    <div class="informe-tit" style="margin-top:26px">Retenciones sufridas (clientes) <span class="flagcarga no" id="di_flag_ret">Sin cargar</span></div>
     <div class="f">
       <textarea id="di_ret" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el listado de retenciones sufridas del mes (con los totales del final)."></textarea>
     </div>
     <div class="row-actions"><button class="btn gold" id="di_calc_ret">Leer retenciones</button></div>
     <div id="di_res_ret" class="ledger" style="margin:12px 0"></div>
 
-    <div class="sectlabel" style="margin-top:20px">Informe de PARTE B (no oficial)</div>
+    <div class="informe-tit" style="margin-top:26px">Parte B <span class="desc">(no oficial)</span> <span class="flagcarga no" id="di_flag_partb">Sin cargar</span></div>
     <p class="lead" style="margin-bottom:8px">Suma a los gastos del mes como Tipo B. No calcula IVA. Las notas de crédito restan.</p>
     <div class="f">
       <textarea id="di_partb" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el informe de la parte B del mes."></textarea>
@@ -603,7 +609,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div id="di_res_partb" class="ledger" style="margin:12px 0"></div>
     <div id="di_rubros_b" style="margin:12px 0"></div>
 
-    <div class="sectlabel" style="margin-top:20px">Desglose GT Cargas (flete) <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px;margin-left:6px">reparte el gasto por fecha de viaje</span></div>
+    <div class="informe-tit" style="margin-top:26px">Desglose GT Cargas (flete) <span class="desc">reparte el gasto por fecha de viaje</span> <span class="flagcarga no" id="di_flag_gt">Sin cargar</span></div>
     <p class="lead" style="margin-bottom:8px">Pegá el desglose de viajes del PDF de GT Cargas. El gasto neto se reparte al mes de cada viaje; el IVA sigue en la factura (se computa en IVA Compras).</p>
     <div class="f">
       <textarea id="di_gt" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el desglose de viajes (cada línea: fecha dd/mm/aa … importe; al final TOTALES CLIENTE)."></textarea>
@@ -629,7 +635,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 <!-- ===== 05 IMP CHEQUE (1,2‰) ===== -->
 <section class="view" data-v="cheque">
   <div class="card">
-    <h2>Impuesto al cheque (Ley 25.413)</h2>
+    <h2>Impuesto al cheque (Ley 25.413) <span class="flagcarga no" id="ch_flag">Sin cargar</span></h2>
     <p class="lead">Pegá el texto del extracto bancario del mes. La app busca las líneas "LEY 25413" (crédito y débito) y las suma sola. Verificá el detalle antes de guardar.</p>
     <div class="monthpick" style="margin-bottom:14px">
       <select id="ch_mes"></select>
@@ -2120,8 +2126,10 @@ function renderChequeTab(){
   const prev=sel.value;
   sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
   if(arr.includes(prev))sel.value=prev; else sel.value=curMonthISO();
+  sel.onchange=actualizarFlagExtracto;   // al cambiar de mes, el pill refleja ese mes
   renderChmSelector();
   renderChequeTabla();
+  actualizarFlagExtracto();
 }
 /* Comisiones del Banco Ciudad que se imputan como GASTO (rubro GASTOS DE ADMINISTRACIÓN).
    El banco trunca las etiquetas → se matchea por PREFIJO, no por texto completo.
@@ -2362,6 +2370,7 @@ $("ch_calc").onclick=()=>{
     if(!imp.coefBsAs)imp.coefBsAs=DEF_CB;
     state.impuestos[mes]=imp;
     renderChequeTabla();
+    actualizarFlagExtracto();   // el pill del título pasa a "Cargado" sin recargar
     // imputar las 4 comisiones del banco como gasto (neto, sin IVA; upsert por mes+concepto)
     const rc=await imputarComisionesExtracto(mes, comisiones);
     renderGastos();
@@ -3390,8 +3399,26 @@ function renderDiarioIVA(){
     gtDeMes.forEach(f=>{ Object.keys(f.porMes||{}).forEach(m=>{ if(!comb.porMes[m])comb.porMes[m]={monto:0,viajes:0}; comb.porMes[m].monto=Math.round((comb.porMes[m].monto+(f.porMes[m].monto||0))*100)/100; comb.porMes[m].viajes+=f.porMes[m].viajes||0; }); comb.total=Math.round((comb.total+(f.total||0))*100)/100; });
     mostrarResGT(comb);
   } else $("di_res_gt").innerHTML="";
+  // pills "cargado / sin cargar" por informe del mes en curso (se actualizan al guardar)
+  setFlagCarga("di_flag_compras", !!d.ivaCompras);
+  setFlagCarga("di_flag_ventas", !!d.ivaVentas);
+  setFlagCarga("di_flag_ret", !!(d.retIVAClientes||d.retIIBBClientes||d.retGanancias||d.retSUSSClientes));
+  setFlagCarga("di_flag_partb", pbTot>0);
+  setFlagCarga("di_flag_gt", gtDeMes.length>0);
   $("di_rubros_box").innerHTML=""; $("di_rubros_b").innerHTML="";
   hideMsg("di_msg");
+}
+/* pill de estado: verde "cargado" / gris "sin cargar" al lado del título del informe */
+function setFlagCarga(id, cargado){
+  const el=$(id); if(!el)return;
+  el.className="flagcarga "+(cargado?"ok":"no");
+  el.textContent=cargado?"✓ Cargado":"Sin cargar";
+}
+/* extracto (Imp. al cheque): cargado si ya hay impuesto/IVA del extracto guardado para el mes */
+function actualizarFlagExtracto(){
+  const m=normMes($("ch_mes")?$("ch_mes").value:"");
+  const cargado=(((state.cheque[m]||{}).total||0)>0) || (((state.impuestos[m]||{}).ivaExtracto||0)>0);
+  setFlagCarga("ch_flag", cargado);
 }
 function mostrarResCompras(r){
   $("di_res_compras").innerHTML=
