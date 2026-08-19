@@ -3309,18 +3309,18 @@ function parseRetenciones(txt){
 }
 /* PARTE B: suma a gastos como negro, sin IVA. NCr resta. */
 function parseParteB(txt){
+  // Formato real (mismo sistema que Compras/Ventas): columnas separadas por ";"
+  //   [5]=Razón social · [9]=IMPORTE (neto; en Parte B = total, sin IVA). NCr viene con signo −.
+  // Las líneas de totales/encabezado tienen pocas columnas (o razón "Total/NETO/Est.") y se descartan.
   const provNeto={};
-  txt.split("\n").forEach(ln=>{
-    const l=ln.trim();
-    if(!l || /^(Total|NETO|TOTAL|Dia|REG|---|===|#)/i.test(l))return;
-    // Formato real del informe parte B:
-    // Día Fac/NCr Letra Nrocomprob Estado RAZON SOCIAL [C Cons.Final | I CUIT] Tipo Importe Total
-    const m=l.match(/^\s*(\d+)\s+(Fac|NCr|NDb)\s+([BCAM])\s+[\d-]+\s+\w+\s+(.+?)\s+(?:C\s+Cons\.Final|[A-Z]\s+\d{11}|\d{11})\s+\d+\s+([\d.,-]+)\s+([\d.,-]+)\s*$/);
-    if(!m)return;
-    const prov=m[4].trim();
-    const monto=parseNumAr(m[6]);   // última columna = TOTAL de la línea
-    if(!prov)return;
-    provNeto[prov]=(provNeto[prov]||0)+monto;
+  txt.split(/\r\n|\r|\n/).forEach(ln=>{
+    const c=ln.split(";");
+    if(c.length<11)return;
+    const razon=(c[5]||"").trim();
+    if(!razon || /^(Total|NETO|TOTAL|Dia|Est\.|Razon)/i.test(razon))return;
+    const monto=parseNumAr(c[9]||"");
+    if(!monto)return;
+    provNeto[razon]=(provNeto[razon]||0)+monto;
   });
   // eliminar proveedores que netean a cero (factura + nota de crédito)
   Object.keys(provNeto).forEach(p=>{ if(Math.abs(provNeto[p])<0.01)delete provNeto[p]; });
