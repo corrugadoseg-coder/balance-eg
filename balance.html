@@ -283,7 +283,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
         <div class="grupo-t">01 · Registro</div>
         <button class="mitem" data-v="diarioiva"><span class="mn">01</span>Carga de Informes</button>
         <button class="mitem" data-v="gasto"><span class="mn">02</span>Facturas a mano</button>
-        <button class="mitem" data-v="venta"><span class="mn">03</span>Ventas del mes</button>
+        <button class="mitem" data-v="venta"><span class="mn">03</span>Historial de Ventas</button>
       </div>
       <div class="grupo">
         <div class="grupo-t">02 · Impuestos</div>
@@ -428,46 +428,8 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 <!-- ===== 02 VENTAS ===== -->
 <section class="view" data-v="venta">
   <div class="card">
-    <h2>Cargar ventas del mes</h2>
-    <p class="lead">A fin de mes registrá las ventas de cada tipo. El total se calcula solo.</p>
-    <div class="grid" style="grid-template-columns:1fr 1fr 1fr;">
-      <div class="f">
-        <label>Mes</label>
-        <input id="v_mes" type="month">
-      </div>
-      <div class="f">
-        <label>Ventas <span class="bndot bl" style="margin-left:4px" title="Tipo A"></span></label>
-        <input id="v_blanco" class="mono" inputmode="decimal" placeholder="0,00">
-      </div>
-      <div class="f">
-        <label>Ventas <span class="bndot ng" style="margin-left:4px" title="Tipo B"></span></label>
-        <input id="v_negro" class="mono" inputmode="decimal" placeholder="0,00">
-      </div>
-    </div>
-    <div class="grid" style="grid-template-columns:1fr 2fr;margin-top:14px;max-width:520px">
-      <div class="f">
-        <label>IVA de ventas <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px;margin-left:6px">se calcula al 21%, editable</span></label>
-        <input id="v_ivad" class="mono" inputmode="decimal" placeholder="0,00">
-      </div>
-      <div class="f" style="justify-content:flex-end">
-        <button class="btn ghost sm" id="v_calciva" type="button">Calcular IVA (21% de las ventas)</button>
-      </div>
-    </div>
-    <div class="sectlabel" style="margin-top:22px">Retenciones que te hicieron los clientes <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px;margin-left:6px">Se carga automáticamente desde Carga de Informes</span></div>
-    <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
-      <div class="f"><label>Retención IVA</label><input id="v_riva" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
-      <div class="f"><label>Retención IIBB</label><input id="v_riibb" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
-      <div class="f"><label>Retención Ganancias</label><input id="v_rgan" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
-      <div class="f"><label>Retención SUSS <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">informativa</span></label><input id="v_rsuss" class="mono" placeholder="0,00" readonly style="background:var(--paper2);color:var(--ink2)"></div>
-    </div>
-    <div class="msg" id="v_msg"></div>
-    <div class="row-actions">
-      <button class="btn" id="v_add">Guardar ventas del mes</button>
-      <small class="note">Si el mes ya tenía ventas cargadas, se reemplazan.</small>
-    </div>
-  </div>
-  <div class="card">
-    <h2>Ventas registradas</h2>
+    <h2>Historial de Ventas</h2>
+    <p class="lead">Se completa solo con lo que leés en <b>Carga de Informes</b> (Ventas A y Ventas B). El ✕ borra un mes para poder recargarlo desde cero (informe corregido o error de carga).</p>
     <div style="overflow-x:auto"><table id="v_tbl"><tbody></tbody></table></div>
   </div>
 </section>
@@ -592,6 +554,14 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     </div>
     <div class="row-actions"><button class="btn gold" id="di_calc_ventas">Leer informe de ventas</button></div>
     <div id="di_res_ventas" class="ledger" style="margin:12px 0"></div>
+
+    <div class="informe-tit" style="margin-top:26px">Ventas B <span class="desc">(no oficial)</span> <span class="flagcarga no" id="di_flag_ventasb">Sin cargar</span></div>
+    <p class="lead" style="margin-bottom:8px">Ventas en negro del mes. Suma como Ventas Tipo B. No calcula IVA.</p>
+    <div class="f">
+      <textarea id="di_ventasb" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el informe de ventas en negro del mes (con los totales del final)."></textarea>
+    </div>
+    <div class="row-actions"><button class="btn gold" id="di_calc_ventasb">Leer ventas B</button></div>
+    <div id="di_res_ventasb" class="ledger" style="margin:12px 0"></div>
 
     <div class="informe-tit" style="margin-top:26px">Retenciones sufridas (clientes) <span class="flagcarga no" id="di_flag_ret">Sin cargar</span></div>
     <div class="f">
@@ -1212,7 +1182,6 @@ function initSelects(){
   $("g_rubro").innerHTML=RUBROS.map(r=>`<option>${r}</option>`).join("");
   $("i_rubro").innerHTML='<option value="">Todos</option>'+RUBROS_BAL.map(r=>`<option>${r}</option>`).join("");
   $("g_fecha").value=todayISO();
-  $("v_mes").value=curMonthISO();
 }
 
 /* ---- subcategorías: llenar según rubro ---- */
@@ -1494,55 +1463,19 @@ $("g_filtprov").addEventListener("change",renderGastos);
 $("g_filtrubro").addEventListener("change",renderGastos);
 
 /* ---- ventas ---- */
-$("v_add").onclick=async ()=>{
-  const mes=$("v_mes").value;
-  const bl=parseNum($("v_blanco").value)||0;
-  const ng=parseNum($("v_negro").value)||0;
-  if(!mes){showMsg("v_msg","learn","Elegí el mes.");return;}
-  if(bl<=0&&ng<=0){showMsg("v_msg","learn","Cargá al menos un monto de ventas.");return;}
-  const ivaDebito=parseNum($("v_ivad").value)||0;
-  // las retenciones de clientes ya no se tipean acá: vienen del informe (Carga de Informes)
-  const imp=state.impuestos[normMes(mes)]||{};
-  const retIVA=imp.retIVAClientes||0;
-  const retIIBB=imp.retIIBBClientes||0;
-  const retGan=imp.retGanancias||0;
-  state.ventas[mes]={blanco:bl,negro:ng,ivaDebito,retIVA,retIIBB,retGan};
-  showMsg("v_msg","ok",`Ventas de ${ymLabel(mes)} guardadas. Total ${money(bl+ng)}.`);
-  $("v_blanco").value="";$("v_negro").value="";$("v_ivad").value="";
-  pintarRetVentas();
-  renderVentas();
-  await apiPost({action:"addVenta",mes,blanco:bl,negro:ng,ivaDebito,retIVA,retIIBB,retGan});
-};
-$("v_calciva").onclick=()=>{
-  const base=parseNum($("v_blanco").value)||0;
-  if(base<=0){showMsg("v_msg","learn","Cargá primero las ventas Tipo A.");return;}
-  $("v_ivad").value=(Math.round(base*0.21*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
-  showMsg("v_msg","ok",`IVA estimado al 21%: <b>${money(base*0.21)}</b>. Podés corregirlo si hace falta.`);
-};
+/* Historial de Ventas: tabla de solo lectura. Las ventas se cargan solas al leer los
+   informes de Ventas A y B en Carga de Informes (ver di_guardar). El ✕ borra un mes. */
 function renderVentas(){
-  pintarRetVentas();   // refresca las retenciones (solo lectura) desde el informe
   const tb=$("v_tbl").querySelector("tbody");
   const keys=Object.keys(state.ventas).sort();
-  if(!keys.length){tb.innerHTML=`<tr><td colspan="5"><div class="empty">Todavía no cargaste ventas.</div></td></tr>`;return;}
+  if(!keys.length){tb.innerHTML=`<tr><td colspan="5"><div class="empty">Todavía no hay ventas. Se cargan solas desde Carga de Informes.</div></td></tr>`;return;}
   let h=`<tr><th class="l">Mes</th><th class="num">Tipo <span class="bndot bl"></span></th><th class="num">Tipo <span class="bndot ng"></span></th><th class="num">Total</th><th></th></tr>`;
-  keys.forEach(k=>{const v=state.ventas[k];const t=v.blanco+v.negro;
-    h+=`<tr><td class="l">${ymLabel(k)}</td><td class="num">${money(v.blanco)}</td><td class="num">${money(v.negro)}</td>
+  keys.forEach(k=>{const v=state.ventas[k];const t=(v.blanco||0)+(v.negro||0);
+    h+=`<tr><td class="l">${ymLabel(k)}</td><td class="num">${money(v.blanco||0)}</td><td class="num">${money(v.negro||0)}</td>
     <td class="num"><b>${money(t)}</b></td><td><button class="del" data-k="${k}">✕</button></td></tr>`;});
   tb.innerHTML=h;
-  tb.querySelectorAll(".del").forEach(b=>b.onclick=async ()=>{if(confirm("¿Borrar las ventas de este mes?")){const mes=b.dataset.k;delete state.ventas[mes];renderVentas();await apiPost({action:"addVenta",mes,blanco:0,negro:0,ivaDebito:0,retIVA:0,retIIBB:0,retGan:0});}});
+  tb.querySelectorAll(".del").forEach(b=>b.onclick=async ()=>{if(confirm("¿Borrar las ventas de este mes? Vas a poder recargarlas leyendo el informe de nuevo.")){const mes=b.dataset.k;delete state.ventas[mes];renderVentas();await apiPost({action:"addVenta",mes,blanco:0,negro:0,ivaDebito:0,retIVA:0,retIIBB:0,retGan:0});}});
 }
-/* las retenciones de clientes (IVA, IIBB, Ganancias, SUSS) se leen del informe de
-   retenciones sufridas (Carga de Informes). Acá solo se muestran, en solo lectura. */
-function pintarRetVentas(){
-  const mes=normMes($("v_mes")?$("v_mes").value:"");
-  const d=state.impuestos[mes]||{};
-  const f=n=>n?n.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2}):"";
-  if($("v_riva")) $("v_riva").value =f(d.retIVAClientes||0);
-  if($("v_riibb"))$("v_riibb").value=f(d.retIIBBClientes||0);
-  if($("v_rgan")) $("v_rgan").value =f(d.retGanancias||0);
-  if($("v_rsuss"))$("v_rsuss").value=f(d.retSUSSClientes||0);
-}
-if($("v_mes"))$("v_mes").addEventListener("change",pintarRetVentas);
 
 /* ---- helpers de cálculo ---- */
 function gastoVal(g,bn){ if(bn==="total")return g.monto; return g.bn===bn?g.monto:0; }
@@ -1998,7 +1931,7 @@ function iibbMes(mes){
   mes=normMes(mes);
   const d=datosMes(mes);
   const v=state.ventas[mes]||{};
-  const ventasNetas=(v.blanco||0)+(v.negro||0);
+  const ventasNetas=(v.blanco||0);   // IIBB sobre ventas OFICIALES: solo Tipo A (blanco), nunca A+B
   const baseBsAs=ventasNetas*(d.coefBsAs/100);   // el IIBB se calcula sobre la porción Bs As
   const iibbBruto=baseBsAs*(d.alicIIBB/100);
   const gm=state.gastos.filter(g=>ym(g.fecha)===mes);
@@ -3299,6 +3232,19 @@ function parseDiarioVentas(txt){
   });
   return {ivaTotal,neto,netoACA};
 }
+/* Ventas B (en negro): mismo formato ";" que Compras/Ventas. [5]=razón, [9]=neto (sin IVA
+   discriminado). Devuelve el neto total (suma de las líneas de detalle; NCr netean con signo). */
+function parseVentasB(txt){
+  let neto=0;
+  txt.split(/\r\n|\r|\n/).forEach(ln=>{
+    const c=ln.split(";");
+    if(c.length<11)return;
+    const razon=(c[5]||"").trim();
+    if(!razon || /^(Total|NETO|TOTAL|Dia|Est\.|Razon)/i.test(razon))return;
+    neto+=parseNumAr(c[9]||"");
+  });
+  return {neto};
+}
 /* Imputa la comisión sobre ventas a ACA como GASTO EN NEGRO del mes (upsert por mes).
    El % sale de comisionACAPct (config). Devuelve el monto imputado (0 si no hay). */
 async function imputarComisionACA(mes, netoACA){
@@ -3373,7 +3319,7 @@ function parseParteB(txt){
   return {neto:sumaProv, provNeto, sumaProv};
 }
 function mesMasTres(mes){ const [y,m]=normMes(mes).split("-").map(Number); const d=new Date(y,m-1+3,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
-let diarioTmp={compras:null,ventas:null,ret:null,partb:null,gt:null};
+let diarioTmp={compras:null,ventas:null,ventasb:null,ret:null,partb:null,gt:null};
 function renderDiarioIVA(){
   const sel=$("di_mes");
   const arr=mesesSelector(Object.keys(state.impuestos));
@@ -3387,6 +3333,9 @@ function renderDiarioIVA(){
   else $("di_res_compras").innerHTML="";
   if(d.ivaVentas)$("di_res_ventas").innerHTML=`<div class="led" style="border-color:var(--gold)"><div class="l">IVA ventas (débito)</div><div class="v">${money0(d.ivaVentas)}</div><div class="sub">guardado</div></div>`;
   else $("di_res_ventas").innerHTML="";
+  const vbNeg=(state.ventas[sel.value]||{}).negro||0;
+  if(vbNeg)$("di_res_ventasb").innerHTML=`<div class="led" style="border-color:var(--gold)"><div class="l">Ventas B (negro)</div><div class="v">${money0(vbNeg)}</div><div class="sub">guardado · Tipo B</div></div>`;
+  else $("di_res_ventasb").innerHTML="";
   if(d.retIVAClientes||d.retIIBBClientes||d.retGanancias||d.retSUSSClientes)mostrarResRet({retIVA:d.retIVAClientes||0,retIIBB:d.retIIBBClientes||0,retGan:d.retGanancias||0,suss:d.retSUSSClientes||0});
   else $("di_res_ret").innerHTML="";
   const pbTot=state.gastosInforme.filter(g=>normMes(g.mes)===sel.value && g.tipo==="negro").reduce((a,g)=>a+g.monto,0);
@@ -3402,6 +3351,7 @@ function renderDiarioIVA(){
   // pills "cargado / sin cargar" por informe del mes en curso (se actualizan al guardar)
   setFlagCarga("di_flag_compras", !!d.ivaCompras);
   setFlagCarga("di_flag_ventas", !!d.ivaVentas);
+  setFlagCarga("di_flag_ventasb", vbNeg>0);
   setFlagCarga("di_flag_ret", !!(d.retIVAClientes||d.retIIBBClientes||d.retGanancias||d.retSUSSClientes));
   setFlagCarga("di_flag_partb", pbTot>0);
   setFlagCarga("di_flag_gt", gtDeMes.length>0);
@@ -3540,6 +3490,15 @@ $("di_calc_ventas").onclick=()=>{
   if(!r.ivaTotal){showMsg("di_msg","learn","No encontré el TOTAL I.V.A. de ventas.");return;}
   diarioTmp.ventas=r; mostrarResVentas(r); hideMsg("di_msg");
 };
+$("di_calc_ventasb").onclick=()=>{
+  const txt=$("di_ventasb").value;
+  if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de ventas B.");return;}
+  const r=parseVentasB(txt);
+  if(!r.neto){showMsg("di_msg","learn","No pude leer el informe de ventas B.");return;}
+  diarioTmp.ventasb=r;
+  $("di_res_ventasb").innerHTML=`<div class="led" style="border-color:var(--gold)"><div class="l">Ventas B (negro)</div><div class="v">${money0(r.neto)}</div><div class="sub">Tipo B · sin IVA</div></div>`;
+  hideMsg("di_msg");
+};
 $("di_calc_ret").onclick=()=>{
   const txt=$("di_ret").value;
   if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de retenciones.");return;}
@@ -3614,6 +3573,21 @@ $("di_guardar").onclick=async ()=>{
     ivaCompras:compras.ivaTotal,ivaCompNeto:compras.ivaCompNeto,ivaExcluido:compras.ivaExcluido,
     percIVACompras:compras.percIVA,percIIBBCompras:compras.percIIBB,netoCompras:compras.neto,
     retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,retSUSSClientes:ret.suss,mesPagoIVA:mesPago});
+  // Historial de Ventas: se completa solo desde el informe (Ventas A y/o B). Reemplaza lo leído
+  // en esta carga; preserva lo no leído. Alimenta Balance, IIBB, Resumen anual, Stats y export.
+  const vb=diarioTmp.ventasb;
+  if(v || vb){
+    const prevV=state.ventas[mes]||{};
+    const nv={
+      blanco:    v  ? (v.neto||0)     : (prevV.blanco||0),
+      negro:     vb ? (vb.neto||0)    : (prevV.negro||0),
+      ivaDebito: v  ? (v.ivaTotal||0) : (prevV.ivaDebito||0),
+      retIVA: imp.retIVAClientes||0, retIIBB: imp.retIIBBClientes||0, retGan: imp.retGanancias||0
+    };
+    state.ventas[mes]=nv;
+    renderVentas();
+    await apiPost({action:"addVenta",mes,blanco:nv.blanco,negro:nv.negro,ivaDebito:nv.ivaDebito,retIVA:nv.retIVA,retIIBB:nv.retIIBB,retGan:nv.retGan});
+  }
   // gastos al balance: una fila por proveedor (el rubro se sigue usando para agrupar)
   const items=[]; let sinRubro=0;
   const itemsDeProv=(provNeto,tipo)=>{
@@ -3653,7 +3627,7 @@ $("di_guardar").onclick=async ()=>{
       await apiPost({action:"setGTCargas",comprobante:comp,facturaMes:mes,data:JSON.stringify(gt)});
     }
   }
-  diarioTmp={compras:null,ventas:null,ret:null,partb:null,gt:null};
+  diarioTmp={compras:null,ventas:null,ventasb:null,ret:null,partb:null,gt:null};
   renderDiarioIVA();
   let msg=`Informes de ${ymLabel(mes)} guardados. El IVA se paga en ${ymLabel(mesPago)}.`;
   if(sinRubro)msg+=` Ojo: ${sinRubro} proveedor(es) sin rubro no suman al balance.`;
