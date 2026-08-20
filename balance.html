@@ -4096,6 +4096,12 @@ function renderHomeEstado(preferido){
     el.onclick=()=>{
       const tab=el.dataset.tab, anchor=el.dataset.anchor;
       if(!tab)return;
+      // llevar a la pantalla destino con el MISMO mes que está elegido en Inicio.
+      // Se setea el selector del destino ANTES de irA: su render lee ese valor como
+      // "prev" y lo respeta (el mes siempre está en las opciones vía mesesSelector).
+      const mesSel=$("he_mes")?$("he_mes").value:"";
+      const selId={diarioiva:"di_mes", sueldos:"su_mes", cheque:"ch_mes"}[tab];
+      if(selId && mesSel){ const s=$(selId); if(s)s.value=mesSel; }
       irA(tab);
       if(anchor)setTimeout(()=>{ const a=$(anchor); if(a)a.scrollIntoView({behavior:"auto",block:"center"}); },60);
     };
