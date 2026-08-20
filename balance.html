@@ -265,9 +265,9 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
   <div class="savebox" id="savebox_home" style="margin-top:6px"><span class="dot"></span><span id="saveTxt_home">conectando…</span></div>
   <div class="hint">Elegí por dónde empezar</div>
   <div class="quick">
-    <button data-go="diarioiva"><span class="qn">01 · Registro</span>Carga de Informes</button>
-    <button data-go="gasto"><span class="qn">01 · Registro</span>Cargar factura a mano</button>
-    <button data-go="balance"><span class="qn">03 · Análisis</span>Ver balance del mes</button>
+    <button data-go="diarioiva">Carga de Informes</button>
+    <button data-go="sueldos">Sueldos</button>
+    <button data-go="balance">Ver balance del mes</button>
   </div>
   <div id="home_estado" class="est"></div>
   <div style="margin-top:24px"><button class="btn ghost sm" id="home_menu">Ver todas las opciones</button></div>
@@ -282,7 +282,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
       <div class="grupo">
         <div class="grupo-t">01 · Registro</div>
         <button class="mitem" data-v="diarioiva"><span class="mn">01</span>Carga de Informes</button>
-        <button class="mitem" data-v="gasto"><span class="mn">02</span>Facturas a mano</button>
+        <button class="mitem" data-v="gasto"><span class="mn">02</span>Gastos fuera de informes</button>
         <button class="mitem" data-v="venta"><span class="mn">03</span>Historial de Ventas</button>
       </div>
       <div class="grupo">
@@ -314,7 +314,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 <section class="view" data-v="gasto">
   <div id="gasto_form_wrap">
   <div class="card">
-    <h2>Registrar un gasto</h2>
+    <h2>Gastos fuera de informes</h2>
     <p class="lead">Cargá cada factura con su proveedor y monto. El rubro se completa solo cuando el proveedor ya es conocido.</p>
     <div class="sectlabel">Datos de la factura</div>
     <div class="grid" style="grid-template-columns:1.6fr 1fr;">
@@ -1206,7 +1206,7 @@ $("g_subadd").onclick=async ()=>{
 };
 
 /* ---- navegación: inicio + menú lateral ---- */
-const TITULOS={gasto:"Facturas a mano",venta:"Ventas del mes",balance:"Balance mensual",impuestos:"Impuestos — IVA e IIBB",
+const TITULOS={gasto:"Gastos fuera de informes",venta:"Historial de Ventas",balance:"Balance mensual",impuestos:"Impuestos — IVA e IIBB",
   diarioiva:"Carga de Informes",cheque:"Impuesto al cheque",servicios:"Servicios y calendario de pagos",sueldos:"Sueldos, CCSS y sindicato",
   chemit:"Cheques emitidos",resumen:"Resumen anual",informes:"Informes",datos:"Datos"};
 function irA(v){
@@ -1332,7 +1332,7 @@ function bnChipBtn(bn,id){return `<button class="bndot btn-dot ${bn==="negro"?"n
 
 /* ids de gastos generados automáticamente desde la pestaña Sueldos.
    Suman al balance y a todos los cálculos, pero NO se listan como
-   "Facturas a mano" (los sueldos se administran en su propia pestaña). */
+   "Gastos fuera de informes" (los sueldos se administran en su propia pestaña). */
 function idsDeSueldos(){
   const s=new Set();
   state.sueldos.forEach(x=>{ if(x.gastoIdA)s.add(x.gastoIdA); if(x.gastoIdB)s.add(x.gastoIdB); });
