@@ -488,7 +488,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="sectlabel" style="margin-top:18px">Datos que cargás vos para este mes</div>
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr;">
       <div class="f"><label>Retenciones bancarias IIBB</label><input id="t_retbanc" class="mono" inputmode="decimal" placeholder="0,00"></div>
-      <div class="f"><label>IVA al contador <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">cuando lo tengas</span></label><input id="t_ivacont" class="mono" inputmode="decimal" placeholder="0,00"></div>
+      <div class="f"><label>IVA al contador <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">negativo = a favor</span></label><input id="t_ivacont" class="mono" inputmode="decimal" placeholder="0,00"></div>
     </div>
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px">
       <div class="f"><label>Saldo a favor anterior (IIBB) <span style="text-transform:none;letter-spacing:0;font-family:'Spectral',serif;font-style:italic;font-weight:400;color:var(--faint);font-size:11px">automático: del "al contador" del mes anterior</span></label><input id="t_sfav" class="mono" readonly style="background:var(--paper2);color:var(--ink2)" placeholder="0,00"></div>
@@ -980,8 +980,20 @@ const RUBROS=["MATERIA PRIMA","GASTOS DE FABRICACIÓN","BIENES DE CAMBIO","FLETE
 "LOCACION, ABL Y SERVICIOS","GASTOS DE ADMINISTRACIÓN","GASTOS VS Y MANTENIMIENTO",
 "GASTOS PERSONAL","HONORARIOS","CCSS, SIND Y SUELDOS","IMPOSITIVO","RETIROS","PERSONAL / NO GASTO"];
 const RUBROS_NO_GASTO=["PERSONAL / NO GASTO"];  // suman al IVA pero no al gasto del mes
-// rubro sintético que solo aparece en el Balance mensual (no en la carga de gastos ni en la asignación de proveedores)
-const RUBROS_BAL=RUBROS.concat("Impuestos del mes");
+// Los impuestos al contador (IVA e IIBB) ya no son un rubro aparte: lo que da a pagar
+// suma al rubro IMPOSITIVO; lo a favor se muestra informativo. RUBROS_BAL = los rubros reales.
+const RUBROS_BAL=RUBROS.slice();
+/* Impuestos del mes evaluados POR SEPARADO (IVA e IIBB). Convención de "al contador":
+   positivo = a pagar (suma a gastos), negativo = a favor (no suma; informativo). */
+function impuestosDelMes(mes){
+  const d=state.impuestos[normMes(mes)]||{};
+  const iva=d.ivaContador||0, iibb=d.iibbContador||0;
+  return {
+    ivaPagar: iva>0?iva:0, iibbPagar: iibb>0?iibb:0,
+    ivaFavor: iva<0?-iva:0, iibbFavor: iibb<0?-iibb:0,
+    aPagar: (iva>0?iva:0)+(iibb>0?iibb:0)
+  };
+}
 const MESN=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 // conceptos fijos de CCSS y cargas sindicales (select del formulario + indicador de inicio)
 const CCSS_CONCEPTOS=["CCSS","Sindicato","Federación - Capacitación Técnica","Federación - Aporte Solidario"];
@@ -1532,11 +1544,16 @@ function drawBalance(){
     const nombre=(g.prov||g.sub||"(sin nombre)");
     (detByR[g.rubro]=detByR[g.rubro]||[]).push({prov:nombre, monto:g.monto||0, tipo:esNegro?"negro":"blanco"});
   });
-  // 2c) "Impuestos del mes": el IVA al contador de ese mes (state.impuestos[mes].ivaContador).
-  //     No es un gasto cargado ni viene del informe, así que no se duplica. Cuenta como Tipo A.
-  const impMes=(state.impuestos[normMes(mes)]||{}).ivaContador||0;
-  const mostrarImp=impMes>0 && bn!=="negro";
-  if(mostrarImp){ gByR["Impuestos del mes"]=(gByR["Impuestos del mes"]||0)+impMes; gTot+=impMes; }
+  // 2c) Impuestos al contador (IVA e IIBB, POR SEPARADO): lo que da A PAGAR suma al rubro
+  //     IMPOSITIVO (junto con lo cargado a mano, ej. Ganancias); lo a favor no suma (aparte).
+  //     Cuentan como Tipo A. No están en state.gastos ni en el informe, así que no se duplican.
+  const impMes=impuestosDelMes(mes);
+  const impAPagar = bn!=="negro" ? impMes.aPagar : 0;
+  if(impAPagar>0){
+    gByR["IMPOSITIVO"]=(gByR["IMPOSITIVO"]||0)+impAPagar; gTot+=impAPagar;
+    if(impMes.ivaPagar>0)(detByR["IMPOSITIVO"]=detByR["IMPOSITIVO"]||[]).push({prov:"IVA (al contador)",monto:impMes.ivaPagar,tipo:"blanco"});
+    if(impMes.iibbPagar>0)(detByR["IMPOSITIVO"]=detByR["IMPOSITIVO"]||[]).push({prov:"IIBB (al contador)",monto:impMes.iibbPagar,tipo:"blanco"});
+  }
   // 2d) GT Cargas: neto de flete repartido por fecha de viaje (state.gtCargas). Cuenta como Tipo A, rubro FLETE.
   const gt=gtGastoMes(mes);
   const mostrarGT=gt.monto>0 && bn!=="negro";
@@ -1549,11 +1566,6 @@ function drawBalance(){
     ? `<span class="caret" style="color:var(--gold);margin-right:7px;display:inline-block;width:9px">▸</span>`
     : `<span style="margin-right:7px;display:inline-block;width:9px"></span>`;
   const filaDetalle=(r,cols)=>{
-    if(r==="Impuestos del mes"){
-      const val=gByR["Impuestos del mes"]||0; if(!val)return "";
-      return `<tr class="det" style="display:none"><td colspan="${cols}" style="background:var(--paper2);padding:10px 10px 14px 30px">
-        <table style="width:100%;max-width:540px"><tr><td class="l" style="border:none;padding:4px 8px">IVA (al contador)</td><td class="num" style="border:none;padding:4px 8px">${money(val)}</td></tr></table></td></tr>`;
-    }
     const d=(detByR[r]||[]).slice().sort((a,b)=>b.monto-a.monto);
     if(!d.length)return "";
     const sub=d.reduce((s,x)=>s+(x.monto||0),0);
@@ -1589,7 +1601,7 @@ function drawBalance(){
       if(g.tipo==="negro")gB[g.rubro]=(gB[g.rubro]||0)+g.monto;
       else gA[g.rubro]=(gA[g.rubro]||0)+g.monto;
     });
-    if(mostrarImp)gA["Impuestos del mes"]=(gA["Impuestos del mes"]||0)+impMes;   // el IVA al contador va en Tipo A
+    if(impAPagar>0)gA["IMPOSITIVO"]=(gA["IMPOSITIVO"]||0)+impAPagar;             // IVA/IIBB al contador a pagar → Tipo A
     if(mostrarGT)gA[GT_RUBRO]=(gA[GT_RUBRO]||0)+gt.monto;                         // GT Cargas (flete) va en Tipo A
     const totA=Object.values(gA).reduce((a,b)=>a+b,0);
     const totB=Object.values(gB).reduce((a,b)=>a+b,0);
@@ -1612,6 +1624,16 @@ function drawBalance(){
       h+=`<tr class="${det?'rub':''}"><td class="l">${caret(det)}${r}</td><td class="num">${money(gByR[r])}</td><td class="num">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`+det;});
     h+=`<tr class="tot"><td class="l">TOTAL GASTOS</td><td class="num">${money(gTot)}</td><td class="num">100%</td></tr>`;
   }
+  // Saldo a favor (IVA e IIBB POR SEPARADO): informativo, NO es gasto ni afecta el resultado.
+  if(bn!=="negro" && (impMes.ivaFavor>0 || impMes.iibbFavor>0)){
+    const cols = bn==="total"?5:3;
+    const cellNum = m => bn==="total"
+      ? `<td></td><td></td><td class="num" style="color:var(--green)">${money(m)}</td><td></td>`
+      : `<td class="num" style="color:var(--green)">${money(m)}</td><td></td>`;
+    h+=`<tr><td colspan="${cols}" style="padding:12px 10px 4px;font-style:italic;color:var(--ink2);font-size:12px">Saldo a favor del mes — informativo, no es gasto ni afecta el resultado:</td></tr>`;
+    if(impMes.ivaFavor>0)h+=`<tr><td class="l" style="color:var(--ink2)">· Saldo a favor IVA</td>${cellNum(impMes.ivaFavor)}</tr>`;
+    if(impMes.iibbFavor>0)h+=`<tr><td class="l" style="color:var(--ink2)">· Saldo a favor IIBB</td>${cellNum(impMes.iibbFavor)}</tr>`;
+  }
   tb.innerHTML=h;
   // cada rubro con detalle abre/cierra la fila de proveedores que va justo abajo
   tb.querySelectorAll("tr.rub").forEach(tr=>{
@@ -1629,8 +1651,7 @@ function drawBalance(){
   Object.keys(detByR).forEach(r=>{
     desgloseByR[r]=detByR[r].slice().sort((a,b)=>b.monto-a.monto).map(x=>({nombre:x.prov,monto:x.monto||0,tipo:x.tipo}));
   });
-  if(mostrarImp)desgloseByR["Impuestos del mes"]=[{nombre:"IVA (al contador)",monto:gByR["Impuestos del mes"]||0,tipo:"blanco"}];
-  _balancePrintCtx={mes,gByR,gTot,vTot,res,bn,desgloseByR};
+  _balancePrintCtx={mes,gByR,gTot,vTot,res,bn,desgloseByR,impMes};
   // botón imprimir → abre el panel "¿Qué querés imprimir?"
   const btn=$("b_print");
   if(btn)btn.onclick=abrirPanelImprimirBalance;
@@ -1683,8 +1704,11 @@ function encabezadoImpreso(titulo, periodo){
 let _balancePrintCtx=null;   // contexto del balance en pantalla, para el panel de impresión selectiva
 /* Imprime el balance del mes: siempre el resumen (cajas + tabla de rubros);
    debajo, el desglose de los rubros tildados (rubrosSel). Sin tildados = solo resumen. */
-function imprimirBalance(mes,gByR,gTot,vTot,res,bn,desgloseByR,rubrosSel){
+function imprimirBalance(mes,gByR,gTot,vTot,res,bn,desgloseByR,rubrosSel,impMes){
   const fmt=n=>"$"+(Math.round((n||0)*100)/100).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  impMes=impMes||{ivaFavor:0,iibbFavor:0};
+  const favorParts=[]; if(impMes.ivaFavor>0)favorParts.push(`IVA ${fmt(impMes.ivaFavor)}`); if(impMes.iibbFavor>0)favorParts.push(`IIBB ${fmt(impMes.iibbFavor)}`);
+  const favorHTML=(bn!=="negro"&&favorParts.length)?`<div class="foot" style="border-top:none;color:#555">Saldo a favor del mes (informativo, no es gasto): ${favorParts.join(" · ")}</div>`:"";
   const lbl=bn==="total"?"Total (A+B)":(bn==="blanco"?"Tipo A (blanco)":"Tipo B (negro)");
   const filas=RUBROS_BAL.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a])
     .map(r=>`<tr><td>${r}</td><td style="text-align:right">${fmt(gByR[r])}</td><td style="text-align:right">${gTot?(gByR[r]/gTot*100).toFixed(1):0}%</td></tr>`).join("");
@@ -1710,6 +1734,7 @@ function imprimirBalance(mes,gByR,gTot,vTot,res,bn,desgloseByR,rubrosSel){
     </div>
     <table><thead><tr><th>Rubro</th><th style="text-align:right">Monto</th><th style="text-align:right">% gastos</th></tr></thead>
     <tbody>${filas}<tr class="tot"><td>TOTAL GASTOS</td><td style="text-align:right">${fmt(gTot)}</td><td style="text-align:right">100%</td></tr></tbody></table>
+    ${favorHTML}
     ${desgloseHTML}
     <div class="foot">Generado por Balance Interno — ${new Date().toLocaleDateString("es-AR")}. Valores para control interno.</div>`;
   imprimirVentana(`Balance ${ymLabel(mes)}`, cuerpo, {ancho:640});
@@ -1742,7 +1767,7 @@ if($("bp_print"))$("bp_print").onclick=()=>{
   setPrintRubros(sel);
   $("bp_overlay").style.display="none";
   const c=_balancePrintCtx; if(!c)return;
-  imprimirBalance(c.mes,c.gByR,c.gTot,c.vTot,c.res,c.bn,c.desgloseByR,sel);
+  imprimirBalance(c.mes,c.gByR,c.gTot,c.vTot,c.res,c.bn,c.desgloseByR,sel,c.impMes);
 };
 
 /* ---- informes / filtros ---- */
@@ -1761,14 +1786,14 @@ function applyFilters(){
     bn:x.tipo==="negro"?"negro":"blanco",
     monto:x.monto||0, iva:0, piva:0, piibb:0
   }));
-  // "Impuestos del mes": IVA al contador de cada mes (state.impuestos[mes].ivaContador), como gasto Tipo A.
-  // No está en state.gastos ni en gastosInforme, así que no se duplica.
-  const impComoGastos=Object.keys(state.impuestos).map(k=>({
-    fecha:(normMes(k)||k)+"-01",
-    prov:"IVA (al contador)", rubro:"Impuestos del mes",
-    sub:"IVA al contador", bn:"blanco",
-    monto:(state.impuestos[k].ivaContador||0), iva:0, piva:0, piibb:0
-  })).filter(x=>x.monto>0);
+  // Impuestos al contador (IVA e IIBB por separado): lo que da A PAGAR va al rubro IMPOSITIVO
+  // como gasto Tipo A. Lo a favor no suma (se muestra informativo en el resumen del informe).
+  const impComoGastos=[];
+  Object.keys(state.impuestos).forEach(k=>{
+    const info=impuestosDelMes(k); const fecha=(normMes(k)||k)+"-01";
+    if(info.ivaPagar>0)impComoGastos.push({fecha,prov:"IVA (al contador)",rubro:"IMPOSITIVO",sub:"IVA al contador",bn:"blanco",monto:info.ivaPagar,iva:0,piva:0,piibb:0});
+    if(info.iibbPagar>0)impComoGastos.push({fecha,prov:"IIBB (al contador)",rubro:"IMPOSITIVO",sub:"IIBB al contador",bn:"blanco",monto:info.iibbPagar,iva:0,piva:0,piibb:0});
+  });
   // GT Cargas: neto de flete repartido por mes de viaje (state.gtCargas), como gasto Tipo A.
   const gtComoGastos=[];
   Object.values(state.gtCargas||{}).forEach(f=>{ if(!f||!f.porMes)return; Object.keys(f.porMes).forEach(m=>{ const mo=f.porMes[m].monto||0; if(mo>0)gtComoGastos.push({fecha:(normMes(m)||m)+"-01",prov:GT_NOMBRE,rubro:GT_RUBRO,sub:"Flete (por viaje)",bn:"blanco",monto:mo,iva:0,piva:0,piibb:0}); }); });
@@ -1789,6 +1814,13 @@ function applyFilters(){
     <div class="led"><div class="l">Ventas del período</div><div class="v">${money0(totV)}</div><div class="sub">${meses.length} ${meses.length===1?'mes':'meses'}</div></div>
     <div class="led"><div class="l">Gastos del período</div><div class="v">${money0(totG)}</div><div class="sub">${g.length} movimientos</div></div>
     <div class="led"><div class="l">Resultado</div><div class="v ${totR>=0?'pos':'neg'}">${money0(totR)}</div><div class="sub">${totV?(totR/totV*100).toFixed(1)+"% margen":"—"}</div></div>`;
+  // Saldo a favor del período (IVA e IIBB por separado): informativo, NO es gasto.
+  let ivaFav=0, iibbFav=0;
+  meses.forEach(k=>{ const info=impuestosDelMes(k); ivaFav+=info.ivaFavor; iibbFav+=info.iibbFavor; });
+  if(ivaFav>0||iibbFav>0){
+    const parts=[]; if(ivaFav>0)parts.push(`IVA ${money(ivaFav)}`); if(iibbFav>0)parts.push(`IIBB ${money(iibbFav)}`);
+    $("i_ledger").insertAdjacentHTML("beforeend",`<div style="flex-basis:100%;margin-top:4px;font-size:12px;font-style:italic;color:var(--ink2)">Saldo a favor del período (informativo, no es gasto): ${parts.join(" · ")}</div>`);
+  }
   drawCharts(meses,serV,serG,serR,g,fbn);
   buildObs(meses,serV,serG,serR,g);
   renderInformeTable(g);
@@ -3650,11 +3682,14 @@ function datosAnio(anio){
   const gs=state.gastos.filter(g=>fechaCorta(g.fecha).slice(0,4)===anio);
   // gastos que vienen de los informes (compras + parte B); son filas aparte de state.gastos, no se duplican
   const gi=gastosInformeExpandido().filter(g=>(normMes(g.mes)||"").slice(0,4)===anio);   // ya repartido en cuotas
-  // "Impuestos del mes": IVA al contador de cada mes; vive en state.impuestos, no se duplica
+  // Impuestos al contador (IVA e IIBB por separado): lo que da a pagar va al rubro IMPOSITIVO;
+  // lo a favor se acumula aparte (informativo). Vive en state.impuestos, no se duplica.
   const imp=Object.keys(state.impuestos)
     .filter(k=>(normMes(k)||"").slice(0,4)===anio)
-    .map(k=>({mes:normMes(k),monto:state.impuestos[k].ivaContador||0}))
+    .map(k=>({mes:normMes(k),monto:impuestosDelMes(k).aPagar}))
     .filter(x=>x.monto>0);
+  let ivaFavor=0, iibbFavor=0;
+  Object.keys(state.impuestos).forEach(k=>{ if((normMes(k)||"").slice(0,4)===anio){ const info=impuestosDelMes(k); ivaFavor+=info.ivaFavor; iibbFavor+=info.iibbFavor; } });
   // GT Cargas: neto de flete repartido por mes de viaje (state.gtCargas); vive aparte, no se duplica
   const gt=[];
   Object.values(state.gtCargas||{}).forEach(f=>{ if(!f||!f.porMes)return; Object.keys(f.porMes).forEach(m=>{ if((normMes(m)||"").slice(0,4)!==anio)return; gt.push({mes:normMes(m),monto:f.porMes[m].monto||0}); }); });
@@ -3672,7 +3707,7 @@ function datosAnio(anio){
   const rubros={};
   gs.forEach(x=>{rubros[x.rubro]=(rubros[x.rubro]||0)+(x.monto||0);});
   gi.forEach(x=>{rubros[x.rubro]=(rubros[x.rubro]||0)+(x.monto||0);});
-  imp.forEach(x=>{rubros["Impuestos del mes"]=(rubros["Impuestos del mes"]||0)+x.monto;});
+  imp.forEach(x=>{rubros["IMPOSITIVO"]=(rubros["IMPOSITIVO"]||0)+x.monto;});
   gt.forEach(x=>{rubros[GT_RUBRO]=(rubros[GT_RUBRO]||0)+x.monto;});
   // impuestos acumulados
   let ivaVent=0,ivaComp=0,iibb=0,cheque=0;
@@ -3680,7 +3715,7 @@ function datosAnio(anio){
   gs.forEach(x=>{ivaComp+=x.iva||0;});
   Object.keys(state.ventas).forEach(k=>{ if(k.slice(0,4)===anio){ivaVent+=state.ventas[k].ivaDebito||0;}});
   Object.keys(state.cheque).forEach(k=>{ if(k.slice(0,4)===anio)cheque+=state.cheque[k].total||0; });
-  return {gastos,ventas,resultado:ventas-gastos,vMes,gMes,rubros,ivaVent,ivaComp,cheque};
+  return {gastos,ventas,resultado:ventas-gastos,vMes,gMes,rubros,ivaVent,ivaComp,cheque,ivaFavor,iibbFavor};
 }
 function renderResumen(){
   const anios=aniosConDatos();
@@ -3723,6 +3758,11 @@ function drawResumen(){
   rub.forEach(([r,v])=>{const pct=totR?Math.round(v/totR*100):0; hr+=`<tr><td class="l">${r}</td><td class="num">${money(v)}</td><td class="num" style="color:var(--faint)">${pct}%</td></tr>`;});
   hr+=`<tr class="tot"><td class="l"><b>Total gastos ${a1}</b></td><td class="num"><b>${money(totR)}</b></td><td></td></tr></tbody></table>`;
   $("r_rubros").innerHTML=rub.length?hr:`<div class="empty">Sin gastos en ${a1}.</div>`;
+  // Saldo a favor del año (IVA e IIBB por separado): informativo, NO es gasto.
+  if((d1.ivaFavor||0)>0||(d1.iibbFavor||0)>0){
+    const parts=[]; if(d1.ivaFavor>0)parts.push(`IVA ${money(d1.ivaFavor)}`); if(d1.iibbFavor>0)parts.push(`IIBB ${money(d1.iibbFavor)}`);
+    $("r_rubros").insertAdjacentHTML("beforeend",`<small class="note" style="display:block;margin-top:6px">Saldo a favor de ${a1} (informativo, no es gasto): ${parts.join(" · ")}</small>`);
+  }
   // Impuestos
   $("r_impuestos").innerHTML=`<table style="max-width:560px"><tbody>
     <tr><td class="l">IVA débito (ventas)</td><td class="num">${money(d1.ivaVent)}</td></tr>
@@ -3760,6 +3800,7 @@ if($("r_print"))$("r_print").onclick=()=>{
     <div class="sect">Gastos por rubro del año</div>
     <table><thead><tr><th>Rubro</th><th style="text-align:right">Monto</th><th style="text-align:right">%</th></tr></thead>
     <tbody>${filasR}<tr class="tot"><td>Total gastos ${a1}</td><td style="text-align:right">${fmt(totR)}</td><td></td></tr></tbody></table>
+    ${((d1.ivaFavor||0)>0||(d1.iibbFavor||0)>0)?`<div class="foot" style="border-top:none;color:#555">Saldo a favor de ${a1} (informativo, no es gasto): ${[(d1.ivaFavor>0?`IVA ${fmt(d1.ivaFavor)}`:""),(d1.iibbFavor>0?`IIBB ${fmt(d1.iibbFavor)}`:"")].filter(Boolean).join(" · ")}</div>`:""}
     <div class="sect">Impuestos acumulados del año</div>
     <table><tbody>
       <tr><td>IVA débito (ventas)</td><td style="text-align:right">${fmt(d1.ivaVent)}</td></tr>
