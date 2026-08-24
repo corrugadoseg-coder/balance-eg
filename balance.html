@@ -961,6 +961,16 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     </div>
     <div class="msg" id="d_aca_msg"></div>
 
+    <div class="sectlabel" style="margin-top:26px">Reglas de proveedores (rubro)</div>
+    <p class="lead" style="margin-bottom:12px">Asigná el rubro de un proveedor. Al leer un informe de compras, si el nombre coincide, se aplica solo. Podés precargar proveedores nuevos (ej. un gasto personal → <b>PERSONAL / NO GASTO</b>: computa IVA pero no suma al gasto) antes de que aparezcan en un informe. Se guarda en la planilla.</p>
+    <div class="grid" style="grid-template-columns:1fr auto auto;gap:10px;align-items:end;max-width:760px">
+      <div class="f"><label>Proveedor (igual que en el informe)</label><input id="d_prov_nuevo" placeholder="Ej. Farmacia del Centro"></div>
+      <div class="f"><label>Rubro</label><select id="d_prov_rubro"></select></div>
+      <div class="row-actions" style="margin:0"><button class="btn sm" id="d_prov_add" type="button">+ Agregar</button></div>
+    </div>
+    <div class="msg" id="d_prov_msg"></div>
+    <div style="overflow-x:auto;max-height:340px;overflow-y:auto;margin-top:8px"><table id="d_prov_tbl" style="max-width:760px"><tbody></tbody></table></div>
+
     <div class="sectlabel" style="margin-top:26px">Estado</div>
     <table style="max-width:480px">
       <tbody id="d_stats"></tbody>
@@ -1471,6 +1481,50 @@ function poblarFiltroProv(){
   if([...sel.options].some(o=>o.value===cur))sel.value=cur;
 }
 function refreshProvList(){ $("provlist").innerHTML=Object.keys(state.memoria).map(k=>`<option value="${k}">`).join(""); }
+/* ---- Reglas de proveedores (rubro), editables desde Datos. Se guardan en la memoria
+   (state.memoria, clave = nombre en minúsculas) y se aplican solas vía rubroDeProveedor
+   al leer un informe. Permite precargar proveedores antes de que aparezcan. ---- */
+function renderProvRules(){
+  const tb=$("d_prov_tbl"); if(!tb)return;
+  const body=tb.querySelector("tbody")||tb;
+  const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+  const keys=Object.keys(state.memoria).filter(k=>state.memoria[k]).sort((a,b)=>a.localeCompare(b));
+  let h=`<tr><th class="l">Proveedor</th><th class="l">Rubro</th><th></th></tr>`;
+  if(!keys.length){ h+=`<tr><td colspan="3"><div class="empty" style="padding:10px 4px">Sin reglas cargadas. Agregá una arriba.</div></td></tr>`; }
+  else keys.forEach(k=>{
+    h+=`<tr>
+      <td class="l">${esc(capProv(k))}</td>
+      <td class="l"><select data-provrule="${esc(k)}" style="min-width:200px">${RUBROS.map(r=>`<option${r===state.memoria[k]?" selected":""}>${r}</option>`).join("")}</select></td>
+      <td style="text-align:center"><button class="del" data-provdel="${esc(k)}" title="Borrar regla">✕</button></td>
+    </tr>`;
+  });
+  body.innerHTML=h;
+  body.querySelectorAll("[data-provrule]").forEach(sel=>sel.onchange=async ()=>{
+    const k=sel.dataset.provrule; state.memoria[k]=sel.value;
+    await apiPost({action:"setProv",prov:k,rubro:sel.value}); refreshProvList();
+  });
+  body.querySelectorAll("[data-provdel]").forEach(b=>b.onclick=async ()=>{
+    const k=b.dataset.provdel;
+    if(!confirm(`¿Borrar la regla de "${capProv(k)}"?`))return;
+    delete state.memoria[k];
+    await apiPost({action:"setProv",prov:k,rubro:""});
+    renderProvRules(); refreshProvList();
+  });
+}
+if($("d_prov_rubro"))$("d_prov_rubro").innerHTML='<option value="">— elegí rubro —</option>'+RUBROS.map(r=>`<option>${r}</option>`).join("");
+if($("d_prov_add"))$("d_prov_add").onclick=async ()=>{
+  const nombre=($("d_prov_nuevo").value||"").trim();
+  const rubro=$("d_prov_rubro").value;
+  if(!nombre){ showMsg("d_prov_msg","learn","Escribí el nombre del proveedor (igual que en el informe)."); return; }
+  if(!rubro){ showMsg("d_prov_msg","learn","Elegí un rubro."); return; }
+  const k=nombre.toLowerCase();
+  const yaExiste=!!state.memoria[k];
+  state.memoria[k]=rubro;
+  await apiPost({action:"setProv",prov:k,rubro});
+  $("d_prov_nuevo").value="";
+  renderProvRules(); refreshProvList();
+  showMsg("d_prov_msg","ok",`${yaExiste?"Actualizada":"Agregada"} la regla: <b>${capProv(nombre)}</b> → ${rubro}.`);
+};
 $("g_filtprov").addEventListener("change",renderGastos);
 $("g_filtrubro").addEventListener("change",renderGastos);
 
@@ -4148,7 +4202,7 @@ function renderHomeEstado(preferido){
     };
   });
 }
-function renderAll(){ renderGastos(); renderVentas(); renderBalance(); renderStats(); renderHomeEstado(); renderReparto(); }
+function renderAll(){ renderGastos(); renderVentas(); renderBalance(); renderStats(); renderHomeEstado(); renderReparto(); renderProvRules(); }
 
 /* ---- boot ---- */
 initSelects();
