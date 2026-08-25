@@ -810,9 +810,16 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 
   <div class="card">
     <h3>Listado de cheques</h3>
-    <div class="f" style="max-width:280px;margin-bottom:12px">
-      <label>Filtrar</label>
-      <select id="che_filtro"><option value="">Todos</option><option value="No cobrado">Solo no cobrados</option><option value="Cobrado">Solo cobrados</option><option value="electronico">Solo electrónicos</option><option value="fisico">Solo físicos</option></select>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;align-items:end">
+      <div class="f" style="max-width:280px;margin:0">
+        <label>Beneficiario</label>
+        <input id="che_benef_filtro" list="che_benef_list" placeholder="Escribí para filtrar…" autocomplete="off">
+        <datalist id="che_benef_list"></datalist>
+      </div>
+      <div class="f" style="max-width:220px;margin:0">
+        <label>Filtrar</label>
+        <select id="che_filtro"><option value="">Todos</option><option value="No cobrado">Solo no cobrados</option><option value="Cobrado">Solo cobrados</option><option value="electronico">Solo electrónicos</option><option value="fisico">Solo físicos</option></select>
+      </div>
     </div>
     <div style="overflow-x:auto"><table id="che_tbl"><tbody></tbody></table></div>
   </div>
@@ -3039,9 +3046,17 @@ function parseChequesEmit(texto){
 }
 function isoDe(ddmmaaaa){ const p=ddmmaaaa.split("/"); return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:""; }
 
+function poblarBenefList(){
+  const dl=$("che_benef_list"); if(!dl)return;
+  const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+  const benef=[...new Set(state.chequesEmit.map(c=>(c.beneficiario||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  dl.innerHTML=benef.map(b=>`<option value="${esc(b)}">`).join("");
+}
 function renderChequesEmit(){
   $("che_rango").onchange=drawAvisoCaja;
   $("che_filtro").onchange=drawChequesTabla;
+  if($("che_benef_filtro"))$("che_benef_filtro").oninput=drawChequesTabla;   // filtra en vivo mientras se tipea
+  poblarBenefList();
   drawAvisoCaja();
   drawChequesTabla();
 }
@@ -3059,7 +3074,7 @@ $("che_calc").onclick=async ()=>{
     await apiPost(Object.assign({action:"setChequeEmit"},c));
   }
   $("che_texto").value="";
-  drawAvisoCaja(); drawChequesTabla();
+  poblarBenefList(); drawAvisoCaja(); drawChequesTabla();
   showMsg("che_msg","ok",`Cargué ${nuevos} cheque(s).${repetidos?" Omití "+repetidos+" que ya estaban (mismo N°).":""}`);
 };
 $("che_clear").onclick=()=>{$("che_texto").value="";hideMsg("che_msg");};
@@ -3078,11 +3093,16 @@ function drawChequesTabla(){
 
   let base=state.chequesEmit.slice();
   if(f==="electronico"||f==="fisico")base=base.filter(c=>c.tipo===f);
+  // filtro por beneficiario (texto parcial, en vivo). Se aplica antes de las secciones,
+  // así convive con el orden y el ocultado de cobrados viejos.
+  const bq=($("che_benef_filtro")?$("che_benef_filtro").value:"").trim().toLowerCase();
+  if(bq)base=base.filter(c=>(c.beneficiario||"").toLowerCase().includes(bq));
   let pend=base.filter(c=>c.estado!=="Cobrado");
   let cob =base.filter(c=>c.estado==="Cobrado");
   // ocultar cobrados de hace más de 30 días (salvo que se pida ver "solo cobrados").
   // La cuenta corre desde fechaCobrado (fecha en que se marcó); si no existe (datos viejos), se usa la fecha de pago.
-  const verTodosCob=(f==="Cobrado");
+  // al buscar un beneficiario puntual se muestran TODOS sus cheques (no se ocultan los cobrados viejos)
+  const verTodosCob=(f==="Cobrado") || !!bq;
   let cobOcultos=0;
   if(!verTodosCob){
     const antes=cob.length;
@@ -3097,7 +3117,7 @@ function drawChequesTabla(){
   // cobrados: los cobrados más recientemente, arriba
   cob.sort((a,b)=>(b.fechaCobrado||b.fechaPago||"").localeCompare(a.fechaCobrado||a.fechaPago||""));
 
-  if(!pend.length && !cob.length && !cobOcultos){ tb.innerHTML=`<tr><td colspan="7"><div class="empty">No hay cheques${f?" con ese filtro":" cargados"}.</div></td></tr>`; return; }
+  if(!pend.length && !cob.length && !cobOcultos){ tb.innerHTML=`<tr><td colspan="7"><div class="empty">No hay cheques${(f||bq)?" con ese filtro":" cargados"}.</div></td></tr>`; return; }
 
   // Acumulado que puede entrar al banco a una fecha: TODOS los no cobrados con fecha de pago <= esa fecha
   // (cualquier no cobrado puede presentarse cualquier día; ignora filtros; los cobrados no suman).
