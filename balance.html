@@ -3370,18 +3370,18 @@ async function imputarComisionACA(mes, netoACA){
   return 0;
 }
 /* retenciones sufridas por tipo */
-/* Clasifica cada retención por su CÓDIGO, que va en la MISMA línea que el importe:
-   202→IVA · 204→Ganancias · 205→IIBB · 206→S.U.S.S.
-   (En el informe el texto descriptor —"S.U.S.S.", "RETENCION IVA"— está en OTRA
-   línea; el código y el importe van juntos, y el importe es el último número.) */
+/* Clasifica cada retención por su CÓDIGO (contrapartida del sistema), en la MISMA línea
+   que el importe: 202→IVA · 204→IIBB · 205→Ganancias · 206→S.U.S.S.
+   (Verificado con datos reales: el 204 es Ingresos Brutos y el 205 Ganancias, al revés
+   de lo que se asumía antes. El código y el importe van juntos; el importe es el último número.) */
 function parseRetenciones(txt){
   const lines=txt.split(/\r\n|\r|\n/);
   let retIVA=0,retIIBB=0,retGan=0,suss=0;
   const sumar=(cod,val)=>{
     if(cod==="202")retIVA+=val;
-    else if(cod==="204")retGan+=val;
-    else if(cod==="205")retIIBB+=val;
-    else if(cod==="206")suss+=val;   // S.U.S.S.: solo informativo, no entra en cálculos
+    else if(cod==="204")retIIBB+=val;   // 204 = IIBB (Ingresos Brutos)
+    else if(cod==="205")retGan+=val;    // 205 = Ganancias
+    else if(cod==="206")suss+=val;      // S.U.S.S.: solo informativo, no entra en cálculos
   };
   lines.forEach(ln=>{
     // importe = último número argentino (con decimales) de la línea
