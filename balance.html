@@ -570,7 +570,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="row-actions"><button class="btn gold" id="di_calc_ret">Leer retenciones</button></div>
     <div id="di_res_ret" class="ledger" style="margin:12px 0"></div>
 
-    <div class="informe-tit" style="margin-top:26px">Parte B <span class="desc">(no oficial)</span> <span class="flagcarga no" id="di_flag_partb">Sin cargar</span></div>
+    <div class="informe-tit" style="margin-top:26px">Compras B <span class="desc">(no oficial)</span> <span class="flagcarga no" id="di_flag_partb">Sin cargar</span></div>
     <p class="lead" style="margin-bottom:8px">Suma a los gastos del mes como Tipo B. No calcula IVA. Las notas de crédito restan.</p>
     <div class="f">
       <textarea id="di_partb" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el informe de la parte B del mes."></textarea>
@@ -968,6 +968,14 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     </div>
     <div class="msg" id="d_aca_msg"></div>
 
+    <div class="sectlabel" style="margin-top:26px">Comisión 3% — Sentida Botánica / Brenchio</div>
+    <p class="lead" style="margin-bottom:12px">% de comisión sobre el neto facturado a <b>Sentida Botánica</b> (base = venta en blanco, informe IVA Ventas) y a <b>Brenchio, Carla</b> (base = venta en negro, informe Ventas B). Las <b>dos</b> se registran como gasto <b>NEGRO</b> en GASTOS DE ADMINISTRACIÓN (igual que ACA), en <b>dos renglones separados</b> (uno por identidad). Se guarda en la planilla. Cambiar el % rige al volver a leer los informes de cada mes.</p>
+    <div class="grid" style="grid-template-columns:auto auto;gap:10px;align-items:end;max-width:420px;justify-content:start">
+      <div class="f"><label>Comisión (%)</label><input id="d_com3_pct" class="mono" inputmode="decimal" style="width:120px" placeholder="3"></div>
+      <div class="row-actions" style="margin:0"><button class="btn sm" id="d_com3_save" type="button">Guardar %</button></div>
+    </div>
+    <div class="msg" id="d_com3_msg"></div>
+
     <div class="sectlabel" style="margin-top:26px">Reglas de proveedores (rubro)</div>
     <p class="lead" style="margin-bottom:12px">Asigná el rubro de un proveedor. Al leer un informe de compras, si el nombre coincide, se aplica solo. Podés precargar proveedores nuevos (ej. un gasto personal → <b>PERSONAL / NO GASTO</b>: computa IVA pero no suma al gasto) antes de que aparezcan en un informe. Se guarda en la planilla.</p>
     <div class="grid" style="grid-template-columns:1fr auto auto;gap:10px;align-items:end;max-width:760px">
@@ -1113,6 +1121,13 @@ function provCuotaLabel(p){ return (p&&p.cuota>0)?`${p.prov} (${p.cuota}/${p.cuo
 const ACA_CUIT="30500120882";                       // 30-50012088-2, sin separadores
 const ACA_NOMBRE="Gasto de comercialización ACA";
 let comisionACAPct=4;                                // %, se carga de la hoja Config
+/* Comisión del 3% sobre ventas de un mismo cliente con dos identidades (una en blanco, otra
+   en negro). Se calcula por separado y se imputa en DOS renglones de gasto distintos (uno por
+   identidad) para poder detectar a simple vista duplicados entre el lado negro y el blanco.
+   El % es configurable (hoja Config, clave "comision3"). */
+const SB_CUIT="30717181030";                         // Sentida Botánica (blanco) — sale de IVA Ventas
+const BR_CUIT="27303403464";                         // Brenchio, Carla (negro) — sale de Ventas B
+let comision3Pct=3;                                  // %, se carga de la hoja Config
 
 let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[], chequesEmit:[], sueldos:[], exclusionesIVA:["EDESUR","AYSA","METROGAS"], gastosInforme:[], svInforme:{}, gtCargas:{} };  // impuestos: {"2026-01":{...}} · gtCargas: {"2026-08":{total,porMes}}
 let balView="total";
@@ -1178,6 +1193,7 @@ async function apiGet(){
     if(j.data.config&&j.data.config.svInforme){try{state.svInforme=JSON.parse(j.data.config.svInforme);}catch(e){}}
     if(j.data.config&&j.data.config.repartoCuotas){try{repartoProv=JSON.parse(j.data.config.repartoCuotas)||[];}catch(e){}}   // reglas de reparto en cuotas (criterio contable, compartido)
     if(j.data.config&&j.data.config.comisionACA!==undefined){try{const p=JSON.parse(j.data.config.comisionACA); if(typeof p==="number"&&p>=0)comisionACAPct=p;}catch(e){}}   // % comisión ventas ACA
+    if(j.data.config&&j.data.config.comision3!==undefined){try{const p=JSON.parse(j.data.config.comision3); if(typeof p==="number"&&p>=0)comision3Pct=p;}catch(e){}}   // % comisión Sentida Botánica / Brenchio
     // GT Cargas: desgloses de flete keyed por N° de comprobante ({comprobante:{comprobante,facturaMes,total,porMes}});
     // tolera valores como string JSON
     state.gtCargas={}; const gtRaw=j.data.gtCargas||{};
@@ -3328,28 +3344,34 @@ function parseDiarioVentas(txt){
   const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
   const ivaTotal=tot(/TOTAL I\.V\.A\.\s*\.+;?\s*([\d.,-]+)/);
   const neto=tot(/NETO\s*\.+;?\s*([\d.,-]+)/);
-  // Neto facturado a ACA (por CUIT, no por nombre): base de la comisión de comercialización.
+  // Neto facturado por CUIT (no por nombre): base de las comisiones sobre ventas.
   // Formato del sistema: columnas ";"  →  [7]=CUIT, [9]=neto gravado (las NCr vienen con signo −).
-  let netoACA=0;
+  //   ACA → comisión de comercialización · Sentida Botánica (blanco) → comisión 3%.
+  let netoACA=0, netoSB=0;
   txt.split(/\r\n|\r|\n/).forEach(ln=>{
     const c=ln.split(";");
     if(c.length<11)return;
-    if(c.some(x=>x.replace(/\D/g,"")===ACA_CUIT)) netoACA+=parseNumAr(c[9]||"");
+    const cuits=c.map(x=>x.replace(/\D/g,""));
+    if(cuits.includes(ACA_CUIT)) netoACA+=parseNumAr(c[9]||"");
+    if(cuits.includes(SB_CUIT))  netoSB +=parseNumAr(c[9]||"");
   });
-  return {ivaTotal,neto,netoACA};
+  return {ivaTotal,neto,netoACA,netoSB};
 }
 /* Ventas B (en negro): mismo formato ";" que Compras/Ventas. [5]=razón, [9]=neto (sin IVA
    discriminado). Devuelve el neto total (suma de las líneas de detalle; NCr netean con signo). */
 function parseVentasB(txt){
-  let neto=0;
+  // netoBr = neto facturado a Brenchio, Carla (por CUIT): base de la comisión 3% en negro.
+  let neto=0, netoBr=0;
   txt.split(/\r\n|\r|\n/).forEach(ln=>{
     const c=ln.split(";");
     if(c.length<11)return;
     const razon=(c[5]||"").trim();
     if(!razon || /^(Total|NETO|TOTAL|Dia|Est\.|Razon)/i.test(razon))return;
-    neto+=parseNumAr(c[9]||"");
+    const n=parseNumAr(c[9]||"");
+    neto+=n;
+    if(c.map(x=>x.replace(/\D/g,"")).includes(BR_CUIT)) netoBr+=n;
   });
-  return {neto};
+  return {neto,netoBr};
 }
 /* Imputa la comisión sobre ventas a ACA como GASTO EN NEGRO del mes (upsert por mes).
    El % sale de comisionACAPct (config). Devuelve el monto imputado (0 si no hay). */
@@ -3366,6 +3388,27 @@ async function imputarComisionACA(mes, netoACA){
     return comision;
   } else if(idx>=0){
     state.gastos.splice(idx,1); await apiPost({action:"deleteGasto",id});   // ese mes ya no factura a ACA
+  }
+  return 0;
+}
+/* Imputa la comisión del 3% de UNA identidad como gasto del mes (upsert por id).
+   base = neto de esa identidad (NCr ya netadas). bn = "blanco" | "negro". idPref/quien la
+   identifican. Cada identidad es un renglón propio (no se suman) para ver duplicados a simple
+   vista. Devuelve el monto imputado (0 si no hay). */
+async function imputarComision3(mes, base, idPref, quien, bn){
+  const m=normMes(mes)||mes;
+  const id=`${idPref}-${String(m).replace("-","")}`;            // ej. COM3SB-202607 / COM3BR-202607
+  const idx=state.gastos.findIndex(g=>g.id===id);
+  const comision=Math.round((base||0)*(comision3Pct/100)*100)/100;
+  const nombre=`Gasto de comercialización ${quien}`;            // mismo formato que ACA
+  if(comision>0){
+    const fecha=ultimoDiaMes(m);
+    const g={id,fecha,prov:nombre,rubro:"GASTOS DE ADMINISTRACIÓN",sub:`Comisión ${comision3Pct}% ventas`,bn,monto:comision,iva:0,piva:0,piibb:0};
+    if(idx>=0){ state.gastos[idx]=Object.assign(state.gastos[idx],g); await apiPost({action:"updateGasto",id,fecha,prov:g.prov,rubro:g.rubro,sub:g.sub,bn:g.bn,monto:comision,iva:0,piva:0,piibb:0}); }
+    else { state.gastos.push(g); await apiPost({action:"addGasto",id,fecha,prov:g.prov,rubro:g.rubro,sub:g.sub,bn:g.bn,monto:comision,iva:0,piva:0,piibb:0}); }
+    return comision;
+  } else if(idx>=0){
+    state.gastos.splice(idx,1); await apiPost({action:"deleteGasto",id});   // ese mes ya no le factura
   }
   return 0;
 }
@@ -3717,9 +3760,21 @@ $("di_guardar").onclick=async ()=>{
   let acaMsg="";
   if(v){
     const com=await imputarComisionACA(mes, v.netoACA||0);
-    renderGastos();
     if(com>0)acaMsg=` Comisión ACA (${comisionACAPct}%): ${money(com)} como gasto negro.`;
   }
+  // Comisión 3% (cálculo interno, no aparece en las ventas): ambas van como gasto NEGRO (igual que
+  // ACA). Sentida Botánica: base = neto en blanco (Ventas A). Brenchio, Carla: base = neto en negro
+  // (Ventas B). Renglones separados para ver duplicados entre el lado negro y el blanco.
+  let com3Msg="";
+  if(v){
+    const cSB=await imputarComision3(mes, v.netoSB||0, "COM3SB", "SENTIDA BOTANICA", "negro");
+    if(cSB>0)com3Msg+=` Comisión Sentida Botánica (${comision3Pct}%): ${money(cSB)}.`;
+  }
+  if(vb){
+    const cBR=await imputarComision3(mes, vb.netoBr||0, "COM3BR", "BRENCHIO", "negro");
+    if(cBR>0)com3Msg+=` Comisión Brenchio (${comision3Pct}%): ${money(cBR)}.`;
+  }
+  if(v||vb)renderGastos();
   // GT Cargas: guardamos el desglose de ESTA factura, keyed por N° de comprobante
   // (reemplaza el mismo comprobante; dos facturas distintas del mismo mes no se pisan).
   let gtMsg="";
@@ -3738,6 +3793,7 @@ $("di_guardar").onclick=async ()=>{
   let msg=`Informes de ${ymLabel(mes)} guardados. El IVA se paga en ${ymLabel(mesPago)}.`;
   if(sinRubro)msg+=` Ojo: ${sinRubro} proveedor(es) sin rubro no suman al balance.`;
   if(acaMsg)msg+=acaMsg;
+  if(com3Msg)msg+=com3Msg;
   if(gtMsg)msg+=gtMsg;
   showMsg("di_msg",gtMsg?"learn":"ok",msg);
 };
@@ -4063,6 +4119,7 @@ function pintarApiUrl(){
   const i=$("d_api"); if(i)i.value=API||"";
   const e=$("d_email"); if(e)e.value=EMAIL_CONTADORA||"";
   const a=$("d_aca_pct"); if(a)a.value=comisionACAPct;
+  const c3=$("d_com3_pct"); if(c3)c3.value=comision3Pct;
 }
 if($("d_aca_save"))$("d_aca_save").onclick=()=>{
   const p=parseFloat(String($("d_aca_pct").value).replace(",",".").trim());
@@ -4070,6 +4127,13 @@ if($("d_aca_save"))$("d_aca_save").onclick=()=>{
   comisionACAPct=p;
   apiPost({action:"setConfig", clave:"comisionACA", valor:JSON.stringify(comisionACAPct)});
   showMsg("d_aca_msg","ok",`Comisión ACA guardada: ${p}%. Rige al volver a leer el informe de ventas de cada mes.`);
+};
+if($("d_com3_save"))$("d_com3_save").onclick=()=>{
+  const p=parseFloat(String($("d_com3_pct").value).replace(",",".").trim());
+  if(!(p>=0)){ showMsg("d_com3_msg","learn","Poné un número válido, ej. 3"); return; }
+  comision3Pct=p;
+  apiPost({action:"setConfig", clave:"comision3", valor:JSON.stringify(comision3Pct)});
+  showMsg("d_com3_msg","ok",`Comisión guardada: ${p}%. Rige al volver a leer los informes de ventas de cada mes.`);
 };
 /* ---- tabla de reparto de gastos en cuotas (editable, en localStorage) ---- */
 function refrescarPorReparto(){
