@@ -546,6 +546,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     </div>
     <div class="row-actions"><button class="btn gold" id="di_calc_compras">Leer informe de compras</button></div>
     <div id="di_res_compras" class="ledger" style="margin:12px 0"></div>
+    <div id="di_edesur_box" style="margin:12px 0"></div>
     <div id="di_rubros_box" style="margin:12px 0"></div>
 
     <div class="informe-tit" style="margin-top:26px">Informe de IVA Ventas <span class="flagcarga no" id="di_flag_ventas">Sin cargar</span></div>
@@ -709,6 +710,38 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <p class="lead">Cargas sociales y boletas sindicales del mes.</p>
     <div style="overflow-x:auto"><table id="su_ccss_tbl"><tbody></tbody></table></div>
     <div class="row-actions"><button class="btn ghost sm" id="su_addccss">+ Agregar concepto</button></div>
+  </div>
+
+  <div class="card" id="ccss_estim_card">
+    <h3>Estimador de Cargas Sociales (F.931)</h3>
+    <p class="lead">Estimado interno de <b>previsión y control</b> — no reemplaza el cálculo de la contadora. Estima el <b>total bruto del F.931 a pagar</b> (contribuciones patronales + retenciones al empleado + ART + Seguro de Vida), antes de la compensación con el impuesto al cheque. Cargá el <b>sueldo bruto</b> de cada empleado por período liquidado (quincena, mensual o vacaciones, tal cual figura en el recibo).</p>
+    <div class="grid" style="grid-template-columns:auto;gap:14px;max-width:260px;margin-bottom:10px">
+      <div class="f"><label>Mes</label><select id="cc_mes"></select></div>
+    </div>
+    <div class="grid" style="grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:end;max-width:700px">
+      <div class="f"><label>Empleado</label><input id="cc_emp" list="cc_emp_list" placeholder="Nombre"><datalist id="cc_emp_list"></datalist></div>
+      <div class="f"><label>Sueldo bruto (del recibo)</label><input id="cc_imp" class="mono" inputmode="decimal" placeholder="0"></div>
+      <div class="f"><label>Período</label><select id="cc_periodo"><option value="quincena">Quincena</option><option value="mensual">Mensual</option><option value="vacaciones">Vacaciones</option></select></div>
+      <div class="row-actions" style="margin:0"><button class="btn sm" id="cc_addlinea">Agregar</button></div>
+    </div>
+    <div class="msg" id="cc_msg"></div>
+    <div style="overflow-x:auto;margin-top:12px"><table id="cc_base_tbl"><tbody></tbody></table></div>
+    <div class="grid" style="grid-template-columns:auto auto;gap:10px;align-items:end;max-width:460px;margin-top:14px">
+      <div class="f"><label>F.931 total que pagaste (bruto, antes de compensar imp. al cheque)</label><input id="cc_oficial" class="mono" inputmode="decimal" placeholder="0,00"></div>
+      <div class="row-actions" style="margin:0"><button class="btn sm" id="cc_oficial_save">Guardar oficial</button></div>
+    </div>
+    <div id="cc_estim_box" style="margin-top:16px"></div>
+    <details style="margin-top:16px">
+      <summary style="cursor:pointer;font-weight:600">Parámetros del cálculo (editables)</summary>
+      <p class="lead" style="margin-top:8px">Alícuotas y montos fijos de ley. Cambialos cuando la ley los actualice; rigen para todos los meses. La detracción es por quincena (el doble si el empleado es mensual).</p>
+      <div id="cc_params_box" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px"></div>
+      <div class="row-actions" style="margin-top:10px"><button class="btn sm" id="cc_params_save">Guardar parámetros</button></div>
+      <div class="msg" id="cc_params_msg"></div>
+      <div class="sectlabel" style="margin-top:18px">Régimen por empleado</div>
+      <p class="lead" style="margin-bottom:8px"><b>Completo</b>: todas las contribuciones. <b>Solo SIPA</b>: únicamente SIPA (jubilado; el resto no aporta). <b>No aporta</b>: excluido del cálculo (Gerencia/Dirección). Cambia cómo se estima cada empleado en todos los períodos, incluidas vacaciones.</p>
+      <div style="overflow-x:auto"><table id="cc_regimen_tbl"><tbody></tbody></table></div>
+      <div class="msg" id="cc_regimen_msg"></div>
+    </details>
   </div>
 
   <!-- Modal editar empleado/sueldo -->
@@ -1076,6 +1109,24 @@ function olvidarApiUrl(){
    ===================================================================== */
 let repartoProv=[];   // [{prov, cuotas, desde:"factura"|"siguiente"}]
 const REPARTO_KEY="repartoCuotas";
+/* Edesur — desde SEP 2026, de todas las facturas de Edesur del mes computa el IVA solo UNA
+   (por defecto la de mayor importe); las demás quedan excluidas como siempre. edesurElegido
+   guarda la elección MANUAL por mes (importe de la factura elegida) para respetarla al releer.
+   Se guarda en la hoja Config (clave "edesurIVA"). Criterio contable, compartido. */
+let edesurElegido={};                                   // { "2026-09": importeElegido }
+const EDESUR_DESDE="2026-09";                            // vigencia (no retroactivo)
+function edesurRuleAplica(mes){ const m=normMes(mes)||""; return m>=EDESUR_DESDE; }
+/* Estimador de Cargas Sociales (F.931) — previsión y control (NO reemplaza el cálculo de la
+   contadora). Parámetros de ley (editables, la ley los actualiza), base remunerativa por
+   empleado/período y valor oficial: todo vive en la hoja Config. El estimado NO suma al balance
+   (los pagos reales de CCSS ya entran como gasto por la tarjeta "CCSS y sindicato"). */
+const CCSS_DEF={sipa:10.77,pami:1.59,fne:0.94,anssal:0.90,asig:4.70,os:5.10,art:3.58,ffep:1905,scvo:424.62,detrac:3501.84,noRem:25000,
+  retJub:11,retINSSJP:3,retOS:3};   // retenciones al empleado: jubilación, INSSJP (Ley 19032), obra social
+let ccssParams=Object.assign({},CCSS_DEF);   // %/fijos editables (Config "ccssParams")
+let ccssExcluidos=["Gutman"];                // (compat) empleados sin aportes CCSS → régimen "noaporta"
+let ccssRegimen={};                          // { "gutman":"noaporta", "bianchini":"solosipa" } · resto "completo"
+let ccssBase={};                             // { "2026-09":[{empleado,importe,periodo:"quincena"|"mensual"|"vacaciones"}] }
+let ccssOficial={};                          // { "2026-09": importe F.931 oficial }
 function guardarReparto(){
   return apiPost({action:"setConfig", clave:REPARTO_KEY, valor:JSON.stringify(repartoProv)});
 }
@@ -1192,6 +1243,12 @@ async function apiGet(){
   if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; state.chequesEmit=j.data.chequesEmit||[]; state.sueldos=j.data.sueldos||[]; state.gastosInforme=j.data.gastosInforme||[]; if(j.data.config&&j.data.config.exclusionesIVA){try{state.exclusionesIVA=JSON.parse(j.data.config.exclusionesIVA);}catch(e){}}
     if(j.data.config&&j.data.config.svInforme){try{state.svInforme=JSON.parse(j.data.config.svInforme);}catch(e){}}
     if(j.data.config&&j.data.config.repartoCuotas){try{repartoProv=JSON.parse(j.data.config.repartoCuotas)||[];}catch(e){}}   // reglas de reparto en cuotas (criterio contable, compartido)
+    if(j.data.config&&j.data.config.edesurIVA){try{edesurElegido=JSON.parse(j.data.config.edesurIVA)||{};}catch(e){}}   // elección manual de la factura Edesur que computa IVA
+    if(j.data.config&&j.data.config.ccssParams){try{ccssParams=Object.assign({},CCSS_DEF,JSON.parse(j.data.config.ccssParams)||{});}catch(e){}}   // alícuotas/fijos CCSS (editables)
+    if(j.data.config&&j.data.config.ccssExcluidos){try{ccssExcluidos=JSON.parse(j.data.config.ccssExcluidos)||[];}catch(e){}}   // empleados sin aportes CCSS (compat)
+    if(j.data.config&&j.data.config.ccssRegimen){try{ccssRegimen=JSON.parse(j.data.config.ccssRegimen)||{};}catch(e){}}   // régimen por empleado (completo/solosipa/noaporta)
+    if(j.data.config&&j.data.config.ccssBase){try{ccssBase=JSON.parse(j.data.config.ccssBase)||{};}catch(e){}}   // base remunerativa por empleado/período
+    if(j.data.config&&j.data.config.ccssOficial){try{ccssOficial=JSON.parse(j.data.config.ccssOficial)||{};}catch(e){}}   // valor F.931 oficial por mes
     if(j.data.config&&j.data.config.comisionACA!==undefined){try{const p=JSON.parse(j.data.config.comisionACA); if(typeof p==="number"&&p>=0)comisionACAPct=p;}catch(e){}}   // % comisión ventas ACA
     if(j.data.config&&j.data.config.comision3!==undefined){try{const p=JSON.parse(j.data.config.comision3); if(typeof p==="number"&&p>=0)comision3Pct=p;}catch(e){}}   // % comisión Sentida Botánica / Brenchio
     // GT Cargas: desgloses de flete keyed por N° de comprobante ({comprobante:{comprobante,facturaMes,total,porMes}});
@@ -1270,7 +1327,7 @@ function irA(v){
   if(v==="resumen")renderResumen();
   if(v==="servicios")renderServicios();
   if(v==="chemit")renderChequesEmit();
-  if(v==="sueldos")renderSueldos();
+  if(v==="sueldos"){renderSueldos();renderCcssTab();}
   if(v==="informes")applyFilters();
   if(v==="datos")renderStats();
 }
@@ -3034,6 +3091,218 @@ async function sueldoAlBalance(s,alBalance){
   }
 }
 
+/* ===== ESTIMADOR DE CARGAS SOCIALES (F.931) — previsión y control =====
+   Derivado de los recibos reales (agosto 2026). Se carga el SUELDO BRUTO de cada período. Sobre él:
+   · base remunerativa = bruto − bono no remunerativo        (para ANSSAL/FSR y Obra Social)
+   · base imponible    = base remunerativa − detracción       (para SIPA, PAMI, FNE y Asig. Fam.)
+       detracción = valor por quincena; el doble si el período es mensual.
+   El COMPARABLE con el F.931 (contribuciones patronales: 351 SIPA + 351 No SIPA + 352 Obra Social) es
+   la suma de SIPA+PAMI+FNE+Asig (s/ base imponible) + ANSSAL+Obra Social (s/ base remunerativa).
+   ART, FFEP y SCVO NO entran en esas 3 líneas: se muestran aparte como "otros costos". */
+const r2=x=>Math.round((x||0)*100)/100;
+const CCSS_PARAM_LBL={sipa:"SIPA %",pami:"PAMI %",fne:"Fondo Nac. Empleo %",asig:"Asig. Familiares %",anssal:"ANSSAL/FSR %",os:"Obra Social %",art:"ART %",ffep:"FFEP ($ × empl.)",scvo:"Seguro Vida SCVO ($ × empl.)",noRem:"Bono no remunerativo (por período, $)",detrac:"Detracción Ley 27.541 (por quincena, $)",retJub:"Retención Jubilación %",retINSSJP:"Retención INSSJP/Ley 19032 %",retOS:"Retención Obra Social %"};
+const CCSS_REG_LBL={completo:"Completo",solosipa:"Solo SIPA",noaporta:"No aporta"};
+function saveCcss(clave,valor){ apiPost({action:"setConfig",clave,valor:JSON.stringify(valor)}); }
+/* Régimen del empleado: "completo" | "solosipa" | "noaporta". Fallback: la lista vieja de
+   excluidos (ccssExcluidos) se interpreta como "noaporta"; el resto, "completo". */
+function regimenDe(nombre){
+  const k=(nombre||"").trim().toLowerCase();
+  if(ccssRegimen[k]) return ccssRegimen[k];
+  if((ccssExcluidos||[]).some(x=>x.trim().toLowerCase()===k)) return "noaporta";
+  return "completo";
+}
+function ccssEmpleadosLista(){
+  const s=new Set(EMP_BASE);
+  state.sueldos.forEach(x=>{ if(x.nombre)s.add(x.nombre); });
+  Object.values(ccssBase).forEach(arr=>arr.forEach(l=>{ if(l.empleado)s.add(l.empleado); }));
+  return [...s].sort((a,b)=>a.localeCompare(b));
+}
+/* Base de cálculo según el período:
+   · quincena/mensual → base rem. = bruto − bono no rem.; base imponible = base rem. − detracción.
+   · vacaciones       → sin bono no rem. y sin detracción: TODA contribución va sobre el bruto. */
+function ccssBasesLinea(bruto, periodo, p){
+  if(periodo==="vacaciones") return {baseRem:bruto, baseImp:bruto, detrac:0};
+  const det=(periodo==="mensual" ? (p.detrac*2) : p.detrac);
+  const baseRem=Math.max(0, bruto-(p.noRem||0));
+  return {baseRem, baseImp:Math.max(0, baseRem-det), detrac:det};
+}
+/* Estimado del mes. Acumula por contribución respetando el régimen de cada empleado.
+   filasComp = contribuciones patronales; filasRet = retenciones al empleado; filasEstim = ART + Seguro de Vida.
+   aPagar = total bruto del F.931 estimado (patronales + retenciones + ART + Seguro de Vida). */
+function ccssEstimado(mes){
+  mes=normMes(mes)||mes;
+  const p=ccssParams;
+  const todas=(ccssBase[mes]||[]);
+  let sipa=0,pami=0,fne=0,asig=0,anssal=0,os=0,art=0;
+  let retJub=0,retINSSJP=0,retOS=0;              // retenciones al empleado (aportes que van al F.931)
+  let bruto=0, baseRemTot=0, baseImpTot=0, detraccion=0, nLineas=0, nExcl=0;
+  const emp=new Set();
+  todas.forEach(l=>{
+    const reg=regimenDe(l.empleado);
+    if(reg==="noaporta"){ nExcl++; return; }
+    const b=parseNum(l.importe)||0;
+    const bs=ccssBasesLinea(b, l.periodo, p);
+    nLineas++; bruto+=b; baseRemTot+=bs.baseRem; baseImpTot+=bs.baseImp; detraccion+=bs.detrac;
+    if(l.empleado)emp.add(l.empleado.trim().toLowerCase());
+    sipa   += bs.baseImp*p.sipa/100;               // SIPA patronal: en todo régimen que aporta
+    art    += b*p.art/100;                          // ART: siempre s/ bruto
+    retJub += bs.baseRem*p.retJub/100;             // retención jubilación: s/ base remunerativa (SIN detracción), completo+solosipa
+    if(reg==="completo"){                           // el resto solo en "Completo"
+      pami      += bs.baseImp*p.pami/100;
+      fne       += bs.baseImp*p.fne/100;
+      asig      += bs.baseImp*p.asig/100;
+      anssal    += bs.baseRem*p.anssal/100;
+      os        += bs.baseRem*p.os/100;
+      retINSSJP += bs.baseRem*p.retINSSJP/100;     // retención INSSJP/Ley 19032
+      retOS     += bs.baseRem*p.retOS/100;         // retención obra social
+    }
+  });
+  bruto=r2(bruto); baseRemTot=r2(baseRemTot); baseImpTot=r2(baseImpTot); detraccion=r2(detraccion);
+  const nEmp=emp.size;
+  const filasComp=[
+    {lbl:"SIPA (jubilación patronal)", det:`${p.sipa}% s/ base imponible`,     monto:r2(sipa)},
+    {lbl:"PAMI (INSSJP)",              det:`${p.pami}% s/ base imponible`,     monto:r2(pami)},
+    {lbl:"Fondo Nacional de Empleo",   det:`${p.fne}% s/ base imponible`,      monto:r2(fne)},
+    {lbl:"Asignaciones Familiares",    det:`${p.asig}% s/ base imponible`,     monto:r2(asig)},
+    {lbl:"ANSSAL / FSR",               det:`${p.anssal}% s/ base remunerativa`,monto:r2(anssal)},
+    {lbl:"Contribuciones Obra Social", det:`${p.os}% s/ base remunerativa`,    monto:r2(os)}
+  ];
+  const patronales=r2(filasComp.reduce((s,x)=>s+x.monto,0));
+  const filasRet=[
+    {lbl:"Retención Jubilación",           det:`${p.retJub}% s/ base remunerativa`,    monto:r2(retJub)},
+    {lbl:"Retención INSSJP (Ley 19.032)",  det:`${p.retINSSJP}% s/ base remunerativa`, monto:r2(retINSSJP)},
+    {lbl:"Retención Obra Social",          det:`${p.retOS}% s/ base remunerativa`,     monto:r2(retOS)}
+  ];
+  const retenciones=r2(filasRet.reduce((s,x)=>s+x.monto,0));
+  const artT=r2(art), scvoT=r2(p.scvo*nEmp), ffepT=r2(p.ffep*nEmp);
+  const filasEstim=[
+    {lbl:"ART", det:`${p.art}% s/ sueldo bruto`, monto:artT},
+    {lbl:"Seguro de Vida (SCVO)", det:`${money0(p.scvo)} × ${nEmp} empl.`, monto:scvoT}
+  ];
+  const aPagar=r2(patronales+retenciones+artT+scvoT);   // TOTAL bruto F.931 estimado (sin compensar imp. al cheque)
+  return {bruto,baseRem:baseRemTot,baseImp:baseImpTot,detraccion,nEmp,nLineas,nExcl,
+    filasComp,patronales, filasRet,retenciones, filasEstim,artT,scvoT,ffepT, aPagar};
+}
+function renderCcssTab(){
+  const sel=$("cc_mes"); if(!sel)return;
+  const arr=mesesSelector(Object.keys(ccssBase));
+  const prev=normMes(sel.value);
+  sel.innerHTML=arr.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join("");
+  sel.value=arr.includes(prev)?prev:(arr.length?arr[arr.length-1]:curMonthISO());
+  sel.onchange=drawCcss;
+  const dl=$("cc_emp_list"); if(dl)dl.innerHTML=ccssEmpleadosLista().map(n=>`<option value="${n}">`).join("");
+  renderCcssParams();
+  renderCcssRegimen();
+  drawCcss();
+}
+function renderCcssParams(){
+  const box=$("cc_params_box"); if(!box)return;
+  box.innerHTML=Object.keys(CCSS_PARAM_LBL).map(k=>`<div class="f"><label>${CCSS_PARAM_LBL[k]}</label><input class="mono" inputmode="decimal" data-ccp="${k}" value="${ccssParams[k]}"></div>`).join("");
+}
+/* Tabla de régimen por empleado (Completo / Solo SIPA / No aporta). */
+function renderCcssRegimen(){
+  const tb=$("cc_regimen_tbl")?$("cc_regimen_tbl").querySelector("tbody"):null; if(!tb)return;
+  const emps=ccssEmpleadosLista();
+  const opts=(sel)=>Object.keys(CCSS_REG_LBL).map(k=>`<option value="${k}" ${k===sel?"selected":""}>${CCSS_REG_LBL[k]}</option>`).join("");
+  tb.innerHTML=`<tr><th class="l">Empleado</th><th class="l">Régimen</th></tr>`+
+    emps.map(n=>`<tr><td class="l">${n}</td><td><select data-ccreg="${encodeURIComponent(n)}" style="max-width:180px">${opts(regimenDe(n))}</select></td></tr>`).join("");
+  tb.querySelectorAll("[data-ccreg]").forEach(s=>s.onchange=()=>{
+    const nombre=decodeURIComponent(s.dataset.ccreg).trim().toLowerCase();
+    ccssRegimen[nombre]=s.value;
+    saveCcss("ccssRegimen",ccssRegimen);
+    showMsg("cc_regimen_msg","ok",`Régimen guardado: ${decodeURIComponent(s.dataset.ccreg)} → ${CCSS_REG_LBL[s.value]}.`);
+    drawCcss();
+  });
+}
+function drawCcss(){
+  const mes=normMes($("cc_mes").value);
+  const tb=$("cc_base_tbl").querySelector("tbody");
+  const lineas=ccssBase[mes]||[];
+  const perLbl={quincena:"Quincena",mensual:"Mensual",vacaciones:"Vacaciones"};
+  const regChip={solosipa:'<span class="chipTipo" style="background:#eef3fb;color:#4a6fa5">solo SIPA</span>',noaporta:'<span class="chipTipo" style="background:#eee;color:#999">no aporta</span>'};
+  if(!lineas.length){
+    tb.innerHTML=`<tr><td colspan="4"><div class="empty">Sin líneas cargadas para ${ymLabel(mes)}. Agregá el sueldo bruto por empleado y período.</div></td></tr>`;
+  } else {
+    let h=`<tr><th class="l">Empleado</th><th class="l">Período</th><th class="num">Sueldo bruto</th><th></th></tr>`;
+    lineas.forEach((l,i)=>{ const reg=regimenDe(l.empleado);
+      h+=`<tr><td class="l">${l.empleado||"—"} ${regChip[reg]||""}</td><td class="l">${perLbl[l.periodo]||"Quincena"}</td><td class="num">${money(parseNum(l.importe)||0)}</td><td><button class="del" data-ccdel="${i}">✕</button></td></tr>`; });
+    tb.innerHTML=h;
+    tb.querySelectorAll("[data-ccdel]").forEach(b=>b.onclick=()=>{
+      const i=+b.dataset.ccdel; if(!confirm("¿Borrar esta línea?"))return;
+      ccssBase[mes].splice(i,1); if(!ccssBase[mes].length)delete ccssBase[mes];
+      saveCcss("ccssBase",ccssBase); drawCcss();
+    });
+  }
+  const of=ccssOficial[mes]||0;
+  if($("cc_oficial"))$("cc_oficial").value= of? of.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2}) : "";
+  drawCcssEstim(mes);
+}
+function drawCcssEstim(mes){
+  const box=$("cc_estim_box"); if(!box)return;
+  const e=ccssEstimado(mes);
+  const of=ccssOficial[mes]||0;
+  const dif= of? (e.aPagar-of) : null;
+  box.innerHTML=`
+    <div class="ledger" style="margin-bottom:14px">
+      <div class="led"><div class="l">Sueldo bruto</div><div class="v">${money0(e.bruto)}</div><div class="sub">${e.nLineas} línea(s) · ${e.nEmp} empl.${e.nExcl?` · ${e.nExcl} no aporta(n)`:''}</div></div>
+      <div class="led"><div class="l">Contribuciones + retenciones</div><div class="v">${money0(e.patronales+e.retenciones)}</div><div class="sub">patronales ${money0(e.patronales)} + retenc. ${money0(e.retenciones)}</div></div>
+      <div class="led" style="border-color:var(--gold)"><div class="l">A pagar (estimado)</div><div class="v">${money0(e.aPagar)}</div><div class="sub">F.931 bruto, antes de imp. al cheque</div></div>
+      ${dif!==null?`<div class="led"><div class="l">Diferencia</div><div class="v ${Math.abs(dif)<1?'pos':'neg'}">${money0(dif)}</div><div class="sub">app − pagado</div></div>`:""}
+    </div>
+    <div class="sectlabel" style="margin-top:8px">1) Contribuciones patronales</div>
+    <table style="max-width:620px"><tbody>
+      ${e.filasComp.map(f=>`<tr><td class="l">${f.lbl} <span style="color:var(--faint);font-size:11px">${f.det}</span></td><td class="num">${money(f.monto)}</td></tr>`).join("")}
+      <tr class="tot"><td class="l">Subtotal contribuciones patronales</td><td class="num">${money(e.patronales)}</td></tr>
+    </tbody></table>
+    <div class="sectlabel" style="margin-top:16px">2) Retenciones a empleados (aportes al F.931)</div>
+    <table style="max-width:620px"><tbody>
+      ${e.filasRet.map(f=>`<tr><td class="l">${f.lbl} <span style="color:var(--faint);font-size:11px">${f.det}</span></td><td class="num">${money(f.monto)}</td></tr>`).join("")}
+      <tr class="tot"><td class="l">Subtotal retenciones</td><td class="num">${money(e.retenciones)}</td></tr>
+    </tbody></table>
+    <div class="sectlabel" style="margin-top:16px">3) ART y Seguro de Vida <span style="color:var(--faint);font-weight:400;text-transform:none;letter-spacing:0">(estimados)</span></div>
+    <div style="background:#fdf6e3;border:1px solid var(--gold);border-radius:8px;padding:10px 12px;margin:6px 0;font-size:12.5px">⚠ ART y Seguro de Vida son estimados aproximados — el F.931 real los calcula con su propia base y pueden variar mes a mes. Verificar contra el formulario oficial.</div>
+    <table style="max-width:620px"><tbody>
+      ${e.filasEstim.map(f=>`<tr><td class="l">${f.lbl} <span style="color:var(--faint);font-size:11px">${f.det}</span></td><td class="num">${money(f.monto)}</td></tr>`).join("")}
+      <tr class="tot"><td class="l">Subtotal ART + Seguro de Vida</td><td class="num">${money(e.artT+e.scvoT)}</td></tr>
+    </tbody></table>
+    <table style="max-width:620px;margin-top:16px"><tbody>
+      <tr class="tot" style="border-top:2px solid var(--gold)"><td class="l"><b>A pagar (estimado) — total F.931 bruto</b></td><td class="num"><b>${money(e.aPagar)}</b></td></tr>
+      <tr><td class="l">Lo que terminaste pagando (F.931 bruto, antes de imp. al cheque)</td><td class="num">${of?money(of):"—"}</td></tr>
+      ${dif!==null?`<tr><td class="l">Diferencia (estimado − pagado)</td><td class="num" style="color:${Math.abs(dif)<1?'var(--green)':'var(--red)'}">${money(dif)}</td></tr>`:""}
+    </tbody></table>
+    <small class="note">Estimado de previsión y control; no reemplaza el cálculo oficial de la contadora. Estima el <b>total bruto del F.931</b> (contribuciones + retenciones + ART + Seguro de Vida), <b>antes</b> de la compensación con el impuesto al cheque (esa compensación se maneja aparte, en Imp. al cheque, y no se resta acá). Se carga el <b>sueldo bruto</b> del recibo por período (quincena, mensual o vacaciones): en quincena/mensual la app resta el bono no remunerativo y la detracción; en <b>vacaciones</b> calcula todo sobre el bruto. Cada empleado se estima según su <b>régimen</b>. Las retenciones (incluida INSSJP/Ley 19.032) van sobre la base remunerativa, sin detracción. No incluye FFEP, impuesto al cheque ni "Capacitación Técnica y Sindical".</small>`;
+}
+if($("cc_addlinea"))$("cc_addlinea").onclick=()=>{
+  const mes=normMes($("cc_mes").value);
+  const empleado=$("cc_emp").value.trim();
+  const importe=parseNum($("cc_imp").value)||0;
+  const periodo=$("cc_periodo").value;
+  if(!empleado){showMsg("cc_msg","learn","Poné el nombre del empleado.");return;}
+  if(!importe){showMsg("cc_msg","learn","Poné el sueldo bruto del recibo.");return;}
+  if(!ccssBase[mes])ccssBase[mes]=[];
+  ccssBase[mes].push({empleado,importe,periodo});
+  saveCcss("ccssBase",ccssBase);
+  $("cc_emp").value=""; $("cc_imp").value=""; $("cc_emp").focus();
+  const dl=$("cc_emp_list"); if(dl)dl.innerHTML=ccssEmpleadosLista().map(n=>`<option value="${n}">`).join("");
+  renderCcssRegimen();   // el empleado nuevo aparece en la tabla de régimen
+  showMsg("cc_msg","ok",`Agregado: ${empleado} · ${periodo} · ${money(importe)}.`);
+  drawCcss();
+};
+if($("cc_oficial_save"))$("cc_oficial_save").onclick=()=>{
+  const mes=normMes($("cc_mes").value);
+  const v=parseNum($("cc_oficial").value)||0;
+  if(v)ccssOficial[mes]=v; else delete ccssOficial[mes];
+  saveCcss("ccssOficial",ccssOficial);
+  showMsg("cc_msg","ok",`F.931 oficial de ${ymLabel(mes)} guardado: ${money(v)}.`);
+  drawCcssEstim(mes);
+};
+if($("cc_params_save"))$("cc_params_save").onclick=()=>{
+  document.querySelectorAll("[data-ccp]").forEach(inp=>{ const k=inp.dataset.ccp; const val=parseNum(inp.value); if(val>=0)ccssParams[k]=val; });
+  saveCcss("ccssParams",ccssParams);
+  showMsg("cc_params_msg","ok","Parámetros guardados. Rigen para todos los meses.");
+  drawCcss();
+};
+
 /* ===== CHEQUES EMITIDOS ===== */
 function parseChequesEmit(texto){
   const bloques=texto.split(/(?=ID:\s)/);
@@ -3307,8 +3576,9 @@ function gtGastoMes(mes){
   return {monto:Math.round(monto*100)/100, viajes};
 }
 
-/* extrae totales del pie del informe de compras + neto por proveedor */
-function parseDiarioCompras(txt){
+/* extrae totales del pie del informe de compras + neto por proveedor.
+   mes: para aplicar la regla de Edesur (desde SEP 2026 computa el IVA solo la factura elegida). */
+function parseDiarioCompras(txt, mes){
   const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
   const ivaTotal=tot(/TOTAL I\.V\.A\.\s*\.+;?\s*([\d.,-]+)/);
   // percepciones: el importe es el ÚLTIMO número argentino de la línea de la etiqueta.
@@ -3325,6 +3595,7 @@ function parseDiarioCompras(txt){
   const excl=(state.exclusionesIVA||[]).map(x=>x.toUpperCase());
   let ivaExcluido=0, gtDetectado=false;
   const provNeto={};
+  const edesurLineas=[];   // {importe, iva} de cada factura de Edesur (una por línea de razón)
   txt.split("\n").forEach(ln=>{
     const c=ln.split(";");
     if(c.length<11)return;
@@ -3335,10 +3606,31 @@ function parseDiarioCompras(txt){
     const ivaLinea=parseNumAr(c[10]||"");
     // GT Cargas: su gasto NO entra acá (se reparte por el desglose). Su IVA queda en el total del pie.
     if(esLineaGT(c,razonUp)){ gtDetectado=true; return; }
-    if(excl.some(ex=>razonUp.includes(ex))){ ivaExcluido+=ivaLinea; }
+    if(excl.some(ex=>razonUp.includes(ex))){
+      // Edesur se trata aparte (puede computar una factura); el resto (Aysa/Metrogas) se excluye entero.
+      if(razonUp.includes("EDESUR")) edesurLineas.push({importe,iva:ivaLinea});
+      else ivaExcluido+=ivaLinea;
+    }
     if(importe){ provNeto[razon]=(provNeto[razon]||0)+importe; }
   });
-  return {ivaTotal,percIVA,percIIBB,neto,ivaExcluido,ivaCompNeto:ivaTotal-ivaExcluido,provNeto,gtDetectado};
+  // Edesur: hasta AGO 2026 se excluye TODO su IVA. Desde SEP 2026 computa el IVA de UNA sola factura
+  // (por defecto la de mayor importe; se puede elegir otra a mano por mes). Las demás quedan excluidas.
+  let edesur=null;
+  if(edesurLineas.length){
+    const totIVAEde=Math.round(edesurLineas.reduce((s,x)=>s+x.iva,0)*100)/100;
+    if(edesurRuleAplica(mes)){
+      let elegido=null;
+      const ov=mes!=null?edesurElegido[normMes(mes)]:undefined;
+      if(ov!=null) elegido=edesurLineas.find(x=>Math.abs(x.importe-ov)<0.01)||null;   // respeta la elección manual
+      if(!elegido) elegido=edesurLineas.reduce((a,b)=>b.importe>a.importe?b:a,edesurLineas[0]);   // por defecto, la mayor
+      ivaExcluido+=totIVAEde-elegido.iva;   // se excluye todo Edesur menos la factura elegida
+      edesur={aplica:true, elegido, lineas:edesurLineas, totIVA:totIVAEde, manual:(ov!=null)};
+    } else {
+      ivaExcluido+=totIVAEde;               // no vigente: se excluye todo (como hasta ahora)
+      edesur={aplica:false, lineas:edesurLineas, totIVA:totIVAEde};
+    }
+  }
+  return {ivaTotal,percIVA,percIIBB,neto,ivaExcluido,ivaCompNeto:ivaTotal-ivaExcluido,provNeto,gtDetectado,edesur};
 }
 function parseDiarioVentas(txt){
   const tot=(re)=>{ const m=txt.match(re); return m?parseNumAr(m[1]):0; };
@@ -3480,6 +3772,7 @@ function renderDiarioIVA(){
   const d=state.impuestos[sel.value]||{};
   if(d.ivaCompras)$("di_res_compras").innerHTML=`<div class="led" style="border-color:var(--gold)"><div class="l">IVA compras (crédito)</div><div class="v">${money0(d.ivaCompNeto||d.ivaCompras)}</div><div class="sub">guardado</div></div>`;
   else $("di_res_compras").innerHTML="";
+  if($("di_edesur_box"))$("di_edesur_box").innerHTML="";   // el panel Edesur se rearma al leer el informe
   if(d.ivaVentas)$("di_res_ventas").innerHTML=`<div class="led" style="border-color:var(--gold)"><div class="l">IVA ventas (débito)</div><div class="v">${money0(d.ivaVentas)}</div><div class="sub">guardado</div></div>`;
   else $("di_res_ventas").innerHTML="";
   const vbNeg=(state.ventas[sel.value]||{}).negro||0;
@@ -3524,6 +3817,34 @@ function mostrarResCompras(r){
     `<div class="led" style="border-color:var(--gold)"><div class="l">IVA compras (crédito)</div><div class="v">${money0(r.ivaCompNeto)}</div><div class="sub">total ${money0(r.ivaTotal)} − excluidos ${money0(r.ivaExcluido)}</div></div>
      <div class="led"><div class="l">Percep. IVA</div><div class="v">${money0(r.percIVA)}</div></div>
      <div class="led"><div class="l">Percep. IIBB</div><div class="v">${money0(r.percIIBB)}</div></div>`;
+}
+/* Panel Edesur: muestra qué factura computa el IVA (desde sep-2026) y deja cambiarla a mano. */
+function renderEdesurBox(r, mes, txt){
+  const box=$("di_edesur_box"); if(!box)return;
+  const e=r&&r.edesur;
+  if(!e){ box.innerHTML=""; return; }   // no hay facturas de Edesur en el mes
+  if(!e.aplica){                        // meses hasta ago-2026: todo el IVA de Edesur excluido (informativo)
+    box.innerHTML=`<div style="background:var(--paper);border:1px solid var(--edge);border-radius:8px;padding:12px;font-size:13px">
+      <b>Edesur</b> · ${e.lineas.length} factura(s) · IVA excluido ${money0(e.totIVA)} <span style="color:var(--faint)">(hasta ago-2026 no computa)</span></div>`;
+    return;
+  }
+  const idxEl=e.lineas.indexOf(e.elegido);
+  const opts=e.lineas.map((x,i)=>`<option value="${i}" ${i===idxEl?"selected":""}>Factura ${money0(x.importe)} · IVA ${money0(x.iva)}</option>`).join("");
+  box.innerHTML=`<div style="background:#fdf6e3;border:1px solid var(--gold);border-radius:8px;padding:12px">
+    <div style="font-weight:600;margin-bottom:6px">Edesur — IVA que computa (desde sep-2026)</div>
+    <div style="font-size:13px;margin-bottom:8px">De ${e.lineas.length} factura(s), computa el IVA de <b>una</b>: importe <b>${money0(e.elegido.importe)}</b>, IVA computado <b>${money0(e.elegido.iva)}</b>. Las demás quedan excluidas.${e.manual?' <span style="color:var(--faint)">(elegida a mano)</span>':''}</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:12px;color:var(--faint)">Cambiar cuál computa:</label>
+      <select id="di_edesur_sel" style="max-width:300px">${opts}</select>
+    </div></div>`;
+  $("di_edesur_sel").onchange=async ()=>{
+    const i=+$("di_edesur_sel").value; const el=e.lineas[i]; if(!el)return;
+    edesurElegido[normMes(mes)]=el.importe;
+    await apiPost({action:"setConfig", clave:"edesurIVA", valor:JSON.stringify(edesurElegido)});
+    const r2=parseDiarioCompras(txt,mes);   // recalcula con la nueva elección
+    diarioTmp.compras=r2; mostrarResCompras(r2); renderEdesurBox(r2,mes,txt);
+    showMsg("di_msg","ok",`Edesur: ahora computa la factura de ${money0(el.importe)} (IVA ${money0(el.iva)}). Volvé a guardar el informe para aplicarlo al balance.`);
+  };
 }
 function mostrarResVentas(r){
   $("di_res_ventas").innerHTML=
@@ -3622,9 +3943,10 @@ function drawRubrosB(provNeto){
 $("di_calc_compras").onclick=()=>{
   const txt=$("di_compras").value;
   if(!txt.trim()){showMsg("di_msg","learn","Pegá primero el informe de compras.");return;}
-  const r=parseDiarioCompras(txt);
+  const mesC=normMes($("di_mes").value);
+  const r=parseDiarioCompras(txt,mesC);
   if(!r.ivaTotal){showMsg("di_msg","learn","No encontré el TOTAL I.V.A. Copiá hasta el final (los totales).");return;}
-  diarioTmp.compras=r; mostrarResCompras(r); drawRubrosInforme(r.provNeto||{});
+  diarioTmp.compras=r; mostrarResCompras(r); drawRubrosInforme(r.provNeto||{}); renderEdesurBox(r,mesC,txt);
   // GT Cargas detectado: su gasto va por el desglose, no por acá. Avisamos si falta cargarlo.
   const mesFac=normMes($("di_mes").value);
   const yaHayGT=Object.values(state.gtCargas||{}).some(f=>normMes(f.facturaMes)===mesFac);
@@ -4200,9 +4522,10 @@ $("d_api_clear").onclick=()=>{
 };
 $("d_reload").onclick=async ()=>{
   showMsg("d_msg","ok","Recargando desde la planilla…");
+  setSync("busy","conectando…");
   const j=await apiGet();
-  if(j&&j.ok){ renderAll(); showMsg("d_msg","ok",`Recargado: ${state.gastos.length} gastos, ${Object.keys(state.ventas).length} meses de ventas.`); }
-  else showMsg("d_msg","learn","No se pudo conectar con la planilla. Revisá la URL (API) y tu conexión.");
+  if(j&&j.ok){ setSync("ok"); fillSubs(); renderAll(); showMsg("d_msg","ok",`Recargado: ${state.gastos.length} gastos, ${Object.keys(state.ventas).length} meses de ventas.`); }
+  else { setSync("err","sin conexión"); showMsg("d_msg","learn","No se pudo conectar con la planilla. Revisá la URL (API) y tu conexión."); }
 };
 $("d_xlsx").onclick=()=>{
   if(!state.gastos.length&&!Object.keys(state.ventas).length){alert("No hay datos para exportar.");return;}
