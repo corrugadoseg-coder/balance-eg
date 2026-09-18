@@ -1019,6 +1019,16 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="msg" id="d_prov_msg"></div>
     <div style="overflow-x:auto;max-height:340px;overflow-y:auto;margin-top:8px"><table id="d_prov_tbl" style="max-width:760px"><tbody></tbody></table></div>
 
+    <div class="sectlabel" style="margin-top:26px">Subcategorías por proveedor (desglose del Balance)</div>
+    <p class="lead" style="margin-bottom:12px">Agrupá renglones bajo una subcategoría dentro de su rubro en el desglose del Balance (ej. <b>Comisiones</b> en Gastos de Administración). Poné el proveedor igual que aparece en el desglose y la subcategoría. Los gastos cargados a mano ya usan su propia subcategoría; esto cubre además los que vienen del informe. Se guarda en la planilla.</p>
+    <div class="grid" style="grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;max-width:760px">
+      <div class="f"><label>Proveedor (igual que en el desglose)</label><input id="d_subprov_nuevo" placeholder="Ej. Sanchez Juan Antonio"></div>
+      <div class="f"><label>Subcategoría</label><input id="d_subprov_sub" placeholder="Ej. Comisiones"></div>
+      <div class="row-actions" style="margin:0"><button class="btn sm" id="d_subprov_add" type="button">+ Agregar</button></div>
+    </div>
+    <div class="msg" id="d_subprov_msg"></div>
+    <div style="overflow-x:auto;max-height:340px;overflow-y:auto;margin-top:8px"><table id="d_subprov_tbl" style="max-width:760px"><tbody></tbody></table></div>
+
     <div class="sectlabel" style="margin-top:26px">Estado</div>
     <table style="max-width:480px">
       <tbody id="d_stats"></tbody>
@@ -1127,6 +1137,29 @@ let ccssExcluidos=["Gutman"];                // (compat) empleados sin aportes C
 let ccssRegimen={};                          // { "gutman":"noaporta", "bianchini":"solosipa" } · resto "completo"
 let ccssBase={};                             // { "2026-09":[{empleado,importe,periodo:"quincena"|"mensual"|"vacaciones"}] }
 let ccssOficial={};                          // { "2026-09": importe F.931 oficial }
+/* Subcategoría por proveedor: agrupa renglones bajo una subcategoría dentro de su rubro en el
+   desglose del Balance (ej. "Comisiones" en Gastos de Administración). Clave = proveedor en
+   minúsculas. Se guarda en la hoja Config (clave "subProv"). Los gastos cargados a mano ya
+   traen su propia subcategoría (campo sub); acá se cubren los que vienen del informe. */
+let subProv={
+  "sanchez juan antonio":"Comisiones",
+  "gasto de comercialización aca":"Comisiones",
+  "gasto de comercialización brenchio":"Comisiones",
+  "gasto de comercialización sentida botanica":"Comisiones"
+};
+function subDeProveedor(prov){ return subProv[(prov||"").trim().toLowerCase()]||""; }
+/* subcategoría efectiva de un renglón del balance: la del mapa por proveedor, o la del gasto. */
+function subDeItem(prov, subGasto){ return subDeProveedor(prov) || (subGasto||"").trim(); }
+/* agrupa ítems de detalle por subcategoría (los sin sub quedan sueltos). */
+function agruparPorSub(items){
+  const sinSub=[], map={};
+  items.forEach(x=>{ const s=(x.sub||"").trim(); if(s){(map[s]=map[s]||[]).push(x);} else sinSub.push(x); });
+  const grupos=Object.keys(map).sort((a,b)=>a.localeCompare(b)).map(name=>({
+    name, items:map[name].slice().sort((a,b)=>b.monto-a.monto),
+    subtotal:map[name].reduce((s,x)=>s+(x.monto||0),0)
+  }));
+  return {sinSub:sinSub.slice().sort((a,b)=>b.monto-a.monto), grupos};
+}
 function guardarReparto(){
   return apiPost({action:"setConfig", clave:REPARTO_KEY, valor:JSON.stringify(repartoProv)});
 }
@@ -1249,6 +1282,9 @@ async function apiGet(){
     if(j.data.config&&j.data.config.ccssRegimen){try{ccssRegimen=JSON.parse(j.data.config.ccssRegimen)||{};}catch(e){}}   // régimen por empleado (completo/solosipa/noaporta)
     if(j.data.config&&j.data.config.ccssBase){try{ccssBase=JSON.parse(j.data.config.ccssBase)||{};}catch(e){}}   // base remunerativa por empleado/período
     if(j.data.config&&j.data.config.ccssOficial){try{ccssOficial=JSON.parse(j.data.config.ccssOficial)||{};}catch(e){}}   // valor F.931 oficial por mes
+    if(j.data.config&&j.data.config.subProv){try{subProv=JSON.parse(j.data.config.subProv)||{};}catch(e){}}   // subcategoría por proveedor (desglose Balance)
+    // "Comisiones" disponible como subcategoría de Gastos de Administración (para el desplegable de carga a mano)
+    if(!(state.subs["GASTOS DE ADMINISTRACIÓN"]||[]).includes("Comisiones")){ (state.subs["GASTOS DE ADMINISTRACIÓN"]=state.subs["GASTOS DE ADMINISTRACIÓN"]||[]).push("Comisiones"); }
     if(j.data.config&&j.data.config.comisionACA!==undefined){try{const p=JSON.parse(j.data.config.comisionACA); if(typeof p==="number"&&p>=0)comisionACAPct=p;}catch(e){}}   // % comisión ventas ACA
     if(j.data.config&&j.data.config.comision3!==undefined){try{const p=JSON.parse(j.data.config.comision3); if(typeof p==="number"&&p>=0)comision3Pct=p;}catch(e){}}   // % comisión Sentida Botánica / Brenchio
     // GT Cargas: desgloses de flete keyed por N° de comprobante ({comprobante:{comprobante,facturaMes,total,porMes}});
@@ -1605,6 +1641,46 @@ if($("d_prov_add"))$("d_prov_add").onclick=async ()=>{
   renderProvRules(); refreshProvList();
   showMsg("d_prov_msg","ok",`${yaExiste?"Actualizada":"Agregada"} la regla: <b>${capProv(nombre)}</b> → ${rubro}.`);
 };
+/* ---- subcategorías por proveedor (desglose del Balance) ---- */
+function saveSubProv(){ apiPost({action:"setConfig",clave:"subProv",valor:JSON.stringify(subProv)}); }
+function renderSubProv(){
+  const tb=$("d_subprov_tbl"); if(!tb)return;
+  const body=tb.querySelector("tbody")||tb;
+  const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+  const keys=Object.keys(subProv).filter(k=>subProv[k]).sort((a,b)=>a.localeCompare(b));
+  let h=`<tr><th class="l">Proveedor</th><th class="l">Subcategoría</th><th></th></tr>`;
+  if(!keys.length){ h+=`<tr><td colspan="3"><div class="empty" style="padding:10px 4px">Sin subcategorías cargadas. Agregá una arriba.</div></td></tr>`; }
+  else keys.forEach(k=>{
+    h+=`<tr>
+      <td class="l">${esc(capProv(k))}</td>
+      <td class="l"><input data-subprovedit="${esc(k)}" value="${esc(subProv[k])}" style="min-width:180px"></td>
+      <td style="text-align:center"><button class="del" data-subprovdel="${esc(k)}" title="Borrar">✕</button></td>
+    </tr>`;
+  });
+  body.innerHTML=h;
+  body.querySelectorAll("[data-subprovedit]").forEach(inp=>inp.onchange=()=>{
+    const k=inp.dataset.subprovedit; const v=inp.value.trim();
+    if(v)subProv[k]=v; else delete subProv[k];
+    saveSubProv(); if($("b_mes"))drawBalance();
+  });
+  body.querySelectorAll("[data-subprovdel]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.subprovdel;
+    if(!confirm(`¿Borrar la subcategoría de "${capProv(k)}"?`))return;
+    delete subProv[k]; saveSubProv(); renderSubProv(); if($("b_mes"))drawBalance();
+  });
+}
+if($("d_subprov_add"))$("d_subprov_add").onclick=()=>{
+  const nombre=($("d_subprov_nuevo").value||"").trim();
+  const sub=($("d_subprov_sub").value||"").trim();
+  if(!nombre){ showMsg("d_subprov_msg","learn","Escribí el proveedor (igual que en el desglose)."); return; }
+  if(!sub){ showMsg("d_subprov_msg","learn","Escribí la subcategoría (ej. Comisiones)."); return; }
+  const k=nombre.toLowerCase();
+  const yaExiste=!!subProv[k];
+  subProv[k]=sub; saveSubProv();
+  $("d_subprov_nuevo").value=""; $("d_subprov_sub").value="";
+  renderSubProv(); if($("b_mes"))drawBalance();
+  showMsg("d_subprov_msg","ok",`${yaExiste?"Actualizada":"Agregada"}: <b>${capProv(nombre)}</b> → ${sub}.`);
+};
 $("g_filtprov").addEventListener("change",renderGastos);
 $("g_filtrubro").addEventListener("change",renderGastos);
 
@@ -1668,7 +1744,7 @@ function drawBalance(){
     const esNegro=(g.tipo==="negro");
     if(bn!=="total" && ((bn==="blanco")===esNegro))return;
     if(!g.prov)return;
-    (detByR[g.rubro]=detByR[g.rubro]||[]).push({prov:provCuotaLabel(g), monto:g.monto, tipo:g.tipo});
+    (detByR[g.rubro]=detByR[g.rubro]||[]).push({prov:provCuotaLabel(g), monto:g.monto, tipo:g.tipo, sub:subDeProveedor(g.prov)});
   });
   // 2b-bis) también los gastos cargados a mano (facturas, sueldos, CCSS, servicios, impositivos)
   //         componen el detalle de su rubro, para poder desplegarlo (ej. CCSS, SIND Y SUELDOS).
@@ -1676,7 +1752,7 @@ function drawBalance(){
     const esNegro=(g.bn==="negro");
     if(bn!=="total" && ((bn==="blanco")===esNegro))return;
     const nombre=(g.prov||g.sub||"(sin nombre)");
-    (detByR[g.rubro]=detByR[g.rubro]||[]).push({prov:nombre, monto:g.monto||0, tipo:esNegro?"negro":"blanco"});
+    (detByR[g.rubro]=detByR[g.rubro]||[]).push({prov:nombre, monto:g.monto||0, tipo:esNegro?"negro":"blanco", sub:subDeItem(g.prov, g.sub)});
   });
   // 2c) Impuestos al contador (IVA e IIBB, POR SEPARADO): lo que da A PAGAR suma al rubro
   //     IMPOSITIVO (junto con lo cargado a mano, ej. Ganancias); lo a favor no suma (aparte).
@@ -1699,16 +1775,27 @@ function drawBalance(){
   const caret=det=>det
     ? `<span class="caret" style="color:var(--gold);margin-right:7px;display:inline-block;width:9px">▸</span>`
     : `<span style="margin-right:7px;display:inline-block;width:9px"></span>`;
-  const filaDetalle=(r,cols)=>{
-    const d=(detByR[r]||[]).slice().sort((a,b)=>b.monto-a.monto);
-    if(!d.length)return "";
-    const sub=d.reduce((s,x)=>s+(x.monto||0),0);
-    const filas=d.map(x=>`<tr>
+  const filaItem=x=>`<tr>
       <td class="l" style="border:none;padding:4px 8px">${x.prov}${bn==="total"?` <span class="chipTipo ${x.tipo==="negro"?"b":"a"}">${x.tipo==="negro"?"B":"A"}</span>`:""}</td>
-      <td class="num" style="border:none;padding:4px 8px">${money(x.monto)}</td></tr>`).join("");
+      <td class="num" style="border:none;padding:4px 8px">${money(x.monto)}</td></tr>`;
+  let subgrpN=0;   // id único por subgrupo (para el plegado anidado)
+  const filaDetalle=(r,cols)=>{
+    const d=(detByR[r]||[]);
+    if(!d.length)return "";
+    const totalR=d.reduce((s,x)=>s+(x.monto||0),0);
+    const {sinSub,grupos}=agruparPorSub(d);
+    // ítems sin subcategoría: tabla plana como antes
+    let cuerpo = sinSub.length ? `<table style="width:100%;max-width:540px">${sinSub.map(filaItem).join("")}</table>` : "";
+    // subcategorías: encabezado plegable + su tabla (mismo estilo que el rubro)
+    grupos.forEach(g=>{
+      const gid=`sg${mes}_${r.replace(/\W/g,"")}_${subgrpN++}`;
+      cuerpo += `<div class="subgrp" data-subgrp="${gid}" style="cursor:pointer;margin:8px 0 2px;font-weight:600;color:var(--ink2)">
+          <span class="caret2" style="color:var(--gold);margin-right:6px;display:inline-block;width:9px">▸</span>${g.name} — ${money(g.subtotal)} <span style="color:var(--faint);font-weight:400;font-size:12px">(${g.items.length})</span></div>
+        <table class="subgrp-rows" data-subrows="${gid}" style="width:100%;max-width:540px;display:none;margin-left:14px">${g.items.map(filaItem).join("")}</table>`;
+    });
     return `<tr class="det" style="display:none"><td colspan="${cols}" style="background:var(--paper2);padding:10px 10px 14px 30px">
-      <div class="sectlabel" style="margin-bottom:8px">${d.length} ítem(s) · ${money(sub)}</div>
-      <table style="width:100%;max-width:540px">${filas}</table></td></tr>`;
+      <div class="sectlabel" style="margin-bottom:8px">${d.length} ítem(s) · ${money(totalR)}</div>
+      ${cuerpo}</td></tr>`;
   };
   const vTot=ventaVal(mes,bn);
   const res=vTot-gTot;
@@ -1780,10 +1867,20 @@ function drawBalance(){
       const c=tr.querySelector(".caret"); if(c)c.textContent=abierto?"▸":"▾";
     };
   });
+  // subcategorías (ej. Comisiones): cada encabezado abre/cierra su tabla, sin afectar el rubro
+  tb.querySelectorAll("[data-subgrp]").forEach(hdr=>{
+    hdr.onclick=e=>{
+      e.stopPropagation();
+      const rows=tb.querySelector(`[data-subrows="${hdr.dataset.subgrp}"]`); if(!rows)return;
+      const abierto=rows.style.display!=="none";
+      rows.style.display=abierto?"none":"";
+      const c=hdr.querySelector(".caret2"); if(c)c.textContent=abierto?"▸":"▾";
+    };
+  });
   // desglose imprimible por rubro (para el panel de impresión selectiva)
   const desgloseByR={};
   Object.keys(detByR).forEach(r=>{
-    desgloseByR[r]=detByR[r].slice().sort((a,b)=>b.monto-a.monto).map(x=>({nombre:x.prov,monto:x.monto||0,tipo:x.tipo}));
+    desgloseByR[r]=detByR[r].slice().sort((a,b)=>b.monto-a.monto).map(x=>({nombre:x.prov,monto:x.monto||0,tipo:x.tipo,sub:x.sub||""}));
   });
   _balancePrintCtx={mes,gByR,gTot,vTot,res,bn,desgloseByR,impMes};
   // botón imprimir → abre el panel "¿Qué querés imprimir?"
@@ -1852,9 +1949,15 @@ function imprimirBalance(mes,gByR,gTot,vTot,res,bn,desgloseByR,rubrosSel,impMes)
   let desgloseHTML="";
   RUBROS_BAL.filter(r=>gByR[r]).sort((a,b)=>gByR[b]-gByR[a]).forEach(r=>{
     if(rubrosSel.indexOf(r)<0)return;
-    const d=(desgloseByR[r]||[]).slice().sort((a,b)=>b.monto-a.monto);
+    const d=(desgloseByR[r]||[]);
     if(!d.length)return;
-    const filasD=d.map(x=>`<tr><td>${x.nombre}${bn==="total"&&x.tipo?` (${x.tipo==="negro"?"B":"A"})`:""}</td><td style="text-align:right">${fmt(x.monto)}</td></tr>`).join("");
+    const filaImp=x=>`<tr><td>${x.nombre}${bn==="total"&&x.tipo?` (${x.tipo==="negro"?"B":"A"})`:""}</td><td style="text-align:right">${fmt(x.monto)}</td></tr>`;
+    const {sinSub,grupos}=agruparPorSub(d);
+    let filasD=sinSub.map(filaImp).join("");
+    grupos.forEach(g=>{   // subcategoría (ej. Comisiones) como sub-encabezado con subtotal
+      filasD+=`<tr><td style="padding-top:8px;font-weight:600">${g.name} — ${fmt(g.subtotal)}</td><td></td></tr>`
+        + g.items.map(x=>`<tr><td style="padding-left:18px">${x.nombre}${bn==="total"&&x.tipo?` (${x.tipo==="negro"?"B":"A"})`:""}</td><td style="text-align:right">${fmt(x.monto)}</td></tr>`).join("");
+    });
     desgloseHTML+=`<div class="sect">${r} — ${fmt(gByR[r])}</div>
       <table><tbody>${filasD}</tbody></table>`;
   });
@@ -4609,7 +4712,7 @@ function renderHomeEstado(preferido){
     };
   });
 }
-function renderAll(){ renderGastos(); renderVentas(); renderBalance(); renderStats(); renderHomeEstado(); renderReparto(); renderProvRules(); }
+function renderAll(){ renderGastos(); renderVentas(); renderBalance(); renderStats(); renderHomeEstado(); renderReparto(); renderProvRules(); renderSubProv(); }
 
 /* ---- boot ---- */
 initSelects();
