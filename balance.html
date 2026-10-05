@@ -131,6 +131,10 @@ tr.rowB:hover > td{background:var(--bgB2)}
 .flagcarga{font-family:'IBM Plex Sans',sans-serif;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 10px;border-radius:20px;white-space:nowrap;display:inline-block;vertical-align:middle}
 .flagcarga.ok{background:var(--greenL);color:var(--green)}
 .flagcarga.no{background:var(--paper2);color:var(--faint)}
+/* parpadeo suave del título mientras ese informe NO está cargado para el mes elegido */
+@keyframes titilaInforme{0%,100%{opacity:1}50%{opacity:.5}}
+.informe-tit.titila{animation:titilaInforme 1.5s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.informe-tit.titila{animation:none;opacity:.7}}
 
 /* FORM */
 .grid{display:grid;gap:14px}
@@ -544,7 +548,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="f">
       <textarea id="di_compras" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el Diario de IVA de Compras completo (con los totales del final)."></textarea>
     </div>
-    <div class="row-actions"><button class="btn gold" id="di_calc_compras">Leer informe de compras</button></div>
+    <div class="row-actions"><button class="btn gold" id="di_calc_compras">Leer informe de compras</button><button class="btn ghost sm" id="di_reset_compras" title="Borra lo guardado de IVA Compras en el mes seleccionado (por si se cargó algo por error). No toca ventas, retenciones ni Parte B.">⟲ Borrar compras del mes</button></div>
     <div id="di_res_compras" class="ledger" style="margin:12px 0"></div>
     <div id="di_edesur_box" style="margin:12px 0"></div>
     <div id="di_rubros_box" style="margin:12px 0"></div>
@@ -553,40 +557,40 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="f">
       <textarea id="di_ventas" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el Diario de IVA de Ventas completo (con los totales del final)."></textarea>
     </div>
-    <div class="row-actions"><button class="btn gold" id="di_calc_ventas">Leer informe de ventas</button></div>
+    <div class="row-actions"><button class="btn gold" id="di_calc_ventas">Leer informe de ventas</button><button class="btn ghost sm" id="di_reset_ventas" title="Borra las ventas oficiales (Tipo A/blanco) del mes seleccionado y las comisiones calculadas sobre ventas blancas. No toca compras, retenciones ni Ventas B.">⟲ Borrar ventas del mes</button></div>
     <div id="di_res_ventas" class="ledger" style="margin:12px 0"></div>
-
-    <div class="informe-tit" style="margin-top:26px">Ventas B <span class="desc">(no oficial)</span> <span class="flagcarga no" id="di_flag_ventasb">Sin cargar</span></div>
-    <p class="lead" style="margin-bottom:8px">Ventas en negro del mes. Suma como Ventas Tipo B. No calcula IVA.</p>
-    <div class="f">
-      <textarea id="di_ventasb" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el informe de ventas en negro del mes (con los totales del final)."></textarea>
-    </div>
-    <div class="row-actions"><button class="btn gold" id="di_calc_ventasb">Leer ventas B</button></div>
-    <div id="di_res_ventasb" class="ledger" style="margin:12px 0"></div>
 
     <div class="informe-tit" style="margin-top:26px">Retenciones sufridas (clientes) <span class="flagcarga no" id="di_flag_ret">Sin cargar</span></div>
     <div class="f">
       <textarea id="di_ret" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el listado de retenciones sufridas del mes (con los totales del final)."></textarea>
     </div>
-    <div class="row-actions"><button class="btn gold" id="di_calc_ret">Leer retenciones</button></div>
+    <div class="row-actions"><button class="btn gold" id="di_calc_ret">Leer retenciones</button><button class="btn ghost sm" id="di_reset_ret" title="Borra las retenciones sufridas (IVA/IIBB/Ganancias/SUSS) del mes seleccionado. No toca compras ni ventas.">⟲ Borrar retenciones del mes</button></div>
     <div id="di_res_ret" class="ledger" style="margin:12px 0"></div>
-
-    <div class="informe-tit" style="margin-top:26px">Compras B <span class="desc">(no oficial)</span> <span class="flagcarga no" id="di_flag_partb">Sin cargar</span></div>
-    <p class="lead" style="margin-bottom:8px">Suma a los gastos del mes como Tipo B. No calcula IVA. Las notas de crédito restan.</p>
-    <div class="f">
-      <textarea id="di_partb" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el informe de la parte B del mes."></textarea>
-    </div>
-    <div class="row-actions"><button class="btn gold" id="di_calc_partb">Leer parte B</button></div>
-    <div id="di_res_partb" class="ledger" style="margin:12px 0"></div>
-    <div id="di_rubros_b" style="margin:12px 0"></div>
 
     <div class="informe-tit" style="margin-top:26px">Desglose GT Cargas (flete) <span class="desc">reparte el gasto por fecha de viaje</span> <span class="flagcarga no" id="di_flag_gt">Sin cargar</span></div>
     <p class="lead" style="margin-bottom:8px">Pegá el desglose de viajes del PDF de GT Cargas. El gasto neto se reparte al mes de cada viaje; el IVA sigue en la factura (se computa en IVA Compras).</p>
     <div class="f">
       <textarea id="di_gt" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el desglose de viajes (cada línea: fecha dd/mm/aa … importe; al final TOTALES CLIENTE)."></textarea>
     </div>
-    <div class="row-actions"><button class="btn gold" id="di_calc_gt">Leer desglose GT Cargas</button></div>
+    <div class="row-actions"><button class="btn gold" id="di_calc_gt">Leer desglose GT Cargas</button><button class="btn ghost sm" id="di_reset_gt" title="Borra el/los desglose(s) de GT Cargas facturados en el mes seleccionado (y su reparto por viaje). No toca el IVA de compras.">⟲ Borrar GT Cargas del mes</button></div>
     <div id="di_res_gt" class="ledger" style="margin:12px 0"></div>
+
+    <div class="informe-tit" style="margin-top:26px">Compras B <span class="desc">(no oficial)</span> <span class="flagcarga no" id="di_flag_partb">Sin cargar</span></div>
+    <p class="lead" style="margin-bottom:8px">Suma a los gastos del mes como Tipo B. No calcula IVA. Las notas de crédito restan.</p>
+    <div class="f">
+      <textarea id="di_partb" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el informe de la parte B del mes."></textarea>
+    </div>
+    <div class="row-actions"><button class="btn gold" id="di_calc_partb">Leer parte B</button><button class="btn ghost sm" id="di_reset_partb" title="Borra los gastos Tipo B (Compras B / no oficial) del mes seleccionado. No toca compras oficiales, ventas ni retenciones.">⟲ Borrar compras B del mes</button></div>
+    <div id="di_res_partb" class="ledger" style="margin:12px 0"></div>
+    <div id="di_rubros_b" style="margin:12px 0"></div>
+
+    <div class="informe-tit" style="margin-top:26px">Ventas B <span class="desc">(no oficial)</span> <span class="flagcarga no" id="di_flag_ventasb">Sin cargar</span></div>
+    <p class="lead" style="margin-bottom:8px">Ventas en negro del mes. Suma como Ventas Tipo B. No calcula IVA.</p>
+    <div class="f">
+      <textarea id="di_ventasb" rows="5" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:12px;border:1px solid var(--edge);border-radius:8px;background:var(--paper);resize:vertical" placeholder="Pegá acá el informe de ventas en negro del mes (con los totales del final)."></textarea>
+    </div>
+    <div class="row-actions"><button class="btn gold" id="di_calc_ventasb">Leer ventas B</button><button class="btn ghost sm" id="di_reset_ventasb" title="Borra las ventas en negro (Tipo B) del mes seleccionado y la comisión calculada sobre Ventas B. No toca ventas oficiales ni lo demás.">⟲ Borrar ventas B del mes</button></div>
+    <div id="di_res_ventasb" class="ledger" style="margin:12px 0"></div>
 
     <div class="row-actions" style="margin-top:16px"><button class="btn" id="di_guardar">Guardar informes del mes</button></div>
     <div class="msg" id="di_msg"></div>
@@ -618,6 +622,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="row-actions">
       <button class="btn gold" id="ch_calc">Calcular del extracto</button>
       <button class="btn ghost sm" id="ch_clear">Limpiar</button>
+      <button class="btn ghost sm" id="ch_reset_extracto" title="Borra lo cargado del extracto del mes seleccionado: impuesto al cheque, SIRCREB (IIBB), IVA del banco y las comisiones del Banco Ciudad. Conserva el cómputo CCSS y el compensado a Ganancias cargados a mano.">⟲ Borrar extracto bancario del mes</button>
     </div>
     <div class="msg" id="ch_msg"></div>
     <div id="ch_result"></div>
@@ -3741,14 +3746,17 @@ function parseDiarioVentas(txt){
   const neto=tot(/NETO\s*\.+;?\s*([\d.,-]+)/);
   // Neto facturado por CUIT (no por nombre): base de las comisiones sobre ventas.
   // Formato del sistema: columnas ";"  →  [7]=CUIT, [9]=neto gravado (las NCr vienen con signo −).
-  //   ACA → comisión de comercialización · Sentida Botánica (blanco) → comisión 3%.
+  //   ACA → comisión de comercialización.
+  //   netoSB (comisión 3% blanco) = TODAS las ventas blancas del cliente, con cualquiera de sus
+  //   dos razones sociales: Sentida Botánica (SB_CUIT) o Brenchio en blanco (BR_CUIT, el mismo
+  //   CUIT que se busca en negro en Ventas B).
   let netoACA=0, netoSB=0;
   txt.split(/\r\n|\r|\n/).forEach(ln=>{
     const c=ln.split(";");
     if(c.length<11)return;
     const cuits=c.map(x=>x.replace(/\D/g,""));
     if(cuits.includes(ACA_CUIT)) netoACA+=parseNumAr(c[9]||"");
-    if(cuits.includes(SB_CUIT))  netoSB +=parseNumAr(c[9]||"");
+    if(cuits.includes(SB_CUIT) || cuits.includes(BR_CUIT)) netoSB +=parseNumAr(c[9]||"");
   });
   return {ivaTotal,neto,netoACA,netoSB};
 }
@@ -3900,6 +3908,11 @@ function renderDiarioIVA(){
   setFlagCarga("di_flag_ret", !!(d.retIVAClientes||d.retIIBBClientes||d.retGanancias||d.retSUSSClientes));
   setFlagCarga("di_flag_partb", pbTot>0);
   setFlagCarga("di_flag_gt", gtDeMes.length>0);
+  // parpadeo del título mientras falta cargar (solo estas 4 secciones; sigue al mes elegido)
+  setTitila("di_flag_compras", !!d.ivaCompras);
+  setTitila("di_flag_ventas", !!d.ivaVentas);
+  setTitila("di_flag_partb", pbTot>0);
+  setTitila("di_flag_ventasb", vbNeg>0);
   $("di_rubros_box").innerHTML=""; $("di_rubros_b").innerHTML="";
   hideMsg("di_msg");
 }
@@ -3908,6 +3921,11 @@ function setFlagCarga(id, cargado){
   const el=$(id); if(!el)return;
   el.className="flagcarga "+(cargado?"ok":"no");
   el.textContent=cargado?"✓ Cargado":"Sin cargar";
+}
+/* titila el título de la sección (contenedor del pill) mientras NO esté cargado para el mes */
+function setTitila(flagId, cargado){
+  const el=$(flagId); if(!el)return;
+  const tit=el.closest(".informe-tit"); if(tit)tit.classList.toggle("titila", !cargado);
 }
 /* extracto (Imp. al cheque): cargado si ya hay impuesto/IVA del extracto guardado para el mes */
 function actualizarFlagExtracto(){
@@ -4056,6 +4074,129 @@ $("di_calc_compras").onclick=()=>{
   if(r.gtDetectado && !diarioTmp.gt && !yaHayGT)
     showMsg("di_msg","learn","Detecté <b>GT Cargas</b> en estas compras. Su gasto se reparte por fecha de viaje: pegá también el <b>desglose GT Cargas</b> más abajo (si no, entra su IVA pero no su gasto).");
   else hideMsg("di_msg");
+};
+/* ---- Borrar por sección del mes (Carga de Informes). Cada botón pone en cero/vacío SOLO los
+   datos de su sección, deja su indicador en "sin cargar" y persiste en la planilla. ---- */
+const ymCompacto=mes=>String(normMes(mes)||mes).replace("-","");
+// reescribe en la planilla todos los campos de IVA del mes desde state.impuestos[mes]
+function persistDiarioIVA(mes){
+  const d=state.impuestos[mes]||{};
+  return apiPost({action:"setDiarioIVA",mes,
+    ivaVentas:d.ivaVentas||0,netoVentas:d.netoVentas||0,
+    ivaCompras:d.ivaCompras||0,ivaCompNeto:d.ivaCompNeto||0,ivaExcluido:d.ivaExcluido||0,
+    percIVACompras:d.percIVACompras||0,percIIBBCompras:d.percIIBBCompras||0,netoCompras:d.netoCompras||0,
+    retIVAClientes:d.retIVAClientes||0,retIIBBClientes:d.retIIBBClientes||0,retGanancias:d.retGanancias||0,retSUSSClientes:d.retSUSSClientes||0,
+    mesPagoIVA:d.mesPagoIVA||mesMasTres(mes)});
+}
+// reescribe el Historial de Ventas del mes desde state.ventas[mes]
+function persistVenta(mes){
+  const v=state.ventas[mes]||{};
+  return apiPost({action:"addVenta",mes,blanco:v.blanco||0,negro:v.negro||0,ivaDebito:v.ivaDebito||0,retIVA:v.retIVA||0,retIIBB:v.retIIBB||0,retGan:v.retGan||0});
+}
+// guarda los gastos de informe del mes desde state.gastosInforme (sin la propiedad mes)
+function persistGastosInforme(mes){
+  const its=state.gastosInforme.filter(g=>normMes(g.mes)===mes).map(g=>({rubro:g.rubro,prov:g.prov,monto:g.monto,tipo:g.tipo}));
+  return apiPost({action:"setGastosInforme",mes,items:JSON.stringify(its)});
+}
+// borra un gasto por id (local + planilla) si existe
+async function borrarGastoId(id){ const i=state.gastos.findIndex(g=>g.id===id); if(i>=0){ state.gastos.splice(i,1); await apiPost({action:"deleteGasto",id}); return true; } return false; }
+
+// 1) Compras (oficial): pone en cero el IVA Compras del mes y quita los gastos Tipo A del informe.
+if($("di_reset_compras"))$("di_reset_compras").onclick=async ()=>{
+  const mes=normMes($("di_mes").value); if(!mes)return;
+  const d=state.impuestos[mes]||{};
+  if(!((d.ivaCompras||0)||(d.ivaCompNeto||0)||(d.netoCompras||0))){ showMsg("di_msg","learn",`${ymLabel(mes)} no tiene IVA Compras cargado.`); return; }
+  if(!confirm(`¿Borrar lo cargado de IVA Compras de ${ymLabel(mes).toUpperCase()}?\n\nEl indicador "Informe de compras" vuelve a "Sin cargar" y se quitan del balance los gastos Tipo A (blanco) del informe de ese mes.\n\nNO se tocan ventas, retenciones ni Compras B.`))return;
+  state.impuestos[mes]=Object.assign({},d,{ivaCompras:0,ivaCompNeto:0,ivaExcluido:0,percIVACompras:0,percIIBBCompras:0,netoCompras:0});
+  await persistDiarioIVA(mes);
+  state.gastosInforme=state.gastosInforme.filter(g=>!(normMes(g.mes)===mes && g.tipo!=="negro"));   // saca Tipo A, deja Tipo B
+  await persistGastosInforme(mes);
+  diarioTmp.compras=null; $("di_compras").value="";
+  renderDiarioIVA(); renderBalance(); renderHomeEstado();
+  showMsg("di_msg","ok",`IVA Compras de ${ymLabel(mes)} borrado: el indicador quedó en "Sin cargar".`);
+};
+// 2) Ventas (oficial / Tipo A): cero IVA Ventas + ventas blancas + comisiones sobre ventas blancas.
+if($("di_reset_ventas"))$("di_reset_ventas").onclick=async ()=>{
+  const mes=normMes($("di_mes").value); if(!mes)return;
+  const d=state.impuestos[mes]||{}, vv=state.ventas[mes]||{};
+  if(!((d.ivaVentas||0)||(vv.blanco||0))){ showMsg("di_msg","learn",`${ymLabel(mes)} no tiene ventas oficiales cargadas.`); return; }
+  if(!confirm(`¿Borrar las ventas oficiales (Tipo A) de ${ymLabel(mes).toUpperCase()}?\n\nSe ponen en cero el IVA Ventas y las ventas blancas, y se quitan las comisiones calculadas sobre ventas blancas (ACA y Sentida Botánica).\n\nNO se tocan compras, retenciones ni Ventas B.`))return;
+  state.impuestos[mes]=Object.assign({},d,{ivaVentas:0,netoVentas:0});
+  await persistDiarioIVA(mes);
+  state.ventas[mes]=Object.assign({},vv,{blanco:0,ivaDebito:0});
+  await persistVenta(mes);
+  await borrarGastoId(`ACA-${ymCompacto(mes)}`);
+  await borrarGastoId(`COM3SB-${ymCompacto(mes)}`);
+  diarioTmp.ventas=null; $("di_ventas").value="";
+  renderVentas(); renderGastos(); renderDiarioIVA(); renderBalance(); renderHomeEstado();
+  showMsg("di_msg","ok",`Ventas oficiales de ${ymLabel(mes)} borradas.`);
+};
+// 3) Retenciones sufridas: cero las 4 retenciones del mes (y su copia en el Historial de Ventas).
+if($("di_reset_ret"))$("di_reset_ret").onclick=async ()=>{
+  const mes=normMes($("di_mes").value); if(!mes)return;
+  const d=state.impuestos[mes]||{};
+  if(!((d.retIVAClientes||0)||(d.retIIBBClientes||0)||(d.retGanancias||0)||(d.retSUSSClientes||0))){ showMsg("di_msg","learn",`${ymLabel(mes)} no tiene retenciones cargadas.`); return; }
+  if(!confirm(`¿Borrar las retenciones sufridas de ${ymLabel(mes).toUpperCase()}? (IVA, IIBB, Ganancias y SUSS)\n\nNO se tocan compras ni ventas.`))return;
+  state.impuestos[mes]=Object.assign({},d,{retIVAClientes:0,retIIBBClientes:0,retGanancias:0,retSUSSClientes:0});
+  await persistDiarioIVA(mes);
+  if(state.ventas[mes]){ state.ventas[mes]=Object.assign({},state.ventas[mes],{retIVA:0,retIIBB:0,retGan:0}); await persistVenta(mes); }
+  diarioTmp.ret=null; $("di_ret").value="";
+  renderDiarioIVA(); renderBalance(); renderHomeEstado();
+  showMsg("di_msg","ok",`Retenciones de ${ymLabel(mes)} borradas.`);
+};
+// 4) GT Cargas: borra los comprobantes facturados en el mes (se filtran al recargar por quedar sin porMes).
+if($("di_reset_gt"))$("di_reset_gt").onclick=async ()=>{
+  const mes=normMes($("di_mes").value); if(!mes)return;
+  const comps=Object.keys(state.gtCargas||{}).filter(k=>normMes((state.gtCargas[k]||{}).facturaMes)===mes);
+  if(!comps.length){ showMsg("di_msg","learn",`${ymLabel(mes)} no tiene GT Cargas cargadas.`); return; }
+  if(!confirm(`¿Borrar el desglose de GT Cargas facturado en ${ymLabel(mes).toUpperCase()}? (${comps.length} comprobante/s)\n\nSe quita su reparto por fecha de viaje del balance. NO se toca el IVA de compras.`))return;
+  for(const comp of comps){
+    delete state.gtCargas[comp];
+    await apiPost({action:"setGTCargas",comprobante:comp,facturaMes:mes,data:JSON.stringify({comprobante:comp,facturaMes:mes,total:0})});
+  }
+  diarioTmp.gt=null; $("di_gt").value="";
+  renderDiarioIVA(); renderBalance(); renderHomeEstado();
+  showMsg("di_msg","ok",`GT Cargas de ${ymLabel(mes)} borrado.`);
+};
+// 5) Compras B (Tipo B): quita los gastos de informe Tipo B del mes (conserva los Tipo A).
+if($("di_reset_partb"))$("di_reset_partb").onclick=async ()=>{
+  const mes=normMes($("di_mes").value); if(!mes)return;
+  if(!state.gastosInforme.some(g=>normMes(g.mes)===mes && g.tipo==="negro")){ showMsg("di_msg","learn",`${ymLabel(mes)} no tiene Compras B cargadas.`); return; }
+  if(!confirm(`¿Borrar las Compras B (Tipo B) de ${ymLabel(mes).toUpperCase()}?\n\nNO se tocan las compras oficiales, ventas ni retenciones.`))return;
+  state.gastosInforme=state.gastosInforme.filter(g=>!(normMes(g.mes)===mes && g.tipo==="negro"));
+  await persistGastosInforme(mes);
+  diarioTmp.partb=null; $("di_partb").value="";
+  renderDiarioIVA(); renderBalance(); renderHomeEstado();
+  showMsg("di_msg","ok",`Compras B de ${ymLabel(mes)} borradas.`);
+};
+// 6) Ventas B (Tipo B / negro): cero las ventas negras del mes + comisión Brenchio.
+if($("di_reset_ventasb"))$("di_reset_ventasb").onclick=async ()=>{
+  const mes=normMes($("di_mes").value); if(!mes)return;
+  const vv=state.ventas[mes]||{};
+  if(!(vv.negro||0)){ showMsg("di_msg","learn",`${ymLabel(mes)} no tiene Ventas B cargadas.`); return; }
+  if(!confirm(`¿Borrar las Ventas B (Tipo B / negro) de ${ymLabel(mes).toUpperCase()}?\n\nSe quita también la comisión Brenchio calculada sobre Ventas B. NO se tocan las ventas oficiales.`))return;
+  state.ventas[mes]=Object.assign({},vv,{negro:0});
+  await persistVenta(mes);
+  await borrarGastoId(`COM3BR-${ymCompacto(mes)}`);
+  diarioTmp.ventasb=null; $("di_ventasb").value="";
+  renderVentas(); renderGastos(); renderDiarioIVA(); renderBalance(); renderHomeEstado();
+  showMsg("di_msg","ok",`Ventas B de ${ymLabel(mes)} borradas.`);
+};
+// Extracto bancario (pantalla Imp. al cheque): cero impuesto al cheque, SIRCREB, IVA banco y comisiones.
+if($("ch_reset_extracto"))$("ch_reset_extracto").onclick=async ()=>{
+  const mes=normMes($("ch_mes").value); if(!mes)return;
+  const c=state.cheque[mes]||{}, d=state.impuestos[mes]||{};
+  if(!((c.total||0)||(d.ivaExtracto||0)||(d.retBancIIBB||0))){ showMsg("ch_msg","learn",`${ymLabel(mes)} no tiene extracto cargado.`); return; }
+  if(!confirm(`¿Borrar lo cargado del extracto bancario de ${ymLabel(mes).toUpperCase()}?\n\nSe ponen en cero el impuesto al cheque, el SIRCREB (IIBB) y el IVA del banco, y se quitan las comisiones del Banco Ciudad del mes.\n\nSe conservan el cómputo CCSS y el compensado a Ganancias cargados a mano.`))return;
+  const compGanV=compGanDe(c); const computo=(c.usadoCCSS!==undefined&&c.usadoCCSS!==null)?c.usadoCCSS:0;
+  state.cheque[mes]=Object.assign({},c,{total:0});
+  await apiPost({action:"setCheque",mes,total:0,compensado:compGanV,usadoCCSS:computo});
+  const imp=Object.assign({},d,{ivaExtracto:0,retBancIIBB:0});
+  state.impuestos[mes]=imp;
+  await apiPost({action:"setImpuestos",mes,ivaContador:imp.ivaContador||0,retBancIIBB:0,iibbContador:imp.iibbContador||0,alicIIBB:imp.alicIIBB||DEF_ALIC,coefCABA:imp.coefCABA||DEF_CC,coefBsAs:imp.coefBsAs||DEF_CB,ivaExtracto:0});
+  await imputarComisionesExtracto(mes, {});   // quita las comisiones del banco del mes
+  renderGastos(); renderChequeTab(); renderBalance(); renderHomeEstado();
+  showMsg("ch_msg","ok",`Extracto de ${ymLabel(mes)} borrado: impuesto al cheque, SIRCREB, IVA banco y comisiones en cero.`);
 };
 $("di_calc_ventas").onclick=()=>{
   const txt=$("di_ventas").value;
