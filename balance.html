@@ -1261,24 +1261,39 @@ function fechaLinda(f){ const c=fechaCorta(f); if(!c) return ""; const p=c.split
 const uid=()=>Date.now()+"-"+Math.floor(Math.random()*10000);
 
 /* ---- indicador de estado (sincronización) ---- */
-function setSync(estado,txt){
+function setSync(estado,txt,detalle){
   const cls="savebox "+(estado==="ok"?"saved":estado==="busy"?"":"unsaved");
   const msg=txt||(estado==="ok"?"sincronizado":estado==="busy"?"guardando…":"sin conexión");
-  const b=$("savebox"); if(b){ b.className=cls; $("saveTxt").textContent=msg; }
-  const bh=$("savebox_home"); if(bh){ bh.className=cls; $("saveTxt_home").textContent=msg; }
+  const tip=detalle||"";   // motivo real al pasar el mouse
+  const b=$("savebox"); if(b){ b.className=cls; $("saveTxt").textContent=msg; b.title=tip; }
+  const bh=$("savebox_home"); if(bh){ bh.className=cls; $("saveTxt_home").textContent=msg; bh.title=tip; }
 }
 
 /* ---- llamadas a la planilla ---- */
+let API_ULTIMO_ERROR="";   // motivo real del último fallo de conexión (para mostrarlo)
 async function apiGet(){
   if(!apiConfigurada())return {ok:false,sinConfigurar:true};
-  let j;
-  try{
-    const r=await fetch(API);
-    j=await r.json();          // si la implementación no existe, Google devuelve HTML y esto falla
-  }catch(e){
-    return {ok:false,error:String((e&&e.message)||e)};
+  const INTENTOS=3;
+  let j=null;
+  for(let n=1;n<=INTENTOS;n++){
+    try{
+      const ctrl=new AbortController();
+      const to=setTimeout(()=>ctrl.abort(),30000);   // corta si la planilla cuelga > 30s
+      let r;
+      try{ r=await fetch(API,{signal:ctrl.signal}); } finally { clearTimeout(to); }
+      if(!r.ok) throw new Error("HTTP "+r.status+" "+(r.statusText||""));
+      j=await r.json();          // si la implementación no existe/caída, Google devuelve HTML y esto falla
+      API_ULTIMO_ERROR="";
+      break;
+    }catch(e){
+      API_ULTIMO_ERROR = (e&&e.name==="AbortError") ? "la planilla tardó demasiado (timeout de 30s)"
+        : (/Unexpected token|JSON|SyntaxError/i.test(String(e&&e.message)) ? "la implementación no respondió datos (¿deploy caído o sin acceso público?)"
+        : String((e&&e.message)||e));
+      if(n<INTENTOS){ setSync("busy",`reintentando (${n}/${INTENTOS})…`); await new Promise(s=>setTimeout(s,1000*n)); continue; }
+      return {ok:false,error:API_ULTIMO_ERROR,intentos:n};
+    }
   }
-  if(j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; state.chequesEmit=j.data.chequesEmit||[]; state.sueldos=j.data.sueldos||[]; state.gastosInforme=j.data.gastosInforme||[]; if(j.data.config&&j.data.config.exclusionesIVA){try{state.exclusionesIVA=JSON.parse(j.data.config.exclusionesIVA);}catch(e){}}
+  if(j&&j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; state.chequesEmit=j.data.chequesEmit||[]; state.sueldos=j.data.sueldos||[]; state.gastosInforme=j.data.gastosInforme||[]; if(j.data.config&&j.data.config.exclusionesIVA){try{state.exclusionesIVA=JSON.parse(j.data.config.exclusionesIVA);}catch(e){}}
     if(j.data.config&&j.data.config.svInforme){try{state.svInforme=JSON.parse(j.data.config.svInforme);}catch(e){}}
     if(j.data.config&&j.data.config.repartoCuotas){try{repartoProv=JSON.parse(j.data.config.repartoCuotas)||[];}catch(e){}}   // reglas de reparto en cuotas (criterio contable, compartido)
     if(j.data.config&&j.data.config.edesurIVA){try{edesurElegido=JSON.parse(j.data.config.edesurIVA)||{};}catch(e){}}   // elección manual de la factura Edesur que computa IVA
@@ -4757,7 +4772,7 @@ $("d_api_save").onclick=async ()=>{
   setSync("busy","conectando…");
   const j=await apiGet();
   if(j&&j.ok){ setSync("ok"); fillSubs(); renderAll(); showMsg("d_api_msg","ok",`Conectada. ${state.gastos.length} gastos y ${Object.keys(state.ventas).length} meses de ventas.`); }
-  else { setSync("err","sin conexión"); showMsg("d_api_msg","learn","Se guardó la URL, pero no respondió. Revisá que la implementación esté activa y con acceso para cualquiera."); }
+  else { const mot=j&&j.error?j.error:"sin respuesta"; setSync("err","sin conexión",mot); showMsg("d_api_msg","learn",`Se guardó la URL, pero no respondió tras 3 intentos. Motivo: <b>${mot}</b>. Revisá que la implementación esté activa y con acceso para cualquiera.`); }
 };
 $("d_api_clear").onclick=()=>{
   if(!confirm("¿Borrar la URL guardada en este navegador?\n\nLa app deja de conectarse hasta que la pegues de nuevo. Tus datos en la planilla no se tocan."))return;
@@ -4769,7 +4784,7 @@ $("d_reload").onclick=async ()=>{
   setSync("busy","conectando…");
   const j=await apiGet();
   if(j&&j.ok){ setSync("ok"); fillSubs(); renderAll(); showMsg("d_msg","ok",`Recargado: ${state.gastos.length} gastos, ${Object.keys(state.ventas).length} meses de ventas.`); }
-  else { setSync("err","sin conexión"); showMsg("d_msg","learn","No se pudo conectar con la planilla. Revisá la URL (API) y tu conexión."); }
+  else { const mot=j&&j.error?j.error:"sin respuesta"; setSync("err","sin conexión",mot); showMsg("d_msg","learn",`No se pudo conectar con la planilla tras 3 intentos. Motivo: <b>${mot}</b>. Revisá la URL (API) y tu conexión.`); }
 };
 $("d_xlsx").onclick=()=>{
   if(!state.gastos.length&&!Object.keys(state.ventas).length){alert("No hay datos para exportar.");return;}
@@ -4866,7 +4881,13 @@ pintarApiUrl();
   setSync("busy","conectando…");
   const j=await apiGet();
   if(j&&j.ok){ setSync("ok"); fillSubs(); renderAll(); }
-  else { setSync("err","sin conexión"); renderAll(); }
+  else {
+    const mot=j&&j.error?j.error:"sin respuesta";
+    setSync("err","sin conexión",mot); renderAll();
+    console.warn("apiGet falló tras 3 intentos:",mot);
+    irA("datos");
+    showMsg("d_api_msg","learn",`No pude conectar con la planilla (3 intentos). Motivo: <b>${mot}</b>. Apretá "Recargar desde la planilla" para reintentar, o revisá la URL y que la implementación esté activa y pública.`);
+  }
 })();
 
 </script>
