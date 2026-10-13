@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Balance EG · Prueba de conexión 365</title>
+<style>
+  :root{ --ink:#23201a; --ink2:#5c5346; --faint:#8a7f6d; --edge:#d8cdb8; --paper:#fbf8f1; --paper2:#f3ecdd; --gold:#b5842f; --green:#3f6b4f; --red:#a3402f; }
+  *{box-sizing:border-box}
+  body{font-family:'IBM Plex Sans',system-ui,Segoe UI,Arial,sans-serif;background:var(--paper);color:var(--ink);margin:0;padding:28px 16px;line-height:1.5}
+  .wrap{max-width:760px;margin:0 auto}
+  h1{font-family:Georgia,'Spectral',serif;font-size:24px;margin:0 0 4px}
+  .lead{color:var(--ink2);margin:0 0 20px}
+  .card{background:#fff;border:1px solid var(--edge);border-radius:12px;padding:18px 20px;margin:14px 0}
+  .btn{font:inherit;font-weight:600;background:var(--gold);color:#fff;border:none;border-radius:8px;padding:10px 18px;cursor:pointer}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--edge)}
+  .btn:disabled{opacity:.5;cursor:default}
+  code,.mono{font-family:'IBM Plex Mono',ui-monospace,Consolas,monospace}
+  .oid{font-family:'IBM Plex Mono',monospace;font-size:16px;background:var(--paper2);border:1px solid var(--edge);border-radius:8px;padding:10px 12px;user-select:all;word-break:break-all}
+  .ok{color:var(--green);font-weight:600}
+  .err{color:var(--red);font-weight:600}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0}
+  .lbl{min-width:150px;color:var(--faint);font-size:13px}
+  .val{flex:1;min-width:200px;word-break:break-word}
+  .foot{margin-top:28px;color:var(--faint);font-size:12px;text-align:center}
+  pre{white-space:pre-wrap;background:var(--paper2);border:1px solid var(--edge);border-radius:8px;padding:10px;font-size:12px;overflow:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Balance EG — Prueba de conexión a Microsoft 365</h1>
+  <p class="lead">Paso 3a de la migración. Esta página <b>solo prueba el login y el acceso a SharePoint</b>. No lee ni escribe datos del Balance. Cuando funcione, Claude porta la app completa a este mismo archivo.</p>
+
+  <div class="card">
+    <div class="row"><button class="btn" id="btnLogin">Iniciar sesión con Microsoft</button>
+      <button class="btn ghost" id="btnLogout" hidden>Cerrar sesión</button></div>
+    <div id="estado" class="row"><span class="lbl">Estado</span><span class="val" id="estadoVal">sin iniciar sesión</span></div>
+  </div>
+
+  <div class="card" id="cuentaCard" hidden>
+    <div class="row"><span class="lbl">Conectado como</span><span class="val" id="cuentaNombre">—</span></div>
+    <div class="row"><span class="lbl">Tu usuario (UPN)</span><span class="val mono" id="cuentaUpn">—</span></div>
+    <div style="margin-top:6px"><div class="lbl" style="margin-bottom:4px">Tu Object ID (GUID) — <b>copialo y pasáselo a Claude</b>:</div>
+      <div class="oid" id="cuentaOid">—</div></div>
+  </div>
+
+  <div class="card" id="graphCard" hidden>
+    <div style="font-weight:600;margin-bottom:8px">Acceso a SharePoint (Graph)</div>
+    <div class="row"><span class="lbl">Sitio BalanceEG</span><span class="val" id="rSite">—</span></div>
+    <div class="row"><span class="lbl">Biblioteca "Documentos"</span><span class="val" id="rDrive">—</span></div>
+    <div class="row"><span class="lbl">Carpeta /datos-prueba/</span><span class="val" id="rCarpeta">—</span></div>
+    <div id="detalleBox" hidden><div class="lbl" style="margin:10px 0 4px">Detalle:</div><pre id="detalle"></pre></div>
+  </div>
+
+  <div class="foot">Desarrollado por Raquel · EG Corrugados · 2026</div>
+</div>
+
+<!-- MSAL (login de Microsoft) -->
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.4/lib/msal-browser.min.js"></script>
+<script>
+/* ===== Configuración de conexión (identificadores públicos; sin login no dan acceso a nada) ===== */
+const TENANT   = "f943f6a4-62dd-4a9b-ba93-c2640a30c7cf";          // inquilino EG
+const CLIENT   = "4dfd2f42-3c4e-4071-b364-1747688ef8da";          // registro "EG Apps"
+const SITE_HOST= "egcorrugados.sharepoint.com";
+const SITE_PATH= "/sites/BalanceEG";
+const CARPETA  = "datos-prueba";                                   // en producción será "datos"
+const SCOPES   = ["User.Read","Sites.ReadWrite.All","Files.ReadWrite.All"];
+const GRAPH     = "https://graph.microsoft.com/v1.0";
+
+const $ = id => document.getElementById(id);
+function setEstado(txt, cls){ const e=$("estadoVal"); e.textContent=txt; e.className="val "+(cls||""); }
+function mostrarDetalle(obj){ $("detalleBox").hidden=false; $("detalle").textContent=(typeof obj==="string")?obj:JSON.stringify(obj,null,2); }
+
+const pca = new msal.PublicClientApplication({
+  auth: { clientId: CLIENT, authority: "https://login.microsoftonline.com/"+TENANT,
+          redirectUri: location.origin + location.pathname },   // = …/365/balance.html (registrada en Entra)
+  cache: { cacheLocation: "localStorage" }
+});
+
+let cuenta = null;
+
+async function token(){
+  try{ const r = await pca.acquireTokenSilent({ scopes: SCOPES, account: cuenta }); return r.accessToken; }
+  catch(e){ const r = await pca.acquireTokenPopup({ scopes: SCOPES }); return r.accessToken; }
+}
+async function graph(path){
+  const t = await token();
+  const r = await fetch(GRAPH + path, { headers: { Authorization: "Bearer " + t } });
+  const body = await r.json().catch(()=>({}));
+  if(!r.ok){ const err = new Error("HTTP "+r.status+(body&&body.error?(" · "+body.error.code+": "+body.error.message):"")); err.status=r.status; err.body=body; throw err; }
+  return body;
+}
+
+function pintarCuenta(){
+  $("cuentaCard").hidden = false;
+  $("cuentaNombre").textContent = cuenta.name || "—";
+  $("cuentaUpn").textContent = cuenta.username || "—";
+  const oid = (cuenta.idTokenClaims && cuenta.idTokenClaims.oid) || cuenta.localAccountId || "—";
+  $("cuentaOid").textContent = oid;
+  $("btnLogout").hidden = false;
+  $("btnLogin").hidden = true;
+}
+
+async function probarGraph(){
+  $("graphCard").hidden = false;
+  // 1) sitio
+  let site;
+  try{ site = await graph("/sites/"+SITE_HOST+":"+SITE_PATH); $("rSite").innerHTML='<span class="ok">OK</span> — '+(site.displayName||site.name||site.id); }
+  catch(e){ $("rSite").innerHTML='<span class="err">ERROR</span> — '+e.message; mostrarDetalle(e.body||String(e)); return; }
+  // 2) biblioteca Documentos (drive por defecto)
+  let drive;
+  try{ drive = await graph("/sites/"+site.id+"/drive"); $("rDrive").innerHTML='<span class="ok">OK</span> — "'+(drive.name||"Documentos")+'"'; }
+  catch(e){ $("rDrive").innerHTML='<span class="err">ERROR</span> — '+e.message; mostrarDetalle(e.body||String(e)); return; }
+  // 3) carpeta /datos-prueba/ (puede no existir todavía: eso está OK)
+  try{
+    const hijos = await graph("/sites/"+site.id+"/drive/root:/"+CARPETA+":/children");
+    const n = (hijos.value||[]).length;
+    $("rCarpeta").innerHTML='<span class="ok">OK</span> — existe, '+n+' archivo(s)';
+    if(n) mostrarDetalle((hijos.value||[]).map(x=>x.name).join("\n"));
+  }catch(e){
+    if(e.status===404){ $("rCarpeta").innerHTML='existe acceso, pero la carpeta <b>todavía no existe</b> (se crea en la importación). <span class="ok">OK</span>'; }
+    else { $("rCarpeta").innerHTML='<span class="err">ERROR</span> — '+e.message; mostrarDetalle(e.body||String(e)); }
+  }
+}
+
+async function trasLogin(){
+  cuenta = pca.getAllAccounts()[0] || null;
+  if(!cuenta){ setEstado("sin iniciar sesión"); return; }
+  setEstado("sesión iniciada", "ok");
+  pintarCuenta();
+  await probarGraph();
+}
+
+$("btnLogin").onclick = async () => {
+  try{ setEstado("abriendo login…"); await pca.loginPopup({ scopes: SCOPES }); await trasLogin(); }
+  catch(e){ setEstado("falló el login: "+(e.message||e), "err"); mostrarDetalle(String(e)); }
+};
+$("btnLogout").onclick = async () => { await pca.logoutPopup(); location.reload(); };
+
+(async function(){
+  try{ await pca.handleRedirectPromise(); }catch(e){}
+  await trasLogin();   // si ya había sesión, continúa solo
+})();
+</script>
+</body>
+</html>

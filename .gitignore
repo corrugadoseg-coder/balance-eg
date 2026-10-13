@@ -23,3 +23,6 @@ desktop.ini
 
 # Backups del backend (Apps Script) con nombres de personas: SOLO local, no al repo publico
 apps-script/Codigo-Balance-EG-*.gs
+
+# Copias de trabajo locales de la migracion a 365 (no se publican)
+365/_*.local.html
