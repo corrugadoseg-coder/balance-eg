@@ -5193,7 +5193,65 @@ function bannerSoloLectura(){
   const b=document.createElement("div"); b.id="ro_banner";
   b.style.cssText="position:fixed;top:0;left:0;right:0;z-index:2000;background:var(--gold);color:#fff;text-align:center;font-size:13px;font-weight:600;padding:5px 10px";
   b.textContent="Modo solo lectura — podés mirar e imprimir, pero no se guardan cambios.";
-  document.body.appendChild(b); document.body.style.paddingTop="26px";
+  document.body.appendChild(b); _ajustarPadBanners();
+}
+/* ---- CHEQUEO DE CONSISTENCIA al abrir: sueldos cuyo gasto derivado (gastoIdA/B) ya no existe ----
+   Solo detecta y avisa; NO escribe al abrir. La reparación es manual (botón) y nunca borra huérfanos. */
+function _ajustarPadBanners(){
+  let h=0; const ro=document.getElementById("ro_banner"), cc=document.getElementById("cc_banner");
+  if(ro)h+=26; if(cc)h+=30; document.body.style.paddingTop=h?h+"px":"";
+}
+function chequearConsistencia(){
+  const ids=new Set(state.gastos.map(g=>g.id));
+  const faltan=[];
+  state.sueldos.forEach(s=>{
+    if(s.gastoIdA && !ids.has(s.gastoIdA)){
+      const monto = s.tipo==="ccss" ? (s.monto||0) : totA(s);
+      faltan.push({sueldo:s, lado:"A", id:s.gastoIdA, monto, sub:(s.tipo==="ccss"?s.nombre:"Sueldos"), bn:"blanco"});
+    }
+    if(s.gastoIdB && !ids.has(s.gastoIdB)){
+      faltan.push({sueldo:s, lado:"B", id:s.gastoIdB, monto:totB(s), sub:"Sueldos", bn:"negro"});
+    }
+  });
+  return faltan;
+}
+async function repararConsistencia(faltan){
+  return await apiTx(["gastos","sueldos"], ()=>{
+    faltan.forEach(f=>{
+      const s=f.sueldo, fecha=(normMes(s.mes)||s.mes)+"-01";
+      if(f.monto>0){
+        if(!state.gastos.some(g=>g.id===f.id))   // recrear el gasto con su MISMO id (mantiene el vínculo)
+          state.gastos.push({id:f.id,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:f.sub,monto:f.monto,bn:f.bn,iva:0,piva:0,piibb:0});
+      } else {                                   // importe derivado 0: el gasto no corresponde → limpiar vínculo colgado
+        if(f.lado==="A") s.gastoIdA=""; else s.gastoIdB="";
+      }
+    });
+  });
+}
+function bannerConsistencia(faltan){
+  if(document.getElementById("cc_banner"))return;
+  const b=document.createElement("div"); b.id="cc_banner";
+  b.style.cssText="position:fixed;left:0;right:0;z-index:2001;background:#b45309;color:#fff;text-align:center;font-size:13px;font-weight:600;padding:6px 10px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap";
+  b.style.top=document.getElementById("ro_banner")?"26px":"0";
+  const txt=document.createElement("span");
+  txt.textContent=`Faltan ${faltan.length} gasto(s) derivado(s) de sueldos: no están sumando al balance.`;
+  b.appendChild(txt);
+  if(esWriter()){
+    const btn=document.createElement("button");
+    btn.textContent="Reparar"; btn.style.cssText="background:#fff;color:#b45309;border:0;border-radius:6px;padding:3px 12px;font-weight:700;cursor:pointer";
+    btn.onclick=async ()=>{
+      const lista=faltan.map(f=>`• ${(f.sueldo.nombre||"(sin nombre)")} · ${ymLabel(f.sueldo.mes)} · ${f.bn} · ${f.monto>0?money(f.monto):"(importe 0 → se limpia el vínculo)"}`).join("\n");
+      if(!confirm(`Voy a reparar ${faltan.length} vínculo(s) de sueldos a gastos:\n\n${lista}\n\nLos que tienen importe se recrean como gasto; los de importe 0 se desvinculan. No se borra nada del balance.\n\n¿Reparar?`))return;
+      btn.disabled=true; btn.textContent="Reparando…";
+      const ok=await repararConsistencia(faltan);
+      if(ok){ b.remove(); _ajustarPadBanners(); renderAll(); setSync("ok"); }
+      else { btn.disabled=false; btn.textContent="Reparar"; }   // apiTx ya mostró el error; dejó todo como antes
+    };
+    b.appendChild(btn);
+  } else {
+    const info=document.createElement("span"); info.textContent="Pedile a Raquel que los repare."; b.appendChild(info);
+  }
+  document.body.appendChild(b); _ajustarPadBanners();
 }
 (async function(){
   setSync("busy","iniciando sesión…");
@@ -5204,7 +5262,7 @@ function bannerSoloLectura(){
   if(!esWriter()) bannerSoloLectura();
   setSync("busy","conectando…");
   const j=await apiGet();
-  if(j&&j.ok){ setSync("ok"); fillSubs(); renderAll(); }
+  if(j&&j.ok){ setSync("ok"); fillSubs(); renderAll(); const faltan=chequearConsistencia(); if(faltan.length) bannerConsistencia(faltan); }
   else if(j&&j.noInicializada){ setSync("err","base no inicializada"); renderAll(); irA("datos");
     showMsg("d_api_msg","learn", esWriter()
       ? `La carpeta /${M365.carpeta}/ está vacía. Importá los datos una vez con el botón <b>"Importar desde Google (una vez)"</b> acá arriba.`
