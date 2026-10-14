@@ -2465,10 +2465,10 @@ $("t_save").onclick=async ()=>{
 /* Relee la planilla y avisa si hay filas repetidas del mismo mes.
    Solo reporta: no borra nada de la planilla. */
 if($("t_dedup"))$("t_dedup").onclick=async ()=>{
-  showMsg("t_msg","learn","Consultando la planilla…");
+  showMsg("t_msg","learn","Consultando los datos…");
   let j=null;
   try{ j=await apiGet(); }catch(e){ j=null; }
-  if(!j||!j.ok||!j.data){ showMsg("t_msg","learn","No se pudo leer la planilla. Revisá la conexión."); return; }
+  if(!j||!j.ok||!j.data){ showMsg("t_msg","learn","No se pudieron leer los datos. Revisá la conexión."); return; }
   const problemas=[];
   // hojas guardadas por mes: buscamos claves distintas que caen en el mismo YYYY-MM
   const dupPorMes=(obj,nombre)=>{
@@ -2488,8 +2488,8 @@ if($("t_dedup"))$("t_dedup").onclick=async ()=>{
     if(cnt[k]>1){ const p=k.split("|"); problemas.push(`<b>Gastos de informe</b> — ${ymLabel(p[0])}: ${p[1]} · ${p[2]} (${p[3]}) aparece ${cnt[k]} veces`); }
   });
   renderImpuestosTab(); renderAll();
-  if(!problemas.length){ showMsg("t_msg","ok","No se encontraron filas duplicadas en la planilla."); return; }
-  showMsg("t_msg","learn",`Se encontraron ${problemas.length} duplicado(s):<br>• ${problemas.join("<br>• ")}<br><br><i>La app los unifica al leer, pero conviene borrar las filas repetidas en la planilla.</i>`);
+  if(!problemas.length){ showMsg("t_msg","ok","No se encontraron meses duplicados en los datos."); return; }
+  showMsg("t_msg","learn",`Se encontraron ${problemas.length} duplicado(s):<br>• ${problemas.join("<br>• ")}<br><br><i>La app los unifica al leer.</i>`);
 };
 
 function ivaMes(mes){ // calcula componentes de IVA del mes
@@ -2836,7 +2836,7 @@ $("ch_calc").onclick=()=>{
   const {grupos,detalle,total,ley,sircreb,ivaCom,comisiones,noClasificadas}=parseCheque(texto);
   const claves=Object.keys(grupos);
   if(!claves.length){showMsg("ch_msg","learn","No encontré cargos bancarios en el texto. Verificá que pegaste el extracto completo.");$("ch_result").innerHTML="";return;}
-  showMsg("ch_msg","ok",`Detecté <b>${claves.length}</b> concepto(s). Tocá cada uno para ver las líneas que sumó. Verificá el desglose contra tu planilla antes de guardar.`);
+  showMsg("ch_msg","ok",`Detecté <b>${claves.length}</b> concepto(s). Tocá cada uno para ver las líneas que sumó. Verificá el desglose contra el extracto antes de guardar.`);
   // cada concepto abre/cierra el detalle de las líneas individuales que sumó
   const caret=hay=>hay
     ? `<span class="caret" style="color:var(--gold);margin-right:7px;display:inline-block;width:9px">▸</span>`
@@ -2863,7 +2863,7 @@ $("ch_calc").onclick=()=>{
     </div>
     ${comisPreviewHTML(comisiones, noClasificadas)}
     <div class="row-actions"><button class="btn" id="ch_save">Guardar ${ymLabel($("ch_mes").value)}</button><button class="btn ghost" id="ch_print">🖨 Imprimir desglose</button><button class="btn ghost" id="ch_email">✉ Enviar por email a la contadora</button></div>
-    <small class="note">Al guardar: el impuesto al cheque va al registro de abajo (ahí cargás a mano el cómputo del mes) y las retenciones SIRCREB se cargan como "Retenciones bancarias IIBB" del mes en Impuestos. El desglose completo es informativo, para que lo compares con tu planilla.</small>`;
+    <small class="note">Al guardar: el impuesto al cheque va al registro de abajo (ahí cargás a mano el cómputo del mes) y las retenciones SIRCREB se cargan como "Retenciones bancarias IIBB" del mes en Impuestos. El desglose completo es informativo, para que lo compares con el extracto.</small>`;
   // clic en un concepto: abre/cierra la fila de detalle que va justo abajo
   $("ch_result").querySelectorAll("tr.chrub").forEach(tr=>{
     const det=tr.nextElementSibling;
@@ -3860,7 +3860,7 @@ function drawChequesTabla(){
     cob.forEach(c=>{ h+=filaHTML(c); });
   }
   if(cobOcultos>0){
-    h+=`<tr><td colspan="7" style="padding:8px 10px"><small class="note">${cobOcultos} cheque(s) cobrado(s) hace más de 30 días, ocultos. Elegí “Solo cobrados” en el filtro para verlos (no se borran de la planilla).</small></td></tr>`;
+    h+=`<tr><td colspan="7" style="padding:8px 10px"><small class="note">${cobOcultos} cheque(s) cobrado(s) hace más de 30 días, ocultos. Elegí “Solo cobrados” en el filtro para verlos (no se borran de la base).</small></td></tr>`;
   }
   tb.innerHTML=h;
   tb.querySelectorAll("[data-estch]").forEach(b=>b.onclick=async ()=>{
