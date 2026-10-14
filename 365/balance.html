@@ -962,9 +962,9 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 <section class="view" data-v="datos">
   <div class="card">
     <h2>Datos y sincronización</h2>
-    <p class="lead">Todo se guarda solo en tu planilla de Google a medida que cargás. No hace falta guardar a mano.</p>
+    <p class="lead">Todo se guarda solo en SharePoint (Microsoft 365) a medida que cargás. No hace falta guardar a mano.</p>
     <div class="row-actions" style="margin-top:0">
-      <button class="btn gold" id="d_reload">Recargar desde la planilla</button>
+      <button class="btn gold" id="d_reload">Recargar desde SharePoint</button>
       <button class="btn ghost" id="d_xlsx">Exportar todo a Excel</button>
     </div>
     <div class="msg" id="d_msg"></div>
@@ -1395,6 +1395,8 @@ async function apiGet(){
     const impFix={};
     for(const k in state.impuestos){ const nk=normMes(k)||k; impFix[nk]=Object.assign({},impFix[nk]||{},state.impuestos[k]); }
     state.impuestos=impFix;
+    // mesPagoIVA a veces viene como fecha desde Google: normalizar a YYYY-MM en memoria
+    Object.keys(state.impuestos).forEach(k=>{ const o=state.impuestos[k]; if(o&&o.mesPagoIVA) o.mesPagoIVA=normMes(o.mesPagoIVA)||o.mesPagoIVA; });
     const chFix={};
     for(const k in state.cheque){ const nk=normMes(k)||k; chFix[nk]=Object.assign({},chFix[nk]||{},state.cheque[k]); }
     state.cheque=chFix;
@@ -1531,6 +1533,8 @@ async function importarDesdeGoogle(execUrl){
     impuestos:_mesKeys(D.impuestos), cheque:_mesKeys(D.cheque), servicios:D.servicios||[], chequesEmit:D.chequesEmit||[],
     sueldos:D.sueldos||[], gastosInforme:D.gastosInforme||[], gtCargas:D.gtCargas||{}, config:D.config||{}
   };
+  // mesPagoIVA viene de Google a veces como fecha ("Tue Dec 01 2026…"): lo normalizamos a YYYY-MM en el archivo.
+  for(const k in porTabla.impuestos){ const o=porTabla.impuestos[k]; if(o&&o.mesPagoIVA) o.mesPagoIVA=normMes(o.mesPagoIVA)||o.mesPagoIVA; }
   // 3) escribir cada archivo (creación inicial: sin If-Match)
   const conteo={};
   for(const t of TABLAS){
@@ -1585,6 +1589,13 @@ function _normGt(obj){
   }
   return out;
 }
+/* impuestos: mesPagoIVA puede venir como fecha ("Tue Dec 01 2026…") en Google y como YYYY-MM en 365.
+   Normalizamos ese campo en ambos lados para no marcar diferencia por el formato. */
+function _normImp(obj){
+  const o=obj||{}, out={};
+  for(const k in o){ const v=Object.assign({}, o[k]); if(v&&v.mesPagoIVA) v.mesPagoIVA=normMes(v.mesPagoIVA)||v.mesPagoIVA; out[k]=v; }
+  return out;
+}
 async function compararConGoogle(execUrl){
   const S={}; await Promise.all(TABLAS.map(async t=>{ const a=await leerArchivo(t+".json"); S[t]=a?a.data:null; }));   // SharePoint
   const r=await fetch(execUrl); const g=await r.json();
@@ -1594,6 +1605,7 @@ async function compararConGoogle(execUrl){
   return TABLAS.map(t=>{
     let gv=mapG[t], sv=S[t];
     if(t==="gtCargas"){ gv=_normGt(gv); sv=_normGt(sv); }   // comparar contenido real, no el formato del comprobante
+    if(t==="impuestos"){ gv=_normImp(gv); sv=_normImp(sv); }   // mesPagoIVA: fecha vs YYYY-MM no cuenta como diferencia
     const difs=_difs(gv, sv);
     const n=Array.isArray(gv)?(gv||[]).length:Object.keys(gv||{}).length;
     return {t, ok:difs.length===0, n, difs};
@@ -2362,7 +2374,7 @@ function applyFilters(){
 
 /* ---- panel de impuestos (estimativo) ---- */
 /* ===== PESTAÑA IMPUESTOS ===== */
-const DEF_ALIC=3, DEF_CC=87.76, DEF_CB=12.24;
+const DEF_ALIC=2.5, DEF_CC=87.76, DEF_CB=12.24;   // meses nuevos arrancan igual que en Google (2,5 / 87,76 / 12,24)
 function datosMes(mes){ // datos cargados a mano para el mes, con defaults
   mes=normMes(mes);
   const d=state.impuestos[mes]||{};
@@ -4570,6 +4582,10 @@ $("di_guardar").onclick=async ()=>{
     ivaCompras:compras.ivaTotal,ivaCompNeto:compras.ivaCompNeto,ivaExcluido:compras.ivaExcluido,
     percIVACompras:compras.percIVA,percIIBBCompras:compras.percIIBB,netoCompras:compras.neto,
     retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,retSUSSClientes:ret.suss,mesPagoIVA:mesPago});
+  // mes nuevo: sembrar los mismos defaults que Google (2,5 / 87,76 / 12,24), no dejarlos en 0/vacío
+  if(imp.alicIIBB==null) imp.alicIIBB=DEF_ALIC;
+  if(imp.coefCABA==null) imp.coefCABA=DEF_CC;
+  if(imp.coefBsAs==null) imp.coefBsAs=DEF_CB;
   // gastos al balance: una fila por proveedor (el rubro se sigue usando para agrupar). Cálculo puro (no muta state).
   const items=[]; let sinRubro=0;
   const itemsDeProv=(provNeto,tipo)=>{
@@ -5031,8 +5047,8 @@ if($("d_reparto_add"))$("d_reparto_add").onclick=()=>{
 if($("d_email_save"))$("d_email_save").onclick=async ()=>{
   if(!guardarEmailContadora($("d_email").value)){ showMsg("d_email_msg","learn","Ese email no parece válido. Ej: nombre@dominio.com"); return; }
   $("d_email").value=EMAIL_CONTADORA;
-  const ok=await apiPost({action:"setConfig", clave:"emailContadora", valor:EMAIL_CONTADORA});   // compartido en la planilla 365
-  showMsg("d_email_msg", ok?"ok":"learn", ok?"Email guardado (compartido en la planilla 365).":"Guardado solo en este navegador (no se pudo compartir: ¿modo lectura?).");
+  const ok=await apiPost({action:"setConfig", clave:"emailContadora", valor:EMAIL_CONTADORA});   // compartido en la config de SharePoint
+  showMsg("d_email_msg", ok?"ok":"learn", ok?"Email guardado (compartido en SharePoint).":"Guardado solo en este navegador (no se pudo compartir: ¿modo lectura?).");
 };
 if($("d_email_clear"))$("d_email_clear").onclick=()=>{
   olvidarEmailContadora(); if($("d_email"))$("d_email").value="";
@@ -5195,7 +5211,7 @@ function bannerSoloLectura(){
       : `La base todavía no está cargada en SharePoint. Pedile a Raquel que haga la importación.`); }
   else { const mot=j&&j.error?j.error:"sin respuesta"; setSync("err","sin conexión",mot); renderAll(); irA("datos");
     console.warn("apiGet falló:",mot);
-    showMsg("d_api_msg","learn",`No pude leer los datos. Motivo: <b>${mot}</b>. Probá "Recargar desde la planilla".`); }
+    showMsg("d_api_msg","learn",`No pude leer los datos. Motivo: <b>${mot}</b>. Probá "Recargar desde SharePoint".`); }
 })();
 
 </script>
