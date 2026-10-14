@@ -5243,18 +5243,63 @@ function chequearConsistencia(){
   });
   return faltan;
 }
-async function repararConsistencia(faltan){
+/* Aplica las elecciones del reparador en UNA transacción (gastos + sueldos):
+   - quitarIds: ids de sueldos sobrantes → se eliminan junto con sus gastos derivados que aún existan.
+   - recrearItems: vínculos a recrear → se vuelve a crear el gasto con su mismo id (si el sueldo no fue quitado). */
+async function aplicarReparaciones(recrearItems, quitarIds){
   return await apiTx(["gastos","sueldos"], ()=>{
-    faltan.forEach(f=>{
-      const s=f.sueldo, fecha=(normMes(s.mes)||s.mes)+"-01";
-      if(f.monto>0){
-        if(!state.gastos.some(g=>g.id===f.id))   // recrear el gasto con su MISMO id (mantiene el vínculo)
-          state.gastos.push({id:f.id,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:f.sub,monto:f.monto,bn:f.bn,iva:0,piva:0,piibb:0});
-      } else {                                   // importe derivado 0: el gasto no corresponde → limpiar vínculo colgado
-        if(f.lado==="A") s.gastoIdA=""; else s.gastoIdB="";
-      }
+    quitarIds.forEach(id=>{
+      const s=state.sueldos.find(x=>x.id===id); if(!s)return;
+      [s.gastoIdA,s.gastoIdB].forEach(gid=>{ if(gid) state.gastos=state.gastos.filter(g=>g.id!==gid); });   // borra sus derivados que queden
+      state.sueldos=state.sueldos.filter(x=>x.id!==id);                                                     // quita el registro sobrante
+    });
+    recrearItems.forEach(f=>{
+      const s=f.sueldo; if(quitarIds.includes(s.id))return;   // si el sueldo se quitó, no recrear
+      const fecha=(normMes(s.mes)||s.mes)+"-01";
+      if(f.monto>0){ if(!state.gastos.some(g=>g.id===f.id)) state.gastos.push({id:f.id,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:f.sub,monto:f.monto,bn:f.bn,iva:0,piva:0,piibb:0}); }
+      else { if(f.lado==="A")s.gastoIdA=""; else s.gastoIdB=""; }   // importe 0: limpiar vínculo colgado
     });
   });
+}
+function abrirReparador(faltan, banner){
+  if(document.getElementById("cc_overlay"))return;
+  const ov=document.createElement("div"); ov.id="cc_overlay";
+  ov.style.cssText="position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px";
+  const card=document.createElement("div");
+  card.style.cssText="background:var(--card,#fff);color:var(--fg,#222);max-width:680px;width:100%;max-height:85vh;overflow:auto;border-radius:12px;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.35)";
+  const head=document.createElement("div");
+  head.innerHTML='<h3 style="margin:0 0 6px">Reparar vínculos de sueldos</h3><p style="font-size:13px;opacity:.8;margin:0 0 8px"><b>Recrear</b>: vuelve a crear el gasto que falta (si el sueldo es correcto). <b>Quitar</b>: elimina el registro de sueldo sobrante (y los gastos derivados que le queden). <b>No tocar</b>: lo deja igual.</p>';
+  card.appendChild(head);
+  const selects=[];
+  faltan.forEach(f=>{
+    const row=document.createElement("div");
+    row.style.cssText="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid rgba(128,128,128,.25)";
+    const info=document.createElement("span"); info.style.cssText="font-size:13px";
+    info.textContent=`${(f.sueldo.nombre||"(sin nombre)")} · ${ymLabel(f.sueldo.mes)} · ${f.bn} · ${f.monto>0?money(f.monto):"importe 0"}`;
+    const sel=document.createElement("select"); sel.style.cssText="font-size:13px;padding:3px 6px";
+    sel.innerHTML='<option value="no">No tocar</option><option value="recrear">Recrear el gasto</option><option value="quitar">Quitar el registro de sueldo</option>';
+    selects.push(sel); row.appendChild(info); row.appendChild(sel); card.appendChild(row);
+  });
+  const acts=document.createElement("div"); acts.style.cssText="display:flex;gap:10px;justify-content:flex-end;margin-top:16px";
+  const cancel=document.createElement("button"); cancel.textContent="Cancelar"; cancel.className="btn ghost sm"; cancel.onclick=()=>ov.remove();
+  const aplicar=document.createElement("button"); aplicar.textContent="Aplicar"; aplicar.className="btn gold sm";
+  aplicar.onclick=async ()=>{
+    const recrearItems=[], quitarIds=[];
+    faltan.forEach((f,i)=>{ const v=selects[i].value; if(v==="recrear")recrearItems.push(f); else if(v==="quitar" && !quitarIds.includes(f.sueldo.id))quitarIds.push(f.sueldo.id); });
+    if(!recrearItems.length && !quitarIds.length){ ov.remove(); return; }
+    const resumen=[];
+    recrearItems.forEach(f=>{ if(!quitarIds.includes(f.sueldo.id))resumen.push(`Recrear: ${f.sueldo.nombre||"(sin nombre)"} · ${ymLabel(f.sueldo.mes)} · ${f.bn} · ${money(f.monto)}`); });
+    quitarIds.forEach(id=>{ const s=state.sueldos.find(x=>x.id===id); if(s)resumen.push(`Quitar registro: ${s.nombre||"(sin nombre)"} · ${ymLabel(s.mes)}`); });
+    if(!confirm("Vas a aplicar:\n\n• "+resumen.join("\n• ")+"\n\n¿Confirmás?"))return;
+    aplicar.disabled=true; cancel.disabled=true; aplicar.textContent="Aplicando…";
+    const ok=await aplicarReparaciones(recrearItems, quitarIds);
+    if(!ok){ aplicar.disabled=false; cancel.disabled=false; aplicar.textContent="Aplicar"; return; }   // apiTx mostró el error; quedó como antes
+    ov.remove(); renderAll(); setSync("ok");
+    const resto=chequearConsistencia(); banner.remove(); _ajustarPadBanners();   // re-evaluar; si quedan, rehacer el banner
+    if(resto.length) bannerConsistencia(resto);
+  };
+  acts.appendChild(cancel); acts.appendChild(aplicar); card.appendChild(acts);
+  ov.appendChild(card); document.body.appendChild(ov);
 }
 function bannerConsistencia(faltan){
   if(document.getElementById("cc_banner"))return;
@@ -5266,15 +5311,8 @@ function bannerConsistencia(faltan){
   b.appendChild(txt);
   if(esWriter()){
     const btn=document.createElement("button");
-    btn.textContent="Reparar"; btn.style.cssText="background:#fff;color:#b45309;border:0;border-radius:6px;padding:3px 12px;font-weight:700;cursor:pointer";
-    btn.onclick=async ()=>{
-      const lista=faltan.map(f=>`• ${(f.sueldo.nombre||"(sin nombre)")} · ${ymLabel(f.sueldo.mes)} · ${f.bn} · ${f.monto>0?money(f.monto):"(importe 0 → se limpia el vínculo)"}`).join("\n");
-      if(!confirm(`Voy a reparar ${faltan.length} vínculo(s) de sueldos a gastos:\n\n${lista}\n\nLos que tienen importe se recrean como gasto; los de importe 0 se desvinculan. No se borra nada del balance.\n\n¿Reparar?`))return;
-      btn.disabled=true; btn.textContent="Reparando…";
-      const ok=await repararConsistencia(faltan);
-      if(ok){ b.remove(); _ajustarPadBanners(); renderAll(); setSync("ok"); }
-      else { btn.disabled=false; btn.textContent="Reparar"; }   // apiTx ya mostró el error; dejó todo como antes
-    };
+    btn.textContent="Revisar y reparar"; btn.style.cssText="background:#fff;color:#b45309;border:0;border-radius:6px;padding:3px 12px;font-weight:700;cursor:pointer";
+    btn.onclick=()=>abrirReparador(faltan, b);
     b.appendChild(btn);
   } else {
     const info=document.createElement("span"); info.textContent="Pedile a Raquel que los repare."; b.appendChild(info);
