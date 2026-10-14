@@ -978,6 +978,11 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     </div>
     <div class="msg" id="d_api_msg"></div>
 
+    <div class="sectlabel" style="margin-top:26px">Migración — comparar con Google</div>
+    <p class="lead" style="margin-bottom:10px">Compara, <b>tabla por tabla y campo por campo</b>, los datos de SharePoint contra los de Google (Apps Script), y muestra los números de control de julio/agosto 2026. No modifica nada.</p>
+    <div class="row-actions"><button class="btn ghost sm" id="d_comparar" type="button">Comparar con Google</button></div>
+    <div id="d_comparar_res" style="margin-top:12px"></div>
+
     <div class="sectlabel" style="margin-top:26px">Email de la contadora</div>
     <p class="lead" style="margin-bottom:12px">Para "Enviar por email" en Imp. al cheque. No se guarda en el archivo: queda en este navegador.</p>
     <div class="grid" style="grid-template-columns:1fr auto auto;gap:10px;align-items:end;max-width:760px">
@@ -1460,10 +1465,14 @@ async function importarDesdeGoogle(execUrl){
   const r=await fetch(execUrl); const g=await r.json();
   if(!g||!g.ok||!g.data) throw new Error("el Apps Script no devolvió datos (revisá la URL /exec)");
   const D=g.data;
-  // 2) armar una tabla JSON por archivo, con la misma forma que espera la app
+  // 2) armar una tabla JSON por archivo, con la misma forma que espera la app.
+  //    Normalizamos las claves de mes a "YYYY-MM" ACÁ (no solo al leer): así el archivo
+  //    guardado nunca mezcla fecha (ene–jun) con texto (jul–sep) como la planilla vieja.
+  //    Es idempotente (sobre "YYYY-MM" no cambia) y junta duplicados sin perder campos.
+  const _mesKeys=obj=>{ const o=obj||{}, out={}; for(const k in o){ const nk=normMes(k)||k; out[nk]=Object.assign({},out[nk]||{},o[k]); } return out; };
   const porTabla={
-    gastos:D.gastos||[], ventas:D.ventas||{}, proveedores:D.memoria||{}, subcategorias:D.subs||{},
-    impuestos:D.impuestos||{}, cheque:D.cheque||{}, servicios:D.servicios||[], chequesEmit:D.chequesEmit||[],
+    gastos:D.gastos||[], ventas:_mesKeys(D.ventas), proveedores:D.memoria||{}, subcategorias:D.subs||{},
+    impuestos:_mesKeys(D.impuestos), cheque:_mesKeys(D.cheque), servicios:D.servicios||[], chequesEmit:D.chequesEmit||[],
     sueldos:D.sueldos||[], gastosInforme:D.gastosInforme||[], gtCargas:D.gtCargas||{}, config:D.config||{}
   };
   // 3) escribir cada archivo (creación inicial: sin If-Match)
@@ -1476,6 +1485,50 @@ async function importarDesdeGoogle(execUrl){
   }
   DBINIT=true;
   return conteo;
+}
+/* ---- COMPARADOR "IDÉNTICOS": SharePoint vs Google, tabla por tabla, campo por campo ---- */
+function _canon(x){   // JSON canónico: ordena claves de objetos para comparar sin importar el orden
+  if(x===undefined) return "undefined";
+  if(x===null||typeof x!=="object") return JSON.stringify(x);
+  if(Array.isArray(x)) return "["+x.map(_canon).join(",")+"]";
+  return "{"+Object.keys(x).sort().map(k=>JSON.stringify(k)+":"+_canon(x[k])).join(",")+"}";
+}
+function _difs(a,b){   // diferencias entre dos tablas (array u objeto), hasta 12
+  const out=[];
+  if(Array.isArray(a)||Array.isArray(b)){
+    const A=a||[], B=b||[];
+    if(A.length!==B.length) out.push(`cantidad: Google ${A.length} vs 365 ${B.length}`);
+    const n=Math.max(A.length,B.length);
+    for(let i=0;i<n && out.length<12;i++){ if(_canon(A[i])!==_canon(B[i])) out.push(`fila ${i}: G ${_canon(A[i]).slice(0,70)} ≠ 365 ${_canon(B[i]).slice(0,70)}`); }
+  } else {
+    const A=a||{}, B=b||{};
+    const ks=[...new Set([...Object.keys(A),...Object.keys(B)])].sort();
+    for(const k of ks){ if(out.length>=12)break; if(_canon(A[k])!==_canon(B[k])) out.push(`[${k}]: G ${_canon(A[k]).slice(0,70)} ≠ 365 ${_canon(B[k]).slice(0,70)}`); }
+  }
+  return out;
+}
+async function compararConGoogle(execUrl){
+  const S={}; await Promise.all(TABLAS.map(async t=>{ const a=await leerArchivo(t+".json"); S[t]=a?a.data:null; }));   // SharePoint
+  const r=await fetch(execUrl); const g=await r.json();
+  if(!g||!g.ok||!g.data) throw new Error("Google no devolvió datos (revisá la URL /exec)");
+  const D=g.data;
+  const mapG={ gastos:D.gastos, ventas:D.ventas, proveedores:D.memoria, subcategorias:D.subs, impuestos:D.impuestos, cheque:D.cheque, servicios:D.servicios, chequesEmit:D.chequesEmit, sueldos:D.sueldos, gastosInforme:D.gastosInforme, gtCargas:D.gtCargas, config:D.config };
+  return TABLAS.map(t=>{
+    const difs=_difs(mapG[t], S[t]);
+    const n=Array.isArray(mapG[t])?(mapG[t]||[]).length:Object.keys(mapG[t]||{}).length;
+    return {t, ok:difs.length===0, n, difs};
+  });
+}
+/* números de control: réplica de la suma del Balance (TOTAL GASTOS del mes por tipo) */
+function totalGastosMes(mes, bn){
+  mes=normMes(mes); let tot=0;
+  state.gastos.filter(g=>ym(g.fecha)===mes).forEach(g=>{ tot+=gastoVal(g,bn); });
+  gastosInformeExpandido().filter(g=>normMes(g.mes)===mes).forEach(g=>{
+    const esNegro=(g.tipo==="negro");
+    if(bn==="total" || (bn==="blanco"&&!esNegro) || (bn==="negro"&&esNegro)) tot+=g.monto||0;
+  });
+  if(bn!=="negro"){ const imp=impuestosDelMes(mes); if(imp.aPagar>0)tot+=imp.aPagar; const gt=gtGastoMes(mes); if(gt.monto>0)tot+=gt.monto; }
+  return Math.round(tot*100)/100;
 }
 
 /* ---- init UI ---- */
@@ -4928,6 +4981,29 @@ if($("d_import"))$("d_import").onclick=async ()=>{
     setSync("ok");
     showMsg("d_api_msg","ok",`Importación lista. ${resumen}`);
   }catch(e){ setSync("err","falló la importación", e.message||String(e)); showMsg("d_api_msg","learn","No se pudo importar: "+(e.message||e)); }
+};
+if($("d_comparar"))$("d_comparar").onclick=async ()=>{
+  const execUrl=(prompt("Pegá la URL /exec del Apps Script de Google (solo lectura, para comparar):","")||"").trim();
+  if(!execUrl) return;
+  const box=$("d_comparar_res"); box.innerHTML="Comparando…"; setSync("busy","comparando…");
+  try{
+    const filas=await compararConGoogle(execUrl);
+    const todoOk=filas.every(f=>f.ok);
+    let h=`<table style="max-width:760px"><tbody><tr><th class="l">Tabla</th><th class="num">Google</th><th>Resultado</th></tr>`;
+    filas.forEach(f=>{
+      h+=`<tr><td class="l">${f.t}</td><td class="num">${f.n}</td><td>${f.ok?'<b style="color:var(--green)">IDÉNTICOS</b>':'<b style="color:var(--red)">DIFIERE</b>'}</td></tr>`;
+      if(!f.ok) h+=`<tr><td colspan="3" style="background:var(--paper2);font-size:11px;padding:8px 10px"><div class="mono">${f.difs.map(d=>String(d).replace(/</g,"&lt;")).join("<br>")}</div></td></tr>`;
+    });
+    h+=`</tbody></table>`;
+    const julNeg=totalGastosMes("2026-07","negro"); const esperado=9212168.62; const okNum=Math.abs(julNeg-esperado)<0.5;
+    h+=`<div class="sectlabel" style="margin-top:16px">Números de control (sobre los datos de SharePoint)</div>
+      <table style="max-width:640px"><tbody>
+      <tr><td class="l">TOTAL GASTOS negro — julio 2026</td><td class="num">${money(julNeg)}</td><td>${okNum?'<b style="color:var(--green)">OK</b>':`<b style="color:var(--red)">esperado ${money(esperado)}</b>`}</td></tr>
+      </tbody></table>`;
+    box.innerHTML=h;
+    setSync("ok");
+    showMsg("d_api_msg", (todoOk&&okNum)?"ok":"learn", (todoOk&&okNum)?"Todo IDÉNTICO y el número de control coincide.":"Hay diferencias — revisá el detalle de arriba.");
+  }catch(e){ box.innerHTML=""; setSync("err","falló la comparación", e.message||String(e)); showMsg("d_api_msg","learn","No se pudo comparar: "+(e.message||e)); }
 };
 $("d_reload").onclick=async ()=>{
   showMsg("d_msg","ok","Recargando desde SharePoint…");
