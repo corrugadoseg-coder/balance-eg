@@ -984,7 +984,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div id="d_comparar_res" style="margin-top:12px"></div>
 
     <div class="sectlabel" style="margin-top:26px">Email de la contadora</div>
-    <p class="lead" style="margin-bottom:12px">Para "Enviar por email" en Imp. al cheque. No se guarda en el archivo: queda en este navegador.</p>
+    <p class="lead" style="margin-bottom:12px">Para "Enviar por email" en Imp. al cheque. Se guarda en SharePoint (configuración compartida), igual para todas las computadoras.</p>
     <div class="grid" style="grid-template-columns:1fr auto auto;gap:10px;align-items:end;max-width:760px">
       <div class="f">
         <label>Email de la contadora</label>
@@ -996,13 +996,13 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="msg" id="d_email_msg"></div>
 
     <div class="sectlabel" style="margin-top:26px">Reparto de gastos en cuotas</div>
-    <p class="lead" style="margin-bottom:12px">Facturas cuyo IVA va entero en el mes de emisión pero el gasto neto se imputa en cuotas. La regla es por proveedor y cada factura se reparte desde su propio mes. El IVA no se toca. Se guarda en la planilla (hoja Config), igual para todas las computadoras.</p>
+    <p class="lead" style="margin-bottom:12px">Facturas cuyo IVA va entero en el mes de emisión pero el gasto neto se imputa en cuotas. La regla es por proveedor y cada factura se reparte desde su propio mes. El IVA no se toca. Se guarda en SharePoint (configuración compartida), igual para todas las computadoras.</p>
     <div style="overflow-x:auto"><table id="d_reparto_tbl" style="max-width:780px"><tbody></tbody></table></div>
     <div class="row-actions" style="margin-top:6px"><button class="btn ghost sm" id="d_reparto_add" type="button">+ Agregar proveedor</button></div>
     <div class="msg" id="d_reparto_msg"></div>
 
     <div class="sectlabel" style="margin-top:26px">Comisión sobre ventas a ACA</div>
-    <p class="lead" style="margin-bottom:12px">% de comisión sobre lo facturado (neto) a ACA. Al leer el informe de IVA Ventas del mes se registra como gasto negro (rubro GASTOS DE ADMINISTRACIÓN). Se guarda en la planilla. Cambiar el % rige al volver a leer el informe de cada mes.</p>
+    <p class="lead" style="margin-bottom:12px">% de comisión sobre lo facturado (neto) a ACA. Al leer el informe de IVA Ventas del mes se registra como gasto negro (rubro GASTOS DE ADMINISTRACIÓN). Se guarda en SharePoint (compartido). Cambiar el % rige al volver a leer el informe de cada mes.</p>
     <div class="grid" style="grid-template-columns:auto auto;gap:10px;align-items:end;max-width:420px;justify-content:start">
       <div class="f"><label>Comisión ACA (%)</label><input id="d_aca_pct" class="mono" inputmode="decimal" style="width:120px" placeholder="4"></div>
       <div class="row-actions" style="margin:0"><button class="btn sm" id="d_aca_save" type="button">Guardar %</button></div>
@@ -1010,7 +1010,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="msg" id="d_aca_msg"></div>
 
     <div class="sectlabel" style="margin-top:26px">Comisión 3% — Sentida Botánica / Brenchio</div>
-    <p class="lead" style="margin-bottom:12px">% de comisión sobre el neto facturado a <b>Sentida Botánica</b> (base = venta en blanco, informe IVA Ventas) y a <b>Brenchio, Carla</b> (base = venta en negro, informe Ventas B). Las <b>dos</b> se registran como gasto <b>NEGRO</b> en GASTOS DE ADMINISTRACIÓN (igual que ACA), en <b>dos renglones separados</b> (uno por identidad). Se guarda en la planilla. Cambiar el % rige al volver a leer los informes de cada mes.</p>
+    <p class="lead" style="margin-bottom:12px">% de comisión sobre el neto facturado a <b>Sentida Botánica</b> (base = venta en blanco, informe IVA Ventas) y a <b>Brenchio, Carla</b> (base = venta en negro, informe Ventas B). Las <b>dos</b> se registran como gasto <b>NEGRO</b> en GASTOS DE ADMINISTRACIÓN (igual que ACA), en <b>dos renglones separados</b> (uno por identidad). Se guarda en SharePoint (compartido). Cambiar el % rige al volver a leer los informes de cada mes.</p>
     <div class="grid" style="grid-template-columns:auto auto;gap:10px;align-items:end;max-width:420px;justify-content:start">
       <div class="f"><label>Comisión (%)</label><input id="d_com3_pct" class="mono" inputmode="decimal" style="width:120px" placeholder="3"></div>
       <div class="row-actions" style="margin:0"><button class="btn sm" id="d_com3_save" type="button">Guardar %</button></div>
@@ -1018,7 +1018,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="msg" id="d_com3_msg"></div>
 
     <div class="sectlabel" style="margin-top:26px">Reglas de proveedores (rubro)</div>
-    <p class="lead" style="margin-bottom:12px">Asigná el rubro de un proveedor. Al leer un informe de compras, si el nombre coincide, se aplica solo. Podés precargar proveedores nuevos (ej. un gasto personal → <b>PERSONAL / NO GASTO</b>: computa IVA pero no suma al gasto) antes de que aparezcan en un informe. Se guarda en la planilla.</p>
+    <p class="lead" style="margin-bottom:12px">Asigná el rubro de un proveedor. Al leer un informe de compras, si el nombre coincide, se aplica solo. Podés precargar proveedores nuevos (ej. un gasto personal → <b>PERSONAL / NO GASTO</b>: computa IVA pero no suma al gasto) antes de que aparezcan en un informe. Se guarda en SharePoint (compartido).</p>
     <div class="grid" style="grid-template-columns:1fr auto auto;gap:10px;align-items:end;max-width:760px">
       <div class="f"><label>Proveedor (igual que en el informe)</label><input id="d_prov_nuevo" placeholder="Ej. Farmacia del Centro"></div>
       <div class="f"><label>Rubro</label><select id="d_prov_rubro"></select></div>
@@ -1028,7 +1028,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div style="overflow-x:auto;max-height:340px;overflow-y:auto;margin-top:8px"><table id="d_prov_tbl" style="max-width:760px"><tbody></tbody></table></div>
 
     <div class="sectlabel" style="margin-top:26px">Subcategorías por proveedor (desglose del Balance)</div>
-    <p class="lead" style="margin-bottom:12px">Agrupá renglones bajo una subcategoría dentro de su rubro en el desglose del Balance (ej. <b>Comisiones</b> en Gastos de Administración). Poné el proveedor igual que aparece en el desglose y la subcategoría. Los gastos cargados a mano ya usan su propia subcategoría; esto cubre además los que vienen del informe. Se guarda en la planilla.</p>
+    <p class="lead" style="margin-bottom:12px">Agrupá renglones bajo una subcategoría dentro de su rubro en el desglose del Balance (ej. <b>Comisiones</b> en Gastos de Administración). Poné el proveedor igual que aparece en el desglose y la subcategoría. Los gastos cargados a mano ya usan su propia subcategoría; esto cubre además los que vienen del informe. Se guarda en SharePoint (compartido).</p>
     <div class="grid" style="grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;max-width:760px">
       <div class="f"><label>Proveedor (igual que en el desglose)</label><input id="d_subprov_nuevo" placeholder="Ej. Sanchez Juan Antonio"></div>
       <div class="f"><label>Subcategoría</label><input id="d_subprov_sub" placeholder="Ej. Comisiones"></div>
@@ -1549,17 +1549,39 @@ function _canon(x){   // JSON canónico: ordena claves de objetos para comparar 
   if(Array.isArray(x)) return "["+x.map(_canon).join(",")+"]";
   return "{"+Object.keys(x).sort().map(k=>JSON.stringify(k)+":"+_canon(x[k])).join(",")+"}";
 }
-function _difs(a,b){   // diferencias entre dos tablas (array u objeto), hasta 12
-  const out=[];
+function _val(x){ const s=_canon(x); return s.length>160?s.slice(0,160)+"…":s; }
+function _difs(a,b,pref){   // diferencias entre dos tablas; baja un nivel a objetos anidados para señalar el campo exacto
+  pref=pref||""; const out=[], LIM=20;
   if(Array.isArray(a)||Array.isArray(b)){
     const A=a||[], B=b||[];
-    if(A.length!==B.length) out.push(`cantidad: Google ${A.length} vs 365 ${B.length}`);
+    if(A.length!==B.length) out.push(`${pref}cantidad: Google ${A.length} vs 365 ${B.length}`);
     const n=Math.max(A.length,B.length);
-    for(let i=0;i<n && out.length<12;i++){ if(_canon(A[i])!==_canon(B[i])) out.push(`fila ${i}: G ${_canon(A[i]).slice(0,70)} ≠ 365 ${_canon(B[i]).slice(0,70)}`); }
+    for(let i=0;i<n && out.length<LIM;i++){ if(_canon(A[i])!==_canon(B[i])) out.push(`${pref}fila ${i}: G ${_val(A[i])} ≠ 365 ${_val(B[i])}`); }
   } else {
     const A=a||{}, B=b||{};
     const ks=[...new Set([...Object.keys(A),...Object.keys(B)])].sort();
-    for(const k of ks){ if(out.length>=12)break; if(_canon(A[k])!==_canon(B[k])) out.push(`[${k}]: G ${_canon(A[k]).slice(0,70)} ≠ 365 ${_canon(B[k]).slice(0,70)}`); }
+    for(const k of ks){
+      if(out.length>=LIM)break;
+      if(_canon(A[k])===_canon(B[k]))continue;
+      const av=A[k], bv=B[k];
+      if(av&&bv&&typeof av==="object"&&typeof bv==="object"&&!Array.isArray(av)&&!Array.isArray(bv)){
+        _difs(av,bv,`${pref}[${k}].`).forEach(s=>{ if(out.length<LIM)out.push(s); });   // drill-in
+      } else out.push(`${pref}[${k}]: G ${_val(A[k])} ≠ 365 ${_val(B[k])}`);
+    }
+  }
+  return out;
+}
+/* gtCargas: Google guarda el comprobante como número (sin ceros) y el detalle como texto JSON;
+   365 lo guarda con ceros y como objeto. Normalizamos AMBOS lados para comparar el contenido real
+   (comprobante sin ceros, detalle parseado): lo que importa es total y porMes. */
+function _normGt(obj){
+  const o=obj||{}, out={};
+  for(const k in o){
+    let v=o[k]; if(typeof v==="string"){ try{v=JSON.parse(v);}catch(e){v={};} }
+    v=v||{};
+    const nk=(String(k).replace(/^0+/,"")||"0");
+    const comp=v.comprobante?(String(v.comprobante).replace(/^0+/,"")||"0"):nk;
+    out[nk]={ comprobante:comp, facturaMes:v.facturaMes?(normMes(v.facturaMes)||v.facturaMes):"", total:Number(v.total)||0, porMes:v.porMes||{} };
   }
   return out;
 }
@@ -1570,8 +1592,10 @@ async function compararConGoogle(execUrl){
   const D=g.data;
   const mapG={ gastos:D.gastos, ventas:D.ventas, proveedores:D.memoria, subcategorias:D.subs, impuestos:D.impuestos, cheque:D.cheque, servicios:D.servicios, chequesEmit:D.chequesEmit, sueldos:D.sueldos, gastosInforme:D.gastosInforme, gtCargas:D.gtCargas, config:D.config };
   return TABLAS.map(t=>{
-    const difs=_difs(mapG[t], S[t]);
-    const n=Array.isArray(mapG[t])?(mapG[t]||[]).length:Object.keys(mapG[t]||{}).length;
+    let gv=mapG[t], sv=S[t];
+    if(t==="gtCargas"){ gv=_normGt(gv); sv=_normGt(sv); }   // comparar contenido real, no el formato del comprobante
+    const difs=_difs(gv, sv);
+    const n=Array.isArray(gv)?(gv||[]).length:Object.keys(gv||{}).length;
     return {t, ok:difs.length===0, n, difs};
   });
 }
@@ -2756,7 +2780,7 @@ function enviarDesglosePorEmail(mes,grupos,total,ley,sircreb,ivaCom){
   if(!grupos || !Object.keys(grupos).length){ showMsg("ch_msg","learn","Primero calculá el extracto."); return; }
   // el email de la contadora no está en el código: se guarda en este navegador. Si falta, se pide.
   if(!EMAIL_RX.test(EMAIL_CONTADORA)){
-    const e=prompt("Email de la contadora (se guarda en este navegador, no en el archivo):", EMAIL_CONTADORA||"");
+    const e=prompt("Email de la contadora (se comparte en SharePoint):", EMAIL_CONTADORA||"");
     if(e===null)return;
     if(!guardarEmailContadora(e)){ showMsg("ch_msg","learn","Ese email no es válido. Podés configurarlo también en Datos."); return; }
     if($("d_email"))$("d_email").value=EMAIL_CONTADORA;
@@ -4536,16 +4560,9 @@ $("di_guardar").onclick=async ()=>{
   if(diarioTmp.partb)partes.push("Parte B "+money(diarioTmp.partb.neto));
   if(diarioTmp.gt)partes.push("GT Cargas "+money(diarioTmp.gt.total));
   if(!confirm(`Vas a guardar los informes en el mes:\n\n➡ ${ymLabel(mes).toUpperCase()}${yaExiste}\n\n${partes.join(" · ")}\n\n¿Es el mes correcto?`))return;
-  // al guardar compras se reescriben TODOS los rubros del mes: si no se leyó la parte B,
-  // los rubros Tipo B que ya estaban guardados se pierden. Avisamos antes.
-  if(diarioTmp.compras && !diarioTmp.partb){
-    const rubrosB=state.gastosInforme.filter(g=>normMes(g.mes)===mes && g.tipo==="negro");
-    if(rubrosB.length){
-      const totB=rubrosB.reduce((s,g)=>s+(g.monto||0),0);
-      const nRub=new Set(rubrosB.map(g=>g.rubro)).size;
-      if(!confirm(`OJO: ${ymLabel(mes).toUpperCase()} ya tiene Parte B guardada por ${money(totB)} (${rubrosB.length} movimiento(s) en ${nRub} rubro(s)).\n\nComo no leíste el informe de Parte B, eso se va a BORRAR del balance.\n\nSi querés conservarlo, cancelá y pegá también la parte B.\n\n¿Guardar igual?`))return;
-    }
-  }
+  // Protección por sección: solo se reemplaza lo que cargaste ahora. Compras (A, blanco) y Parte B
+  // (negro) son independientes: cargar una NO borra la otra. (Antes se reescribía el mes entero y
+  // cargar solo A borraba la B — y viceversa.)
   const mesPago=mesMasTres(mes);
   const vb=diarioTmp.ventasb;
   const imp=Object.assign({},dPrev,{
@@ -4563,9 +4580,11 @@ $("di_guardar").onclick=async ()=>{
       items.push({rubro:r,prov:capProv(p),monto:provNeto[p],tipo});
     });
   };
-  if(compras.provNeto)itemsDeProv(compras.provNeto,"blanco");
   const pb=diarioTmp.partb;
-  if(pb && pb.provNeto)itemsDeProv(pb.provNeto,"negro");
+  const loadedA=!!compras.provNeto;              // cargué Compras A (blanco) en ESTA carga
+  const loadedB=!!(pb && pb.provNeto);           // cargué Parte B (negro) en ESTA carga
+  if(loadedA)itemsDeProv(compras.provNeto,"blanco");
+  if(loadedB)itemsDeProv(pb.provNeto,"negro");
   // GT Cargas: desglose de ESTA factura (keyed por N° de comprobante). Validamos el comprobante acá.
   let gtMsg="", gtObj=null, gtComp="";
   if(diarioTmp.gt){
@@ -4576,7 +4595,7 @@ $("di_guardar").onclick=async ()=>{
   // tablas que toca este guardado → una sola transacción con rollback (todo o nada)
   const tablas=["impuestos"];
   if(v||vb) tablas.push("ventas","gastos");
-  if(items.length || compras.provNeto) tablas.push("gastosInforme");
+  if(loadedA||loadedB) tablas.push("gastosInforme");
   if(gtObj) tablas.push("gtCargas");
   let acaMsg="", com3Msg="";
   const aplicar=()=>{
@@ -4592,8 +4611,13 @@ $("di_guardar").onclick=async ()=>{
         retIVA: imp.retIVAClientes||0, retIIBB: imp.retIIBBClientes||0, retGan: imp.retGanancias||0
       };
     }
-    if(items.length || compras.provNeto){
-      state.gastosInforme=state.gastosInforme.filter(g=>normMes(g.mes)!==mes);
+    // Reemplazo POR SECCIÓN: borra del mes solo el tipo que cargaste (A=blanco / B=negro) y deja el otro intacto.
+    if(loadedA||loadedB){
+      state.gastosInforme=state.gastosInforme.filter(g=>{
+        if(normMes(g.mes)!==mes) return true;                 // otro mes: no se toca
+        if(g.tipo==="negro") return !loadedB;                 // B: se borra solo si cargué B
+        return !loadedA;                                      // A (blanco): se borra solo si cargué A
+      });
       items.forEach(it=>state.gastosInforme.push({mes,rubro:it.rubro,prov:it.prov,monto:it.monto,tipo:it.tipo}));
     }
     // Comisiones (cálculo interno, no aparecen en IVA Ventas): solo mutan state.gastos. Upsert por mes.
