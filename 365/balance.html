@@ -1457,6 +1457,62 @@ async function apiPost(payload){
     return false;
   }
 }
+/* ---- escritura MULTI-TABLA con rollback: o se guardan TODAS, o queda exactamente como antes ----
+   Protege los flujos que tocan varias tablas (ej. "Guardar informes del mes"): si se corta la
+   conexión a mitad de camino, se rehacen los archivos ya escritos y se restaura el state en memoria.
+   Único escritor (Raquel) → los conflictos 412 casi no existen; esto cubre sobre todo el corte. */
+function _restaurarState(tabla, json){
+  const v=JSON.parse(json);
+  switch(tabla){
+    case "gastos": state.gastos=v; break;
+    case "ventas": state.ventas=v; break;
+    case "proveedores": state.memoria=v; break;
+    case "subcategorias": state.subs=v; break;
+    case "impuestos": state.impuestos=v; break;
+    case "cheque": state.cheque=v; break;
+    case "servicios": state.servicios=v; break;
+    case "chequesEmit": state.chequesEmit=v; break;
+    case "sueldos": state.sueldos=v; break;
+    case "gastosInforme": state.gastosInforme=v; break;
+    case "gtCargas": state.gtCargas=v; break;
+    case "config": DBCONFIG=v; break;
+  }
+}
+async function apiTx(tablas, aplicar){
+  if(!SESION.ok){ setSync("err","sin conexión — no se guarda", SESION.error); return false; }
+  if(!esWriter()){ setSync("err","modo lectura — no se guarda", "Tu cuenta no tiene permiso de escritura."); return false; }
+  if(!DBINIT){ setSync("err","base no inicializada — no se guarda", "Importá los datos primero (Datos → Importar)."); return false; }
+  const ts=[...new Set(tablas)];
+  // FOTO previa: contenido guardado (para rehacer el archivo) + state en memoria (para rehacer la pantalla)
+  const snap={};
+  for(const t of ts){ const m=DBMETA[t]||{etag:"",raw:null}; snap[t]={ etag:m.etag||"", raw:(m.raw===undefined?null:m.raw), state:JSON.stringify(_datosTabla(t)) }; }
+  try{ aplicar(); }catch(e){ for(const t of ts){ try{ _restaurarState(t, snap[t].state); }catch(e3){} } setSync("err","error preparando el guardado — quedó como antes", e.message||String(e)); return false; }   // aplicar los cambios en memoria (si falla, restaurar)
+  setSync("busy","guardando…");
+  const hechas=[];
+  try{
+    for(const t of ts){ await _guardarTabla(t); hechas.push(t); }   // escribe todas; si una falla, salta al catch
+    setSync("ok");
+    return true;
+  }catch(e){
+    let rollbackOk=true;
+    for(const t of hechas){                                          // deshacer SOLO las que ya se escribieron
+      try{
+        const cur=DBMETA[t]||{};
+        if(snap[t].raw==null){ await borrarArchivoRel(t+".json"); DBMETA[t]={etag:"",raw:null}; }   // antes no existía → borrar
+        else { const et=await escribirArchivo(t+".json", snap[t].raw, cur.etag||null); DBMETA[t]={etag:et, raw:snap[t].raw}; }
+      }catch(e2){ rollbackOk=false; }
+    }
+    for(const t of ts){ try{ _restaurarState(t, snap[t].state); }catch(e3){} }   // restaurar memoria siempre
+    if(rollbackOk){
+      if(e.status===412) setSync("err","otra sesión cambió los datos — no se guardó", "Conflicto de versión. Recargá desde Datos y reintentá.");
+      else setSync("err","no se pudo guardar — quedó como antes", e.message||String(e));
+    } else {
+      DBINIT=false;   // no pudimos deshacer todo: bloquear escrituras hasta recargar
+      setSync("err","guardado incompleto — recargá", "Un corte impidió deshacer todo. Recargá desde Datos antes de seguir cargando.");
+    }
+    return false;
+  }
+}
 /* ---- IMPORTACIÓN inicial (una vez): lee del Apps Script en vivo y crea los JSON en SharePoint ---- */
 async function importarDesdeGoogle(execUrl){
   if(!SESION.ok) throw new Error("sin sesión");
@@ -3988,8 +4044,9 @@ function parseVentasB(txt){
   return {neto,netoBr};
 }
 /* Imputa la comisión sobre ventas a ACA como GASTO EN NEGRO del mes (upsert por mes).
+   SOLO muta state.gastos; NO persiste (lo hace la transacción del flujo que la llama).
    El % sale de comisionACAPct (config). Devuelve el monto imputado (0 si no hay). */
-async function imputarComisionACA(mes, netoACA){
+function imputarComisionACA(mes, netoACA){
   const m=normMes(mes)||mes;
   const id=`ACA-${String(m).replace("-","")}`;                 // ej. ACA-202607
   const idx=state.gastos.findIndex(g=>g.id===id);
@@ -3997,19 +4054,20 @@ async function imputarComisionACA(mes, netoACA){
   if(comision>0){
     const fecha=ultimoDiaMes(m);
     const g={id,fecha,prov:ACA_NOMBRE,rubro:"GASTOS DE ADMINISTRACIÓN",sub:`Comisión ${comisionACAPct}% ventas ACA`,bn:"negro",monto:comision,iva:0,piva:0,piibb:0};
-    if(idx>=0){ state.gastos[idx]=Object.assign(state.gastos[idx],g); await apiPost({action:"updateGasto",id,fecha,prov:g.prov,rubro:g.rubro,sub:g.sub,bn:g.bn,monto:comision,iva:0,piva:0,piibb:0}); }
-    else { state.gastos.push(g); await apiPost({action:"addGasto",id,fecha,prov:g.prov,rubro:g.rubro,sub:g.sub,bn:g.bn,monto:comision,iva:0,piva:0,piibb:0}); }
+    if(idx>=0){ state.gastos[idx]=Object.assign(state.gastos[idx],g); }
+    else { state.gastos.push(g); }
     return comision;
   } else if(idx>=0){
-    state.gastos.splice(idx,1); await apiPost({action:"deleteGasto",id});   // ese mes ya no factura a ACA
+    state.gastos.splice(idx,1);   // ese mes ya no factura a ACA
   }
   return 0;
 }
 /* Imputa la comisión del 3% de UNA identidad como gasto del mes (upsert por id).
+   SOLO muta state.gastos; NO persiste (lo hace la transacción del flujo que la llama).
    base = neto de esa identidad (NCr ya netadas). bn = "blanco" | "negro". idPref/quien la
    identifican. Cada identidad es un renglón propio (no se suman) para ver duplicados a simple
    vista. Devuelve el monto imputado (0 si no hay). */
-async function imputarComision3(mes, base, idPref, quien, bn){
+function imputarComision3(mes, base, idPref, quien, bn){
   const m=normMes(mes)||mes;
   const id=`${idPref}-${String(m).replace("-","")}`;            // ej. COM3SB-202607 / COM3BR-202607
   const idx=state.gastos.findIndex(g=>g.id===id);
@@ -4018,11 +4076,11 @@ async function imputarComision3(mes, base, idPref, quien, bn){
   if(comision>0){
     const fecha=ultimoDiaMes(m);
     const g={id,fecha,prov:nombre,rubro:"GASTOS DE ADMINISTRACIÓN",sub:`Comisión ${comision3Pct}% ventas`,bn,monto:comision,iva:0,piva:0,piibb:0};
-    if(idx>=0){ state.gastos[idx]=Object.assign(state.gastos[idx],g); await apiPost({action:"updateGasto",id,fecha,prov:g.prov,rubro:g.rubro,sub:g.sub,bn:g.bn,monto:comision,iva:0,piva:0,piibb:0}); }
-    else { state.gastos.push(g); await apiPost({action:"addGasto",id,fecha,prov:g.prov,rubro:g.rubro,sub:g.sub,bn:g.bn,monto:comision,iva:0,piva:0,piibb:0}); }
+    if(idx>=0){ state.gastos[idx]=Object.assign(state.gastos[idx],g); }
+    else { state.gastos.push(g); }
     return comision;
   } else if(idx>=0){
-    state.gastos.splice(idx,1); await apiPost({action:"deleteGasto",id});   // ese mes ya no le factura
+    state.gastos.splice(idx,1);   // ese mes ya no le factura
   }
   return 0;
 }
@@ -4489,32 +4547,13 @@ $("di_guardar").onclick=async ()=>{
     }
   }
   const mesPago=mesMasTres(mes);
+  const vb=diarioTmp.ventasb;
   const imp=Object.assign({},dPrev,{
     ivaVentas:ventas.ivaTotal,netoVentas:ventas.neto,
     ivaCompras:compras.ivaTotal,ivaCompNeto:compras.ivaCompNeto,ivaExcluido:compras.ivaExcluido,
     percIVACompras:compras.percIVA,percIIBBCompras:compras.percIIBB,netoCompras:compras.neto,
     retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,retSUSSClientes:ret.suss,mesPagoIVA:mesPago});
-  state.impuestos[mes]=imp;
-  await apiPost({action:"setDiarioIVA",mes,ivaVentas:ventas.ivaTotal,netoVentas:ventas.neto,
-    ivaCompras:compras.ivaTotal,ivaCompNeto:compras.ivaCompNeto,ivaExcluido:compras.ivaExcluido,
-    percIVACompras:compras.percIVA,percIIBBCompras:compras.percIIBB,netoCompras:compras.neto,
-    retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,retSUSSClientes:ret.suss,mesPagoIVA:mesPago});
-  // Historial de Ventas: se completa solo desde el informe (Ventas A y/o B). Reemplaza lo leído
-  // en esta carga; preserva lo no leído. Alimenta Balance, IIBB, Resumen anual, Stats y export.
-  const vb=diarioTmp.ventasb;
-  if(v || vb){
-    const prevV=state.ventas[mes]||{};
-    const nv={
-      blanco:    v  ? (v.neto||0)     : (prevV.blanco||0),
-      negro:     vb ? (vb.neto||0)    : (prevV.negro||0),
-      ivaDebito: v  ? (v.ivaTotal||0) : (prevV.ivaDebito||0),
-      retIVA: imp.retIVAClientes||0, retIIBB: imp.retIIBBClientes||0, retGan: imp.retGanancias||0
-    };
-    state.ventas[mes]=nv;
-    renderVentas();
-    await apiPost({action:"addVenta",mes,blanco:nv.blanco,negro:nv.negro,ivaDebito:nv.ivaDebito,retIVA:nv.retIVA,retIIBB:nv.retIIBB,retGan:nv.retGan});
-  }
-  // gastos al balance: una fila por proveedor (el rubro se sigue usando para agrupar)
+  // gastos al balance: una fila por proveedor (el rubro se sigue usando para agrupar). Cálculo puro (no muta state).
   const items=[]; let sinRubro=0;
   const itemsDeProv=(provNeto,tipo)=>{
     Object.keys(provNeto).forEach(p=>{
@@ -4527,44 +4566,53 @@ $("di_guardar").onclick=async ()=>{
   if(compras.provNeto)itemsDeProv(compras.provNeto,"blanco");
   const pb=diarioTmp.partb;
   if(pb && pb.provNeto)itemsDeProv(pb.provNeto,"negro");
-  if(items.length || compras.provNeto){
-    state.gastosInforme=state.gastosInforme.filter(g=>normMes(g.mes)!==mes);
-    items.forEach(it=>state.gastosInforme.push({mes,rubro:it.rubro,prov:it.prov,monto:it.monto,tipo:it.tipo}));
-    await apiPost({action:"setGastosInforme",mes,items:JSON.stringify(items)});
-  }
-  // Comisión sobre ventas a ACA: gasto NEGRO del mes (cálculo interno, no aparece en IVA Ventas).
-  // Solo si se leyó el informe de ventas en esta carga (v). Upsert por mes (no duplica).
-  let acaMsg="";
-  if(v){
-    const com=await imputarComisionACA(mes, v.netoACA||0);
-    if(com>0)acaMsg=` Comisión ACA (${comisionACAPct}%): ${money(com)} como gasto negro.`;
-  }
-  // Comisión 3% (cálculo interno, no aparece en las ventas): ambas van como gasto NEGRO (igual que
-  // ACA). Sentida Botánica: base = neto en blanco (Ventas A). Brenchio, Carla: base = neto en negro
-  // (Ventas B). Renglones separados para ver duplicados entre el lado negro y el blanco.
-  let com3Msg="";
-  if(v){
-    const cSB=await imputarComision3(mes, v.netoSB||0, "COM3SB", "SENTIDA BOTANICA", "negro");
-    if(cSB>0)com3Msg+=` Comisión Sentida Botánica (${comision3Pct}%): ${money(cSB)}.`;
-  }
-  if(vb){
-    const cBR=await imputarComision3(mes, vb.netoBr||0, "COM3BR", "BRENCHIO", "negro");
-    if(cBR>0)com3Msg+=` Comisión Brenchio (${comision3Pct}%): ${money(cBR)}.`;
-  }
-  if(v||vb)renderGastos();
-  // GT Cargas: guardamos el desglose de ESTA factura, keyed por N° de comprobante
-  // (reemplaza el mismo comprobante; dos facturas distintas del mismo mes no se pisan).
-  let gtMsg="";
+  // GT Cargas: desglose de ESTA factura (keyed por N° de comprobante). Validamos el comprobante acá.
+  let gtMsg="", gtObj=null, gtComp="";
   if(diarioTmp.gt){
-    const comp=(diarioTmp.gt.comprobante||"").trim();
-    if(!comp){
-      gtMsg=" El desglose GT no se guardó: falta el N° de comprobante.";
-    } else {
-      const gt={comprobante:comp,facturaMes:mes,total:diarioTmp.gt.total,porMes:diarioTmp.gt.porMes};
-      state.gtCargas[comp]=gt;
-      await apiPost({action:"setGTCargas",comprobante:comp,facturaMes:mes,data:JSON.stringify(gt)});
-    }
+    gtComp=(diarioTmp.gt.comprobante||"").trim();
+    if(!gtComp){ gtMsg=" El desglose GT no se guardó: falta el N° de comprobante."; }
+    else { gtObj={comprobante:gtComp,facturaMes:mes,total:diarioTmp.gt.total,porMes:diarioTmp.gt.porMes}; }
   }
+  // tablas que toca este guardado → una sola transacción con rollback (todo o nada)
+  const tablas=["impuestos"];
+  if(v||vb) tablas.push("ventas","gastos");
+  if(items.length || compras.provNeto) tablas.push("gastosInforme");
+  if(gtObj) tablas.push("gtCargas");
+  let acaMsg="", com3Msg="";
+  const aplicar=()=>{
+    state.impuestos[mes]=imp;
+    // Historial de Ventas: se completa solo desde el informe (Ventas A y/o B). Reemplaza lo leído
+    // en esta carga; preserva lo no leído. Alimenta Balance, IIBB, Resumen anual, Stats y export.
+    if(v || vb){
+      const prevV=state.ventas[mes]||{};
+      state.ventas[mes]={
+        blanco:    v  ? (v.neto||0)     : (prevV.blanco||0),
+        negro:     vb ? (vb.neto||0)    : (prevV.negro||0),
+        ivaDebito: v  ? (v.ivaTotal||0) : (prevV.ivaDebito||0),
+        retIVA: imp.retIVAClientes||0, retIIBB: imp.retIIBBClientes||0, retGan: imp.retGanancias||0
+      };
+    }
+    if(items.length || compras.provNeto){
+      state.gastosInforme=state.gastosInforme.filter(g=>normMes(g.mes)!==mes);
+      items.forEach(it=>state.gastosInforme.push({mes,rubro:it.rubro,prov:it.prov,monto:it.monto,tipo:it.tipo}));
+    }
+    // Comisiones (cálculo interno, no aparecen en IVA Ventas): solo mutan state.gastos. Upsert por mes.
+    // ACA y Sentida Botánica necesitan Ventas A (v); Brenchio necesita Ventas B (vb). Renglones separados.
+    if(v){
+      const com=imputarComisionACA(mes, v.netoACA||0);
+      if(com>0)acaMsg=` Comisión ACA (${comisionACAPct}%): ${money(com)} como gasto negro.`;
+      const cSB=imputarComision3(mes, v.netoSB||0, "COM3SB", "SENTIDA BOTANICA", "negro");
+      if(cSB>0)com3Msg+=` Comisión Sentida Botánica (${comision3Pct}%): ${money(cSB)}.`;
+    }
+    if(vb){
+      const cBR=imputarComision3(mes, vb.netoBr||0, "COM3BR", "BRENCHIO", "negro");
+      if(cBR>0)com3Msg+=` Comisión Brenchio (${comision3Pct}%): ${money(cBR)}.`;
+    }
+    if(gtObj) state.gtCargas[gtComp]=gtObj;
+  };
+  const ok=await apiTx(tablas, aplicar);
+  if(!ok){ showMsg("di_msg","err","No se pudo guardar. Quedó todo como antes; revisá la conexión y reintentá (no se cargó nada a medias)."); return; }
+  renderVentas(); renderGastos();
   diarioTmp={compras:null,ventas:null,ventasb:null,ret:null,partb:null,gt:null};
   renderDiarioIVA();
   let msg=`Informes de ${ymLabel(mes)} guardados. El IVA se paga en ${ymLabel(mesPago)}.`;
