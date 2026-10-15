@@ -10,6 +10,7 @@
 <title>Balance Interno — Gestión 2026</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.4/lib/msal-browser.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 :root{
@@ -244,6 +245,38 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 .estado-btn{font-family:inherit;font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid var(--edge);cursor:pointer;transition:.15s}
 .estado-btn.pend{background:#c47f1a;color:#fff;border-color:#c47f1a}
 .estado-btn.pagado{background:var(--paper2);color:var(--ink2);border-color:var(--edge)}
+/* ---- MODO SOLO LECTURA (lectores, ej. Alejandro): oculta TODO botón de alta/edición/borrado.
+   Se deja visible lo de lectura: navegación, filtros, imprimir, exportar y recargar. ---- */
+body.solo-lectura #g_add, body.solo-lectura #g_clear, body.solo-lectura #g_subadd,
+body.solo-lectura #ed_save,
+body.solo-lectura #t_save, body.solo-lectura #t_dedup, body.solo-lectura #pi_add,
+body.solo-lectura #di_calc_compras, body.solo-lectura #di_calc_ventas, body.solo-lectura #di_calc_ret,
+body.solo-lectura #di_calc_gt, body.solo-lectura #di_calc_partb, body.solo-lectura #di_calc_ventasb,
+body.solo-lectura #di_reset_compras, body.solo-lectura #di_reset_ventas, body.solo-lectura #di_reset_ret,
+body.solo-lectura #di_reset_gt, body.solo-lectura #di_reset_partb, body.solo-lectura #di_reset_ventasb,
+body.solo-lectura #di_guardar, body.solo-lectura #di_exclu_add,
+body.solo-lectura #ch_calc, body.solo-lectura #ch_clear, body.solo-lectura #ch_reset_extracto,
+body.solo-lectura #ch_save, body.solo-lectura #chm_add, body.solo-lectura #chm_save,
+body.solo-lectura #che_add, body.solo-lectura #che_calc, body.solo-lectura #che_clear,
+body.solo-lectura #sv_add, body.solo-lectura #sv_limpiar, body.solo-lectura #eds_save,
+body.solo-lectura #su_addccss, body.solo-lectura #su_addemp, body.solo-lectura #su_seed,
+body.solo-lectura #su_limpiar, body.solo-lectura #succ_save, body.solo-lectura #sum_save,
+body.solo-lectura #cc_addlinea, body.solo-lectura #cc_oficial_save, body.solo-lectura #cc_params_save,
+body.solo-lectura #d_aca_save, body.solo-lectura #d_com3_save, body.solo-lectura #d_cuit_save,
+body.solo-lectura #d_email_save, body.solo-lectura #d_email_clear, body.solo-lectura #d_prov_add,
+body.solo-lectura #d_reparto_add, body.solo-lectura #d_subprov_add, body.solo-lectura #d_comparar,
+body.solo-lectura #d_import,
+body.solo-lectura .del,
+body.solo-lectura [data-toggle], body.solo-lectura [data-edit], body.solo-lectura [data-del],
+body.solo-lectura [data-dels], body.solo-lectura [data-delche], body.solo-lectura [data-delch],
+body.solo-lectura [data-delcc], body.solo-lectura [data-delpi], body.solo-lectura [data-delsu],
+body.solo-lectura [data-edch], body.solo-lectura [data-edcc], body.solo-lectura [data-edsu],
+body.solo-lectura [data-eds], body.solo-lectura [data-pag], body.solo-lectura [data-estch],
+body.solo-lectura [data-ccreg], body.solo-lectura [data-rep], body.solo-lectura [data-repdel],
+body.solo-lectura [data-provrule], body.solo-lectura [data-provrubro], body.solo-lectura [data-provrubrob],
+body.solo-lectura [data-provdel], body.solo-lectura [data-subprovedit], body.solo-lectura [data-subprovdel]
+{ display:none !important; }
+body.solo-lectura #gasto_form_wrap{ display:none !important; }   /* formulario de alta de gastos completo */
 </style>
 </head>
 <body>
@@ -961,27 +994,29 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 <section class="view" data-v="datos">
   <div class="card">
     <h2>Datos y sincronización</h2>
-    <p class="lead">Todo se guarda solo en tu planilla de Google a medida que cargás. No hace falta guardar a mano.</p>
+    <p class="lead">Todo se guarda solo en SharePoint (Microsoft 365) a medida que cargás. No hace falta guardar a mano.</p>
     <div class="row-actions" style="margin-top:0">
-      <button class="btn gold" id="d_reload">Recargar desde la planilla</button>
+      <button class="btn gold" id="d_reload">Recargar desde SharePoint</button>
       <button class="btn ghost" id="d_xlsx">Exportar todo a Excel</button>
     </div>
     <div class="msg" id="d_msg"></div>
 
-    <div class="sectlabel" style="margin-top:26px">Conexión con la planilla</div>
-    <p class="lead" style="margin-bottom:12px">La URL no se guarda en el archivo: queda en este navegador. Si abrís la app en otra computadora, la pegás de nuevo.</p>
-    <div class="grid" style="grid-template-columns:1fr auto auto;gap:10px;align-items:end;max-width:760px">
-      <div class="f">
-        <label>URL de la planilla (termina en /exec)</label>
-        <input id="d_api" placeholder="https://script.google.com/macros/s/…/exec">
-      </div>
-      <div class="row-actions" style="margin:0"><button class="btn sm" id="d_api_save" type="button">Guardar URL</button></div>
-      <div class="row-actions" style="margin:0"><button class="btn ghost sm" id="d_api_clear" type="button">Borrar</button></div>
+    <div class="sectlabel" style="margin-top:26px">Conexión (Microsoft 365)</div>
+    <p class="lead" style="margin-bottom:12px">Se entra con tu cuenta de EG. No se pega ninguna URL por computadora.</p>
+    <div id="d_sesion" style="font-size:13px;color:var(--ink2);margin-bottom:10px">—</div>
+    <div class="row-actions">
+      <button class="btn ghost sm" id="d_logout" type="button">Cerrar sesión</button>
+      <button class="btn ghost sm" id="d_import" type="button" hidden>Importar desde Google (una vez)</button>
     </div>
     <div class="msg" id="d_api_msg"></div>
 
+    <div class="sectlabel" style="margin-top:26px">Migración — comparar con Google</div>
+    <p class="lead" style="margin-bottom:10px">Compara, <b>tabla por tabla y campo por campo</b>, los datos de SharePoint contra los de Google (Apps Script), y muestra los números de control de julio/agosto 2026. No modifica nada.</p>
+    <div class="row-actions"><button class="btn ghost sm" id="d_comparar" type="button">Comparar con Google</button></div>
+    <div id="d_comparar_res" style="margin-top:12px"></div>
+
     <div class="sectlabel" style="margin-top:26px">Email de la contadora</div>
-    <p class="lead" style="margin-bottom:12px">Para "Enviar por email" en Imp. al cheque. No se guarda en el archivo: queda en este navegador.</p>
+    <p class="lead" style="margin-bottom:12px">Para "Enviar por email" en Imp. al cheque. Se guarda en SharePoint (configuración compartida), igual para todas las computadoras.</p>
     <div class="grid" style="grid-template-columns:1fr auto auto;gap:10px;align-items:end;max-width:760px">
       <div class="f">
         <label>Email de la contadora</label>
@@ -993,13 +1028,13 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="msg" id="d_email_msg"></div>
 
     <div class="sectlabel" style="margin-top:26px">Reparto de gastos en cuotas</div>
-    <p class="lead" style="margin-bottom:12px">Facturas cuyo IVA va entero en el mes de emisión pero el gasto neto se imputa en cuotas. La regla es por proveedor y cada factura se reparte desde su propio mes. El IVA no se toca. Se guarda en la planilla (hoja Config), igual para todas las computadoras.</p>
+    <p class="lead" style="margin-bottom:12px">Facturas cuyo IVA va entero en el mes de emisión pero el gasto neto se imputa en cuotas. La regla es por proveedor y cada factura se reparte desde su propio mes. El IVA no se toca. Se guarda en SharePoint (configuración compartida), igual para todas las computadoras.</p>
     <div style="overflow-x:auto"><table id="d_reparto_tbl" style="max-width:780px"><tbody></tbody></table></div>
     <div class="row-actions" style="margin-top:6px"><button class="btn ghost sm" id="d_reparto_add" type="button">+ Agregar proveedor</button></div>
     <div class="msg" id="d_reparto_msg"></div>
 
     <div class="sectlabel" style="margin-top:26px">Comisión sobre ventas a ACA</div>
-    <p class="lead" style="margin-bottom:12px">% de comisión sobre lo facturado (neto) a ACA. Al leer el informe de IVA Ventas del mes se registra como gasto negro (rubro GASTOS DE ADMINISTRACIÓN). Se guarda en la planilla. Cambiar el % rige al volver a leer el informe de cada mes.</p>
+    <p class="lead" style="margin-bottom:12px">% de comisión sobre lo facturado (neto) a ACA. Al leer el informe de IVA Ventas del mes se registra como gasto negro (rubro GASTOS DE ADMINISTRACIÓN). Se guarda en SharePoint (compartido). Cambiar el % rige al volver a leer el informe de cada mes.</p>
     <div class="grid" style="grid-template-columns:auto auto;gap:10px;align-items:end;max-width:420px;justify-content:start">
       <div class="f"><label>Comisión ACA (%)</label><input id="d_aca_pct" class="mono" inputmode="decimal" style="width:120px" placeholder="4"></div>
       <div class="row-actions" style="margin:0"><button class="btn sm" id="d_aca_save" type="button">Guardar %</button></div>
@@ -1007,15 +1042,26 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div class="msg" id="d_aca_msg"></div>
 
     <div class="sectlabel" style="margin-top:26px">Comisión 3% — Sentida Botánica / Brenchio</div>
-    <p class="lead" style="margin-bottom:12px">% de comisión sobre el neto facturado a <b>Sentida Botánica</b> (base = venta en blanco, informe IVA Ventas) y a <b>Brenchio, Carla</b> (base = venta en negro, informe Ventas B). Las <b>dos</b> se registran como gasto <b>NEGRO</b> en GASTOS DE ADMINISTRACIÓN (igual que ACA), en <b>dos renglones separados</b> (uno por identidad). Se guarda en la planilla. Cambiar el % rige al volver a leer los informes de cada mes.</p>
+    <p class="lead" style="margin-bottom:12px">% de comisión sobre el neto facturado a <b>Sentida Botánica</b> (base = venta en blanco, informe IVA Ventas) y a <b>Brenchio, Carla</b> (base = venta en negro, informe Ventas B). Las <b>dos</b> se registran como gasto <b>NEGRO</b> en GASTOS DE ADMINISTRACIÓN (igual que ACA), en <b>dos renglones separados</b> (uno por identidad). Se guarda en SharePoint (compartido). Cambiar el % rige al volver a leer los informes de cada mes.</p>
     <div class="grid" style="grid-template-columns:auto auto;gap:10px;align-items:end;max-width:420px;justify-content:start">
       <div class="f"><label>Comisión (%)</label><input id="d_com3_pct" class="mono" inputmode="decimal" style="width:120px" placeholder="3"></div>
       <div class="row-actions" style="margin:0"><button class="btn sm" id="d_com3_save" type="button">Guardar %</button></div>
     </div>
     <div class="msg" id="d_com3_msg"></div>
 
+    <div class="sectlabel" style="margin-top:26px">CUIT para comisiones y flete (privado)</div>
+    <p class="lead" style="margin-bottom:12px">CUIT con los que la app identifica a <b>ACA</b>, <b>Sentida Botánica</b>, <b>Brenchio</b> (comisiones) y <b>GT Cargas</b> (flete) al leer los informes. <b>No se guardan en el código</b>: viven solo en SharePoint (configuración compartida). Cargalos una vez; se aplican al volver a leer los informes. Podés escribirlos con o sin guiones.</p>
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px;align-items:end;max-width:620px">
+      <div class="f"><label>ACA</label><input id="d_cuit_aca" class="mono" inputmode="numeric" placeholder="30-XXXXXXXX-X"></div>
+      <div class="f"><label>Sentida Botánica</label><input id="d_cuit_sb" class="mono" inputmode="numeric" placeholder="30-XXXXXXXX-X"></div>
+      <div class="f"><label>Brenchio, Carla</label><input id="d_cuit_br" class="mono" inputmode="numeric" placeholder="27-XXXXXXXX-X"></div>
+      <div class="f"><label>GT Cargas (flete)</label><input id="d_cuit_gt" class="mono" inputmode="numeric" placeholder="30-XXXXXXXX-X"></div>
+    </div>
+    <div class="row-actions" style="margin-top:10px"><button class="btn sm" id="d_cuit_save" type="button">Guardar CUIT</button></div>
+    <div class="msg" id="d_cuit_msg"></div>
+
     <div class="sectlabel" style="margin-top:26px">Reglas de proveedores (rubro)</div>
-    <p class="lead" style="margin-bottom:12px">Asigná el rubro de un proveedor. Al leer un informe de compras, si el nombre coincide, se aplica solo. Podés precargar proveedores nuevos (ej. un gasto personal → <b>PERSONAL / NO GASTO</b>: computa IVA pero no suma al gasto) antes de que aparezcan en un informe. Se guarda en la planilla.</p>
+    <p class="lead" style="margin-bottom:12px">Asigná el rubro de un proveedor. Al leer un informe de compras, si el nombre coincide, se aplica solo. Podés precargar proveedores nuevos (ej. un gasto personal → <b>PERSONAL / NO GASTO</b>: computa IVA pero no suma al gasto) antes de que aparezcan en un informe. Se guarda en SharePoint (compartido).</p>
     <div class="grid" style="grid-template-columns:1fr auto auto;gap:10px;align-items:end;max-width:760px">
       <div class="f"><label>Proveedor (igual que en el informe)</label><input id="d_prov_nuevo" placeholder="Ej. Farmacia del Centro"></div>
       <div class="f"><label>Rubro</label><select id="d_prov_rubro"></select></div>
@@ -1025,7 +1071,7 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
     <div style="overflow-x:auto;max-height:340px;overflow-y:auto;margin-top:8px"><table id="d_prov_tbl" style="max-width:760px"><tbody></tbody></table></div>
 
     <div class="sectlabel" style="margin-top:26px">Subcategorías por proveedor (desglose del Balance)</div>
-    <p class="lead" style="margin-bottom:12px">Agrupá renglones bajo una subcategoría dentro de su rubro en el desglose del Balance (ej. <b>Comisiones</b> en Gastos de Administración). Poné el proveedor igual que aparece en el desglose y la subcategoría. Los gastos cargados a mano ya usan su propia subcategoría; esto cubre además los que vienen del informe. Se guarda en la planilla.</p>
+    <p class="lead" style="margin-bottom:12px">Agrupá renglones bajo una subcategoría dentro de su rubro en el desglose del Balance (ej. <b>Comisiones</b> en Gastos de Administración). Poné el proveedor igual que aparece en el desglose y la subcategoría. Los gastos cargados a mano ya usan su propia subcategoría; esto cubre además los que vienen del informe. Se guarda en SharePoint (compartido).</p>
     <div class="grid" style="grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;max-width:760px">
       <div class="f"><label>Proveedor (igual que en el desglose)</label><input id="d_subprov_nuevo" placeholder="Ej. Sanchez Juan Antonio"></div>
       <div class="f"><label>Subcategoría</label><input id="d_subprov_sub" placeholder="Ej. Comisiones"></div>
@@ -1085,28 +1131,117 @@ function guardarEmailContadora(e){
 function olvidarEmailContadora(){ EMAIL_CONTADORA=""; try{ localStorage.removeItem(EMAIL_LS); }catch(e){} }
 
 /* =====================================================================
-   CONEXIÓN CON LA PLANILLA (Google Apps Script)
-
-   La URL NO va escrita acá. Se pega una sola vez desde la pestaña
-   "Datos" y queda guardada en este navegador (localStorage).
-   Así el archivo se puede publicar en GitHub sin dar acceso a la
-   planilla: quien lo descargue tiene la app, pero no tus datos.
+   CONEXIÓN — Microsoft 365 / SharePoint (sitio BalanceEG) vía Graph.
+   Login con la cuenta de EG (MSAL). Los identificadores de abajo son
+   PÚBLICOS: sin iniciar sesión no dan acceso a ningún dato. No se pega
+   ninguna URL por computadora. Solo la cuenta de la lista "writers"
+   puede ESCRIBIR; el resto entra en SOLO LECTURA.
    ===================================================================== */
-const API_LS="eg_balance_api_url";
-const API_RX=/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_\-]+\/exec$/;
-let API="";
-try{ API=localStorage.getItem(API_LS)||""; }catch(e){ API=""; }   // por si el navegador bloquea localStorage
-function apiConfigurada(){ return API_RX.test(API); }
-function guardarApiUrl(u){
-  u=String(u||"").trim().replace(/\?.*$/,"");
-  if(!API_RX.test(u))return false;
-  API=u;
-  try{ localStorage.setItem(API_LS,u); }catch(e){}   // si no se puede guardar, sirve para esta sesión
-  return true;
+const M365 = {
+  tenant:"f943f6a4-62dd-4a9b-ba93-c2640a30c7cf",
+  client:"4dfd2f42-3c4e-4071-b364-1747688ef8da",
+  siteHost:"egcorrugados.sharepoint.com",
+  sitePath:"/sites/BalanceEG",
+  carpeta:"datos",                        // PRODUCCIÓN. (La prueba, en /365/, usa "datos-prueba".)
+  scopes:["User.Read","Sites.ReadWrite.All","Files.ReadWrite.All"],
+  graph:"https://graph.microsoft.com/v1.0",
+  writers:["0929d1c5-7ef7-4203-bc41-1289e1918cb8"],  // Object IDs (GUID) con permiso de escritura (Raquel).
+  lectores:["2b22fd5f-ca1d-4cd9-887f-1e5f65cb09e9"]  // lectores conocidos (solo lectura): Alejandro. El acceso real lo gobierna SharePoint.
+};
+const MAX_BACKUPS = 20;   // respaldos por tabla (rotativos)
+const TABLAS = ["gastos","ventas","proveedores","subcategorias","impuestos","cheque","servicios","chequesEmit","sueldos","gastosInforme","gtCargas","config"];
+let SESION = { ok:false, cuenta:null, oid:"", writer:false, siteId:"", error:"" };
+let DBMETA = {};     // por tabla: { etag, raw } — para If-Match (no pisar) y respaldos
+let DBCONFIG = {};   // mapa {clave:valor} de config.json
+let DBINIT = false;  // ¿la base existe en SharePoint? (nunca inventar vacío)
+let _pca = null;
+function apiConfigurada(){ return SESION.ok; }
+function esWriter(){ return SESION.writer; }
+function msalApp(){
+  if(_pca) return _pca;
+  _pca = new msal.PublicClientApplication({
+    auth:{ clientId:M365.client, authority:"https://login.microsoftonline.com/"+M365.tenant, redirectUri:location.origin+location.pathname },
+    cache:{ cacheLocation:"localStorage" }
+  });
+  return _pca;
 }
-function olvidarApiUrl(){
-  API="";
-  try{ localStorage.removeItem(API_LS); }catch(e){}
+// ¿el error de MSAL es porque el navegador bloqueó el popup? → entonces usamos redirección
+function _popupBloqueado(e){
+  const c=((e&&e.errorCode)||"")+"";
+  if(c==="popup_window_error"||c==="empty_window_error"||c==="block_nested_popups") return true;
+  const m=((e&&e.message)||"").toLowerCase();
+  return m.includes("popup")&&(m.includes("block")||m.includes("could not open")||m.includes("error opening"));
+}
+async function msalToken(){
+  const pca=msalApp();
+  try{ const r=await pca.acquireTokenSilent({scopes:M365.scopes, account:SESION.cuenta}); return r.accessToken; }
+  catch(e){
+    try{ const r=await pca.acquireTokenPopup({scopes:M365.scopes}); SESION.cuenta=pca.getAllAccounts()[0]||SESION.cuenta; return r.accessToken; }
+    catch(e2){ if(_popupBloqueado(e2)){ await pca.acquireTokenRedirect({scopes:M365.scopes}); return ""; } throw e2; }   // popup bloqueado → redirección
+  }
+}
+async function iniciarSesion(){
+  const pca=msalApp();
+  try{ await pca.handleRedirectPromise(); }catch(e){}
+  let cuenta=pca.getAllAccounts()[0]||null;
+  if(!cuenta){
+    try{ await pca.loginPopup({scopes:M365.scopes}); cuenta=pca.getAllAccounts()[0]||null; }
+    catch(e){
+      if(_popupBloqueado(e)){ try{ await pca.loginRedirect({scopes:M365.scopes}); }catch(e2){} return false; }   // popup bloqueado → redirección (la página navega y vuelve)
+      SESION.error="No se pudo iniciar sesión: "+(e.message||e); return false;
+    }
+  }
+  SESION.cuenta=cuenta;
+  SESION.oid=(cuenta.idTokenClaims&&cuenta.idTokenClaims.oid)||cuenta.localAccountId||"";
+  SESION.writer=M365.writers.indexOf(SESION.oid)>=0;
+  try{ const site=await graphJson("/sites/"+M365.siteHost+":"+M365.sitePath); SESION.siteId=site.id; SESION.ok=true; return true; }
+  catch(e){ SESION.error="No se pudo acceder al sitio BalanceEG: "+(e.message||e); return false; }
+}
+async function cerrarSesion(){ try{ await msalApp().logoutPopup(); }catch(e){} location.reload(); }
+/* ---- Graph: lectura/escritura de archivos en la carpeta de datos ---- */
+async function graphJson(path, opts){
+  const t=await msalToken();
+  opts=opts||{}; opts.headers=Object.assign({Authorization:"Bearer "+t}, opts.headers||{});
+  const r=await fetch(M365.graph+path, opts);
+  if(r.status===404){ const e=new Error("no existe (404)"); e.status=404; throw e; }
+  const body=await r.json().catch(()=>({}));
+  if(!r.ok){ const e=new Error("HTTP "+r.status+(body&&body.error?(" · "+body.error.code):"")); e.status=r.status; e.body=body; throw e; }
+  return body;
+}
+function _ruta(file){ return "/sites/"+SESION.siteId+"/drive/root:/"+M365.carpeta+"/"+file; }
+async function leerArchivo(file){   // {data, etag} o null si 404
+  const t=await msalToken();
+  const r=await fetch(M365.graph+_ruta(file)+":/content", { headers:{Authorization:"Bearer "+t} });
+  if(r.status===404) return null;
+  if(!r.ok){ const e=new Error("HTTP "+r.status+" al leer "+file); e.status=r.status; throw e; }
+  const etag=r.headers.get("ETag")||r.headers.get("etag")||"";
+  const txt=await r.text();
+  let data; try{ data=txt?JSON.parse(txt):null; }catch(e){ const er=new Error("archivo corrupto: "+file); er.corrupto=true; throw er; }
+  return { data, etag };
+}
+async function escribirArchivo(file, contenidoStr, etag){   // devuelve nuevo eTag; 412 si cambió
+  const t=await msalToken();
+  const headers={ Authorization:"Bearer "+t, "Content-Type":"application/json" };
+  if(etag) headers["If-Match"]=etag;
+  const r=await fetch(M365.graph+_ruta(file)+":/content", { method:"PUT", headers, body:contenidoStr });
+  if(r.status===412){ const e=new Error("conflicto de versión (412)"); e.status=412; throw e; }
+  if(!r.ok){ const e=new Error("HTTP "+r.status+" al guardar "+file); e.status=r.status; throw e; }
+  const it=await r.json().catch(()=>({}));
+  return it.eTag||it.cTag||"";
+}
+async function borrarArchivoRel(path){
+  const t=await msalToken();
+  await fetch(M365.graph+"/sites/"+SESION.siteId+"/drive/root:/"+M365.carpeta+"/"+path, { method:"DELETE", headers:{Authorization:"Bearer "+t} });
+}
+async function respaldarTabla(tabla, rawPrevio){   // respaldo rotativo (máx MAX_BACKUPS)
+  if(rawPrevio==null) return;
+  const ts=new Date().toISOString().replace(/[:.]/g,"-").slice(0,19);
+  try{ await escribirArchivo("backups/"+tabla+"-"+ts+".json", rawPrevio, null); }catch(e){ return; }   // si falla el respaldo, no bloquea
+  try{
+    const hijos=await graphJson("/sites/"+SESION.siteId+"/drive/root:/"+M365.carpeta+"/backups:/children?$top=200&$select=name");
+    const viejos=(hijos.value||[]).filter(x=>x.name.indexOf(tabla+"-")===0).sort((a,b)=>a.name<b.name?1:-1);   // más nuevo primero
+    for(const v of viejos.slice(MAX_BACKUPS)){ await borrarArchivoRel("backups/"+v.name); }
+  }catch(e){}
 }
 /* ===================================================================== */
 
@@ -1207,15 +1342,15 @@ function provCuotaLabel(p){ return (p&&p.cuota>0)?`${p.prov} (${p.cuota}/${p.cuo
    interno: NO se muestra en la pantalla de IVA Ventas. Upsert por mes
    (id "ACA-AAAAMM") para que reprocesar el informe actualice, no duplique.
    ===================================================================== */
-const ACA_CUIT="30500120882";                       // 30-50012088-2, sin separadores
+let ACA_CUIT="";                                     // se carga de config.json (SharePoint, privado), clave "cuitsComision". NO va en el código público.
 const ACA_NOMBRE="Gasto de comercialización ACA";
 let comisionACAPct=4;                                // %, se carga de la hoja Config
 /* Comisión del 3% sobre ventas de un mismo cliente con dos identidades (una en blanco, otra
    en negro). Se calcula por separado y se imputa en DOS renglones de gasto distintos (uno por
    identidad) para poder detectar a simple vista duplicados entre el lado negro y el blanco.
    El % es configurable (hoja Config, clave "comision3"). */
-const SB_CUIT="30717181030";                         // Sentida Botánica (blanco) — sale de IVA Ventas
-const BR_CUIT="27303403464";                         // Brenchio, Carla (negro) — sale de Ventas B
+let SB_CUIT="";                                      // Sentida Botánica (blanco) — de config privada (cuitsComision)
+let BR_CUIT="";                                      // Brenchio, Carla (negro) — de config privada (cuitsComision)
 let comision3Pct=3;                                  // %, se carga de la hoja Config
 
 let state={ gastos:[], ventas:{}, memoria:{}, subs:{}, impuestos:{}, cheque:{}, servicios:[], chequesEmit:[], sueldos:[], exclusionesIVA:["EDESUR","AYSA","METROGAS"], gastosInforme:[], svInforme:{}, gtCargas:{} };  // impuestos: {"2026-01":{...}} · gtCargas: {"2026-08":{total,porMes}}
@@ -1269,30 +1404,32 @@ function setSync(estado,txt,detalle){
   const bh=$("savebox_home"); if(bh){ bh.className=cls; $("saveTxt_home").textContent=msg; bh.title=tip; }
 }
 
-/* ---- llamadas a la planilla ---- */
+/* ---- lectura: trae todas las tablas desde SharePoint (un JSON por tabla) ---- */
 let API_ULTIMO_ERROR="";   // motivo real del último fallo de conexión (para mostrarlo)
 async function apiGet(){
-  if(!apiConfigurada())return {ok:false,sinConfigurar:true};
-  const INTENTOS=3;
-  let j=null;
-  for(let n=1;n<=INTENTOS;n++){
-    try{
-      const ctrl=new AbortController();
-      const to=setTimeout(()=>ctrl.abort(),30000);   // corta si la planilla cuelga > 30s
-      let r;
-      try{ r=await fetch(API,{signal:ctrl.signal}); } finally { clearTimeout(to); }
-      if(!r.ok) throw new Error("HTTP "+r.status+" "+(r.statusText||""));
-      j=await r.json();          // si la implementación no existe/caída, Google devuelve HTML y esto falla
-      API_ULTIMO_ERROR="";
-      break;
-    }catch(e){
-      API_ULTIMO_ERROR = (e&&e.name==="AbortError") ? "la planilla tardó demasiado (timeout de 30s)"
-        : (/Unexpected token|JSON|SyntaxError/i.test(String(e&&e.message)) ? "la implementación no respondió datos (¿deploy caído o sin acceso público?)"
-        : String((e&&e.message)||e));
-      if(n<INTENTOS){ setSync("busy",`reintentando (${n}/${INTENTOS})…`); await new Promise(s=>setTimeout(s,1000*n)); continue; }
-      return {ok:false,error:API_ULTIMO_ERROR,intentos:n};
-    }
+  if(!SESION.ok) return {ok:false, error:SESION.error||"sin sesión"};
+  let res={};
+  try{
+    await Promise.all(TABLAS.map(async t=>{ res[t]=await leerArchivo(t+".json"); }));   // lectura en paralelo
+  }catch(e){
+    API_ULTIMO_ERROR = e.corrupto ? e.message : (e.message||String(e));
+    return {ok:false, error:API_ULTIMO_ERROR};
   }
+  // PROTECCIÓN: nunca inventar vacío. Si no existe NINGÚN archivo → base no inicializada.
+  const existeAlguna=TABLAS.some(t=>res[t]!==null);
+  if(!existeAlguna){ DBINIT=false; return {ok:false, noInicializada:true}; }
+  const nucleo=["gastos","ventas","impuestos"];
+  if(!nucleo.every(t=>res[t]!==null)){ DBINIT=false; return {ok:false, error:"faltan archivos núcleo (gastos/ventas/impuestos); no se inventa base vacía"}; }
+  DBINIT=true; API_ULTIMO_ERROR="";
+  DBMETA={}; TABLAS.forEach(t=>{ const a=res[t]; DBMETA[t]={ etag:a?a.etag:"", raw:a?JSON.stringify(a.data):null }; });   // eTags + contenido previo (If-Match y respaldos)
+  const d=t=> (res[t]&&res[t].data!=null) ? res[t].data : null;
+  DBCONFIG = d("config") || {};
+  if(DBCONFIG.emailContadora) EMAIL_CONTADORA=DBCONFIG.emailContadora;   // mail de la contadora: ahora compartido en config
+  const j={ ok:true, data:{
+    gastos:d("gastos")||[], ventas:d("ventas")||{}, memoria:d("proveedores")||{}, subs:d("subcategorias")||{},
+    impuestos:d("impuestos")||{}, cheque:d("cheque")||{}, servicios:d("servicios")||[], chequesEmit:d("chequesEmit")||[],
+    sueldos:d("sueldos")||[], gastosInforme:d("gastosInforme")||[], gtCargas:d("gtCargas")||{}, config:DBCONFIG
+  }};
   if(j&&j.ok&&j.data){ state.gastos=j.data.gastos||[]; state.ventas=j.data.ventas||{}; state.memoria=j.data.memoria||{}; state.subs=j.data.subs||{}; state.impuestos=j.data.impuestos||{}; state.cheque=j.data.cheque||{}; state.servicios=j.data.servicios||[]; state.chequesEmit=j.data.chequesEmit||[]; state.sueldos=j.data.sueldos||[]; state.gastosInforme=j.data.gastosInforme||[]; if(j.data.config&&j.data.config.exclusionesIVA){try{state.exclusionesIVA=JSON.parse(j.data.config.exclusionesIVA);}catch(e){}}
     if(j.data.config&&j.data.config.svInforme){try{state.svInforme=JSON.parse(j.data.config.svInforme);}catch(e){}}
     if(j.data.config&&j.data.config.repartoCuotas){try{repartoProv=JSON.parse(j.data.config.repartoCuotas)||[];}catch(e){}}   // reglas de reparto en cuotas (criterio contable, compartido)
@@ -1307,6 +1444,8 @@ async function apiGet(){
     if(!(state.subs["GASTOS DE ADMINISTRACIÓN"]||[]).includes("Comisiones")){ (state.subs["GASTOS DE ADMINISTRACIÓN"]=state.subs["GASTOS DE ADMINISTRACIÓN"]||[]).push("Comisiones"); }
     if(j.data.config&&j.data.config.comisionACA!==undefined){try{const p=JSON.parse(j.data.config.comisionACA); if(typeof p==="number"&&p>=0)comisionACAPct=p;}catch(e){}}   // % comisión ventas ACA
     if(j.data.config&&j.data.config.comision3!==undefined){try{const p=JSON.parse(j.data.config.comision3); if(typeof p==="number"&&p>=0)comision3Pct=p;}catch(e){}}   // % comisión Sentida Botánica / Brenchio
+    // CUIT de comisiones y flete: SOLO en config (SharePoint, privado). No van en el código público. Se guardan como dígitos.
+    if(j.data.config&&j.data.config.cuitsComision){try{const c=JSON.parse(j.data.config.cuitsComision)||{}; const sd=x=>String(x||"").replace(/\D/g,""); ACA_CUIT=sd(c.aca); SB_CUIT=sd(c.sb); BR_CUIT=sd(c.br); GT_CUIT=sd(c.gt);}catch(e){}}
     // GT Cargas: desgloses de flete keyed por N° de comprobante ({comprobante:{comprobante,facturaMes,total,porMes}});
     // tolera valores como string JSON
     state.gtCargas={}; const gtRaw=j.data.gtCargas||{};
@@ -1315,6 +1454,8 @@ async function apiGet(){
     const impFix={};
     for(const k in state.impuestos){ const nk=normMes(k)||k; impFix[nk]=Object.assign({},impFix[nk]||{},state.impuestos[k]); }
     state.impuestos=impFix;
+    // mesPagoIVA a veces viene como fecha desde Google: normalizar a YYYY-MM en memoria
+    Object.keys(state.impuestos).forEach(k=>{ const o=state.impuestos[k]; if(o&&o.mesPagoIVA) o.mesPagoIVA=normMes(o.mesPagoIVA)||o.mesPagoIVA; });
     const chFix={};
     for(const k in state.cheque){ const nk=normMes(k)||k; chFix[nk]=Object.assign({},chFix[nk]||{},state.cheque[k]); }
     state.cheque=chFix;
@@ -1325,14 +1466,220 @@ async function apiGet(){
   }
   return j;
 }
+/* ---- escritura: guarda la tabla que toca la acción (atómico por archivo, con eTag + respaldo) ---- */
+const TABLA_POR_ACCION = {
+  addGasto:"gastos", updateGasto:"gastos", updateTipo:"gastos", deleteGasto:"gastos",
+  addVenta:"ventas", setProv:"proveedores", addSub:"subcategorias",
+  setImpuestos:"impuestos", setDiarioIVA:"impuestos", setCheque:"cheque",
+  setServicio:"servicios", deleteServicio:"servicios", seedServicios:"servicios",
+  setChequeEmit:"chequesEmit", deleteChequeEmit:"chequesEmit",
+  setSueldo:"sueldos", deleteSueldo:"sueldos",
+  setGastosInforme:"gastosInforme", setGTCargas:"gtCargas", setConfig:"config"
+};
+function _datosTabla(tabla){
+  switch(tabla){
+    case "gastos": return state.gastos;
+    case "ventas": return state.ventas;
+    case "proveedores": return state.memoria;
+    case "subcategorias": return state.subs;
+    case "impuestos": return state.impuestos;
+    case "cheque": return state.cheque;
+    case "servicios": return state.servicios;
+    case "chequesEmit": return state.chequesEmit;
+    case "sueldos": return state.sueldos;
+    case "gastosInforme": return state.gastosInforme;
+    case "gtCargas": return state.gtCargas;
+    case "config": return DBCONFIG;
+  }
+}
+async function _guardarTabla(tabla){
+  const file=tabla+".json";
+  const meta=DBMETA[tabla]||{etag:"",raw:null};
+  await respaldarTabla(tabla, meta.raw);                       // respaldo del contenido previo
+  const contenido=JSON.stringify(_datosTabla(tabla));
+  const nuevoEtag=await escribirArchivo(file, contenido, meta.etag||null);   // If-Match: no pisa si cambió
+  DBMETA[tabla]={ etag:nuevoEtag, raw:contenido };
+}
 async function apiPost(payload){
-  if(!apiConfigurada()){ setSync("err","sin configurar"); return false; }
-  setSync("busy");
+  if(payload.action==="setConfig"){ DBCONFIG=DBCONFIG||{}; DBCONFIG[payload.clave]=payload.valor||""; }   // actualizar mapa de config en memoria
+  if(!SESION.ok){ setSync("err","sin conexión — no se guarda", SESION.error); return false; }
+  if(!esWriter()){ setSync("err","modo lectura — no se guarda", "Tu cuenta no tiene permiso de escritura."); return false; }
+  if(!DBINIT){ setSync("err","base no inicializada — no se guarda", "Importá los datos primero (Datos → Importar)."); return false; }
+  const tabla=TABLA_POR_ACCION[payload.action];
+  if(!tabla){ return true; }   // acción sin tabla asociada: no persiste nada
   try{
-    await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
+    setSync("busy","guardando…");
+    await _guardarTabla(tabla);
     setSync("ok");
     return true;
-  }catch(e){ setSync("err","error al guardar"); return false; }
+  }catch(e){
+    if(e.status===412){ setSync("err","otra sesión cambió los datos — recargá", "Conflicto de versión. Recargá desde Datos y reintentá."); }
+    else { setSync("err","error al guardar", e.message||String(e)); }
+    return false;
+  }
+}
+/* ---- escritura MULTI-TABLA con rollback: o se guardan TODAS, o queda exactamente como antes ----
+   Protege los flujos que tocan varias tablas (ej. "Guardar informes del mes"): si se corta la
+   conexión a mitad de camino, se rehacen los archivos ya escritos y se restaura el state en memoria.
+   Único escritor (Raquel) → los conflictos 412 casi no existen; esto cubre sobre todo el corte. */
+function _restaurarState(tabla, json){
+  const v=JSON.parse(json);
+  switch(tabla){
+    case "gastos": state.gastos=v; break;
+    case "ventas": state.ventas=v; break;
+    case "proveedores": state.memoria=v; break;
+    case "subcategorias": state.subs=v; break;
+    case "impuestos": state.impuestos=v; break;
+    case "cheque": state.cheque=v; break;
+    case "servicios": state.servicios=v; break;
+    case "chequesEmit": state.chequesEmit=v; break;
+    case "sueldos": state.sueldos=v; break;
+    case "gastosInforme": state.gastosInforme=v; break;
+    case "gtCargas": state.gtCargas=v; break;
+    case "config": DBCONFIG=v; break;
+  }
+}
+async function apiTx(tablas, aplicar){
+  if(!SESION.ok){ setSync("err","sin conexión — no se guarda", SESION.error); return false; }
+  if(!esWriter()){ setSync("err","modo lectura — no se guarda", "Tu cuenta no tiene permiso de escritura."); return false; }
+  if(!DBINIT){ setSync("err","base no inicializada — no se guarda", "Importá los datos primero (Datos → Importar)."); return false; }
+  const ts=[...new Set(tablas)];
+  // FOTO previa: contenido guardado (para rehacer el archivo) + state en memoria (para rehacer la pantalla)
+  const snap={};
+  for(const t of ts){ const m=DBMETA[t]||{etag:"",raw:null}; snap[t]={ etag:m.etag||"", raw:(m.raw===undefined?null:m.raw), state:JSON.stringify(_datosTabla(t)) }; }
+  try{ aplicar(); }catch(e){ for(const t of ts){ try{ _restaurarState(t, snap[t].state); }catch(e3){} } setSync("err","error preparando el guardado — quedó como antes", e.message||String(e)); return false; }   // aplicar los cambios en memoria (si falla, restaurar)
+  setSync("busy","guardando…");
+  const hechas=[];
+  try{
+    for(const t of ts){ await _guardarTabla(t); hechas.push(t); }   // escribe todas; si una falla, salta al catch
+    setSync("ok");
+    return true;
+  }catch(e){
+    let rollbackOk=true;
+    for(const t of hechas){                                          // deshacer SOLO las que ya se escribieron
+      try{
+        const cur=DBMETA[t]||{};
+        if(snap[t].raw==null){ await borrarArchivoRel(t+".json"); DBMETA[t]={etag:"",raw:null}; }   // antes no existía → borrar
+        else { const et=await escribirArchivo(t+".json", snap[t].raw, cur.etag||null); DBMETA[t]={etag:et, raw:snap[t].raw}; }
+      }catch(e2){ rollbackOk=false; }
+    }
+    for(const t of ts){ try{ _restaurarState(t, snap[t].state); }catch(e3){} }   // restaurar memoria siempre
+    if(rollbackOk){
+      if(e.status===412) setSync("err","otra sesión cambió los datos — no se guardó", "Conflicto de versión. Recargá desde Datos y reintentá.");
+      else setSync("err","no se pudo guardar — quedó como antes", e.message||String(e));
+    } else {
+      DBINIT=false;   // no pudimos deshacer todo: bloquear escrituras hasta recargar
+      setSync("err","guardado incompleto — recargá", "Un corte impidió deshacer todo. Recargá desde Datos antes de seguir cargando.");
+    }
+    return false;
+  }
+}
+/* ---- IMPORTACIÓN inicial (una vez): lee del Apps Script en vivo y crea los JSON en SharePoint ---- */
+async function importarDesdeGoogle(execUrl){
+  if(!SESION.ok) throw new Error("sin sesión");
+  if(!esWriter()) throw new Error("tu cuenta no tiene permiso de escritura");
+  // 1) leer Google (solo lectura; no lo modifica)
+  const r=await fetch(execUrl); const g=await r.json();
+  if(!g||!g.ok||!g.data) throw new Error("el Apps Script no devolvió datos (revisá la URL /exec)");
+  const D=g.data;
+  // 2) armar una tabla JSON por archivo, con la misma forma que espera la app.
+  //    Normalizamos las claves de mes a "YYYY-MM" ACÁ (no solo al leer): así el archivo
+  //    guardado nunca mezcla fecha (ene–jun) con texto (jul–sep) como la planilla vieja.
+  //    Es idempotente (sobre "YYYY-MM" no cambia) y junta duplicados sin perder campos.
+  const _mesKeys=obj=>{ const o=obj||{}, out={}; for(const k in o){ const nk=normMes(k)||k; out[nk]=Object.assign({},out[nk]||{},o[k]); } return out; };
+  const porTabla={
+    gastos:D.gastos||[], ventas:_mesKeys(D.ventas), proveedores:D.memoria||{}, subcategorias:D.subs||{},
+    impuestos:_mesKeys(D.impuestos), cheque:_mesKeys(D.cheque), servicios:D.servicios||[], chequesEmit:D.chequesEmit||[],
+    sueldos:D.sueldos||[], gastosInforme:D.gastosInforme||[], gtCargas:D.gtCargas||{}, config:D.config||{}
+  };
+  // mesPagoIVA viene de Google a veces como fecha ("Tue Dec 01 2026…"): lo normalizamos a YYYY-MM en el archivo.
+  for(const k in porTabla.impuestos){ const o=porTabla.impuestos[k]; if(o&&o.mesPagoIVA) o.mesPagoIVA=normMes(o.mesPagoIVA)||o.mesPagoIVA; }
+  // 3) escribir cada archivo (creación inicial: sin If-Match)
+  const conteo={};
+  for(const t of TABLAS){
+    const cont=JSON.stringify(porTabla[t]);
+    const etag=await escribirArchivo(t+".json", cont, null);
+    DBMETA[t]={ etag, raw:cont };
+    const v=porTabla[t]; conteo[t]=Array.isArray(v)?v.length:Object.keys(v).length;
+  }
+  DBINIT=true;
+  return conteo;
+}
+/* ---- COMPARADOR "IDÉNTICOS": SharePoint vs Google, tabla por tabla, campo por campo ---- */
+function _canon(x){   // JSON canónico: ordena claves de objetos para comparar sin importar el orden
+  if(x===undefined) return "undefined";
+  if(x===null||typeof x!=="object") return JSON.stringify(x);
+  if(Array.isArray(x)) return "["+x.map(_canon).join(",")+"]";
+  return "{"+Object.keys(x).sort().map(k=>JSON.stringify(k)+":"+_canon(x[k])).join(",")+"}";
+}
+function _val(x){ const s=_canon(x); return s.length>160?s.slice(0,160)+"…":s; }
+function _difs(a,b,pref){   // diferencias entre dos tablas; baja un nivel a objetos anidados para señalar el campo exacto
+  pref=pref||""; const out=[], LIM=20;
+  if(Array.isArray(a)||Array.isArray(b)){
+    const A=a||[], B=b||[];
+    if(A.length!==B.length) out.push(`${pref}cantidad: Google ${A.length} vs 365 ${B.length}`);
+    const n=Math.max(A.length,B.length);
+    for(let i=0;i<n && out.length<LIM;i++){ if(_canon(A[i])!==_canon(B[i])) out.push(`${pref}fila ${i}: G ${_val(A[i])} ≠ 365 ${_val(B[i])}`); }
+  } else {
+    const A=a||{}, B=b||{};
+    const ks=[...new Set([...Object.keys(A),...Object.keys(B)])].sort();
+    for(const k of ks){
+      if(out.length>=LIM)break;
+      if(_canon(A[k])===_canon(B[k]))continue;
+      const av=A[k], bv=B[k];
+      if(av&&bv&&typeof av==="object"&&typeof bv==="object"&&!Array.isArray(av)&&!Array.isArray(bv)){
+        _difs(av,bv,`${pref}[${k}].`).forEach(s=>{ if(out.length<LIM)out.push(s); });   // drill-in
+      } else out.push(`${pref}[${k}]: G ${_val(A[k])} ≠ 365 ${_val(B[k])}`);
+    }
+  }
+  return out;
+}
+/* gtCargas: Google guarda el comprobante como número (sin ceros) y el detalle como texto JSON;
+   365 lo guarda con ceros y como objeto. Normalizamos AMBOS lados para comparar el contenido real
+   (comprobante sin ceros, detalle parseado): lo que importa es total y porMes. */
+function _normGt(obj){
+  const o=obj||{}, out={};
+  for(const k in o){
+    let v=o[k]; if(typeof v==="string"){ try{v=JSON.parse(v);}catch(e){v={};} }
+    v=v||{};
+    const nk=(String(k).replace(/^0+/,"")||"0");
+    const comp=v.comprobante?(String(v.comprobante).replace(/^0+/,"")||"0"):nk;
+    out[nk]={ comprobante:comp, facturaMes:v.facturaMes?(normMes(v.facturaMes)||v.facturaMes):"", total:Number(v.total)||0, porMes:v.porMes||{} };
+  }
+  return out;
+}
+/* impuestos: mesPagoIVA puede venir como fecha ("Tue Dec 01 2026…") en Google y como YYYY-MM en 365.
+   Normalizamos ese campo en ambos lados para no marcar diferencia por el formato. */
+function _normImp(obj){
+  const o=obj||{}, out={};
+  for(const k in o){ const v=Object.assign({}, o[k]); if(v&&v.mesPagoIVA) v.mesPagoIVA=normMes(v.mesPagoIVA)||v.mesPagoIVA; out[k]=v; }
+  return out;
+}
+async function compararConGoogle(execUrl){
+  const S={}; await Promise.all(TABLAS.map(async t=>{ const a=await leerArchivo(t+".json"); S[t]=a?a.data:null; }));   // SharePoint
+  const r=await fetch(execUrl); const g=await r.json();
+  if(!g||!g.ok||!g.data) throw new Error("Google no devolvió datos (revisá la URL /exec)");
+  const D=g.data;
+  const mapG={ gastos:D.gastos, ventas:D.ventas, proveedores:D.memoria, subcategorias:D.subs, impuestos:D.impuestos, cheque:D.cheque, servicios:D.servicios, chequesEmit:D.chequesEmit, sueldos:D.sueldos, gastosInforme:D.gastosInforme, gtCargas:D.gtCargas, config:D.config };
+  return TABLAS.map(t=>{
+    let gv=mapG[t], sv=S[t];
+    if(t==="gtCargas"){ gv=_normGt(gv); sv=_normGt(sv); }   // comparar contenido real, no el formato del comprobante
+    if(t==="impuestos"){ gv=_normImp(gv); sv=_normImp(sv); }   // mesPagoIVA: fecha vs YYYY-MM no cuenta como diferencia
+    const difs=_difs(gv, sv);
+    const n=Array.isArray(gv)?(gv||[]).length:Object.keys(gv||{}).length;
+    return {t, ok:difs.length===0, n, difs};
+  });
+}
+/* números de control: réplica de la suma del Balance (TOTAL GASTOS del mes por tipo) */
+function totalGastosMes(mes, bn){
+  mes=normMes(mes); let tot=0;
+  state.gastos.filter(g=>ym(g.fecha)===mes).forEach(g=>{ tot+=gastoVal(g,bn); });
+  gastosInformeExpandido().filter(g=>normMes(g.mes)===mes).forEach(g=>{
+    const esNegro=(g.tipo==="negro");
+    if(bn==="total" || (bn==="blanco"&&!esNegro) || (bn==="negro"&&esNegro)) tot+=g.monto||0;
+  });
+  if(bn!=="negro"){ const imp=impuestosDelMes(mes); if(imp.aPagar>0)tot+=imp.aPagar; const gt=gtGastoMes(mes); if(gt.monto>0)tot+=gt.monto; }
+  return Math.round(tot*100)/100;
 }
 
 /* ---- init UI ---- */
@@ -1386,6 +1733,7 @@ function irA(v){
   if(v==="sueldos"){renderSueldos();renderCcssTab();}
   if(v==="informes")applyFilters();
   if(v==="datos")renderStats();
+  aplicarModoLecturaCarga();   // modo lectura: ocultar campos de carga de la vista recién mostrada
 }
 function irAInicio(){
   $("home").style.display="flex";
@@ -2086,7 +2434,7 @@ function applyFilters(){
 
 /* ---- panel de impuestos (estimativo) ---- */
 /* ===== PESTAÑA IMPUESTOS ===== */
-const DEF_ALIC=3, DEF_CC=87.76, DEF_CB=12.24;
+const DEF_ALIC=2.5, DEF_CC=87.76, DEF_CB=12.24;   // meses nuevos arrancan igual que en Google (2,5 / 87,76 / 12,24)
 function datosMes(mes){ // datos cargados a mano para el mes, con defaults
   mes=normMes(mes);
   const d=state.impuestos[mes]||{};
@@ -2164,10 +2512,10 @@ $("t_save").onclick=async ()=>{
 /* Relee la planilla y avisa si hay filas repetidas del mismo mes.
    Solo reporta: no borra nada de la planilla. */
 if($("t_dedup"))$("t_dedup").onclick=async ()=>{
-  showMsg("t_msg","learn","Consultando la planilla…");
+  showMsg("t_msg","learn","Consultando los datos…");
   let j=null;
   try{ j=await apiGet(); }catch(e){ j=null; }
-  if(!j||!j.ok||!j.data){ showMsg("t_msg","learn","No se pudo leer la planilla. Revisá la conexión."); return; }
+  if(!j||!j.ok||!j.data){ showMsg("t_msg","learn","No se pudieron leer los datos. Revisá la conexión."); return; }
   const problemas=[];
   // hojas guardadas por mes: buscamos claves distintas que caen en el mismo YYYY-MM
   const dupPorMes=(obj,nombre)=>{
@@ -2187,8 +2535,8 @@ if($("t_dedup"))$("t_dedup").onclick=async ()=>{
     if(cnt[k]>1){ const p=k.split("|"); problemas.push(`<b>Gastos de informe</b> — ${ymLabel(p[0])}: ${p[1]} · ${p[2]} (${p[3]}) aparece ${cnt[k]} veces`); }
   });
   renderImpuestosTab(); renderAll();
-  if(!problemas.length){ showMsg("t_msg","ok","No se encontraron filas duplicadas en la planilla."); return; }
-  showMsg("t_msg","learn",`Se encontraron ${problemas.length} duplicado(s):<br>• ${problemas.join("<br>• ")}<br><br><i>La app los unifica al leer, pero conviene borrar las filas repetidas en la planilla.</i>`);
+  if(!problemas.length){ showMsg("t_msg","ok","No se encontraron meses duplicados en los datos."); return; }
+  showMsg("t_msg","learn",`Se encontraron ${problemas.length} duplicado(s):<br>• ${problemas.join("<br>• ")}<br><br><i>La app los unifica al leer.</i>`);
 };
 
 function ivaMes(mes){ // calcula componentes de IVA del mes
@@ -2504,7 +2852,7 @@ function enviarDesglosePorEmail(mes,grupos,total,ley,sircreb,ivaCom){
   if(!grupos || !Object.keys(grupos).length){ showMsg("ch_msg","learn","Primero calculá el extracto."); return; }
   // el email de la contadora no está en el código: se guarda en este navegador. Si falta, se pide.
   if(!EMAIL_RX.test(EMAIL_CONTADORA)){
-    const e=prompt("Email de la contadora (se guarda en este navegador, no en el archivo):", EMAIL_CONTADORA||"");
+    const e=prompt("Email de la contadora (se comparte en SharePoint):", EMAIL_CONTADORA||"");
     if(e===null)return;
     if(!guardarEmailContadora(e)){ showMsg("ch_msg","learn","Ese email no es válido. Podés configurarlo también en Datos."); return; }
     if($("d_email"))$("d_email").value=EMAIL_CONTADORA;
@@ -2535,7 +2883,7 @@ $("ch_calc").onclick=()=>{
   const {grupos,detalle,total,ley,sircreb,ivaCom,comisiones,noClasificadas}=parseCheque(texto);
   const claves=Object.keys(grupos);
   if(!claves.length){showMsg("ch_msg","learn","No encontré cargos bancarios en el texto. Verificá que pegaste el extracto completo.");$("ch_result").innerHTML="";return;}
-  showMsg("ch_msg","ok",`Detecté <b>${claves.length}</b> concepto(s). Tocá cada uno para ver las líneas que sumó. Verificá el desglose contra tu planilla antes de guardar.`);
+  showMsg("ch_msg","ok",`Detecté <b>${claves.length}</b> concepto(s). Tocá cada uno para ver las líneas que sumó. Verificá el desglose contra el extracto antes de guardar.`);
   // cada concepto abre/cierra el detalle de las líneas individuales que sumó
   const caret=hay=>hay
     ? `<span class="caret" style="color:var(--gold);margin-right:7px;display:inline-block;width:9px">▸</span>`
@@ -2562,7 +2910,7 @@ $("ch_calc").onclick=()=>{
     </div>
     ${comisPreviewHTML(comisiones, noClasificadas)}
     <div class="row-actions"><button class="btn" id="ch_save">Guardar ${ymLabel($("ch_mes").value)}</button><button class="btn ghost" id="ch_print">🖨 Imprimir desglose</button><button class="btn ghost" id="ch_email">✉ Enviar por email a la contadora</button></div>
-    <small class="note">Al guardar: el impuesto al cheque va al registro de abajo (ahí cargás a mano el cómputo del mes) y las retenciones SIRCREB se cargan como "Retenciones bancarias IIBB" del mes en Impuestos. El desglose completo es informativo, para que lo compares con tu planilla.</small>`;
+    <small class="note">Al guardar: el impuesto al cheque va al registro de abajo (ahí cargás a mano el cómputo del mes) y las retenciones SIRCREB se cargan como "Retenciones bancarias IIBB" del mes en Impuestos. El desglose completo es informativo, para que lo compares con el extracto.</small>`;
   // clic en un concepto: abre/cierra la fila de detalle que va justo abajo
   $("ch_result").querySelectorAll("tr.chrub").forEach(tr=>{
     const det=tr.nextElementSibling;
@@ -3559,7 +3907,7 @@ function drawChequesTabla(){
     cob.forEach(c=>{ h+=filaHTML(c); });
   }
   if(cobOcultos>0){
-    h+=`<tr><td colspan="7" style="padding:8px 10px"><small class="note">${cobOcultos} cheque(s) cobrado(s) hace más de 30 días, ocultos. Elegí “Solo cobrados” en el filtro para verlos (no se borran de la planilla).</small></td></tr>`;
+    h+=`<tr><td colspan="7" style="padding:8px 10px"><small class="note">${cobOcultos} cheque(s) cobrado(s) hace más de 30 días, ocultos. Elegí “Solo cobrados” en el filtro para verlos (no se borran de la base).</small></td></tr>`;
   }
   tb.innerHTML=h;
   tb.querySelectorAll("[data-estch]").forEach(b=>b.onclick=async ()=>{
@@ -3646,13 +3994,13 @@ function rubroDeProveedor(nombre){
 /* ===== GT CARGAS (flete): el gasto neto se reparte por fecha de viaje =====
    El IVA sigue a la factura (mes de emisión, vía IVA Compras). El gasto neto
    se reparte al mes de cada viaje mediante el desglose (PDF de GT Cargas). */
-const GT_CUIT="30716561859";
+let GT_CUIT="";                                      // de config privada (cuitsComision). NO va en el código público.
 const GT_NOMBRE="GT CARGAS";
 const GT_RUBRO="FLETE Y NAFTA";
 // ¿la línea del informe de compras es de GT Cargas? (por CUIT en cualquier campo, o por nombre)
 function esLineaGT(campos, razonUp){
   if(razonUp && /GT\s*CARGAS/.test(razonUp))return true;
-  return campos.some(f=>String(f).replace(/\D/g,"")===GT_CUIT);
+  return !!GT_CUIT && campos.some(f=>String(f).replace(/\D/g,"")===GT_CUIT);   // guard: sin CUIT configurado, no matchea por CUIT
 }
 // número del desglose GT: punto decimal, sin separador de miles (ej. 63000.00). Tolera formato AR.
 function parseGTNum(s){
@@ -3770,8 +4118,8 @@ function parseDiarioVentas(txt){
     const c=ln.split(";");
     if(c.length<11)return;
     const cuits=c.map(x=>x.replace(/\D/g,""));
-    if(cuits.includes(ACA_CUIT)) netoACA+=parseNumAr(c[9]||"");
-    if(cuits.includes(SB_CUIT) || cuits.includes(BR_CUIT)) netoSB +=parseNumAr(c[9]||"");
+    if(ACA_CUIT && cuits.includes(ACA_CUIT)) netoACA+=parseNumAr(c[9]||"");
+    if((SB_CUIT && cuits.includes(SB_CUIT)) || (BR_CUIT && cuits.includes(BR_CUIT))) netoSB +=parseNumAr(c[9]||"");
   });
   return {ivaTotal,neto,netoACA,netoSB};
 }
@@ -3787,13 +4135,14 @@ function parseVentasB(txt){
     if(!razon || /^(Total|NETO|TOTAL|Dia|Est\.|Razon)/i.test(razon))return;
     const n=parseNumAr(c[9]||"");
     neto+=n;
-    if(c.map(x=>x.replace(/\D/g,"")).includes(BR_CUIT)) netoBr+=n;
+    if(BR_CUIT && c.map(x=>x.replace(/\D/g,"")).includes(BR_CUIT)) netoBr+=n;
   });
   return {neto,netoBr};
 }
 /* Imputa la comisión sobre ventas a ACA como GASTO EN NEGRO del mes (upsert por mes).
+   SOLO muta state.gastos; NO persiste (lo hace la transacción del flujo que la llama).
    El % sale de comisionACAPct (config). Devuelve el monto imputado (0 si no hay). */
-async function imputarComisionACA(mes, netoACA){
+function imputarComisionACA(mes, netoACA){
   const m=normMes(mes)||mes;
   const id=`ACA-${String(m).replace("-","")}`;                 // ej. ACA-202607
   const idx=state.gastos.findIndex(g=>g.id===id);
@@ -3801,19 +4150,20 @@ async function imputarComisionACA(mes, netoACA){
   if(comision>0){
     const fecha=ultimoDiaMes(m);
     const g={id,fecha,prov:ACA_NOMBRE,rubro:"GASTOS DE ADMINISTRACIÓN",sub:`Comisión ${comisionACAPct}% ventas ACA`,bn:"negro",monto:comision,iva:0,piva:0,piibb:0};
-    if(idx>=0){ state.gastos[idx]=Object.assign(state.gastos[idx],g); await apiPost({action:"updateGasto",id,fecha,prov:g.prov,rubro:g.rubro,sub:g.sub,bn:g.bn,monto:comision,iva:0,piva:0,piibb:0}); }
-    else { state.gastos.push(g); await apiPost({action:"addGasto",id,fecha,prov:g.prov,rubro:g.rubro,sub:g.sub,bn:g.bn,monto:comision,iva:0,piva:0,piibb:0}); }
+    if(idx>=0){ state.gastos[idx]=Object.assign(state.gastos[idx],g); }
+    else { state.gastos.push(g); }
     return comision;
   } else if(idx>=0){
-    state.gastos.splice(idx,1); await apiPost({action:"deleteGasto",id});   // ese mes ya no factura a ACA
+    state.gastos.splice(idx,1);   // ese mes ya no factura a ACA
   }
   return 0;
 }
 /* Imputa la comisión del 3% de UNA identidad como gasto del mes (upsert por id).
+   SOLO muta state.gastos; NO persiste (lo hace la transacción del flujo que la llama).
    base = neto de esa identidad (NCr ya netadas). bn = "blanco" | "negro". idPref/quien la
    identifican. Cada identidad es un renglón propio (no se suman) para ver duplicados a simple
    vista. Devuelve el monto imputado (0 si no hay). */
-async function imputarComision3(mes, base, idPref, quien, bn){
+function imputarComision3(mes, base, idPref, quien, bn){
   const m=normMes(mes)||mes;
   const id=`${idPref}-${String(m).replace("-","")}`;            // ej. COM3SB-202607 / COM3BR-202607
   const idx=state.gastos.findIndex(g=>g.id===id);
@@ -3822,11 +4172,11 @@ async function imputarComision3(mes, base, idPref, quien, bn){
   if(comision>0){
     const fecha=ultimoDiaMes(m);
     const g={id,fecha,prov:nombre,rubro:"GASTOS DE ADMINISTRACIÓN",sub:`Comisión ${comision3Pct}% ventas`,bn,monto:comision,iva:0,piva:0,piibb:0};
-    if(idx>=0){ state.gastos[idx]=Object.assign(state.gastos[idx],g); await apiPost({action:"updateGasto",id,fecha,prov:g.prov,rubro:g.rubro,sub:g.sub,bn:g.bn,monto:comision,iva:0,piva:0,piibb:0}); }
-    else { state.gastos.push(g); await apiPost({action:"addGasto",id,fecha,prov:g.prov,rubro:g.rubro,sub:g.sub,bn:g.bn,monto:comision,iva:0,piva:0,piibb:0}); }
+    if(idx>=0){ state.gastos[idx]=Object.assign(state.gastos[idx],g); }
+    else { state.gastos.push(g); }
     return comision;
   } else if(idx>=0){
-    state.gastos.splice(idx,1); await apiPost({action:"deleteGasto",id});   // ese mes ya no le factura
+    state.gastos.splice(idx,1);   // ese mes ya no le factura
   }
   return 0;
 }
@@ -4282,43 +4632,21 @@ $("di_guardar").onclick=async ()=>{
   if(diarioTmp.partb)partes.push("Parte B "+money(diarioTmp.partb.neto));
   if(diarioTmp.gt)partes.push("GT Cargas "+money(diarioTmp.gt.total));
   if(!confirm(`Vas a guardar los informes en el mes:\n\n➡ ${ymLabel(mes).toUpperCase()}${yaExiste}\n\n${partes.join(" · ")}\n\n¿Es el mes correcto?`))return;
-  // al guardar compras se reescriben TODOS los rubros del mes: si no se leyó la parte B,
-  // los rubros Tipo B que ya estaban guardados se pierden. Avisamos antes.
-  if(diarioTmp.compras && !diarioTmp.partb){
-    const rubrosB=state.gastosInforme.filter(g=>normMes(g.mes)===mes && g.tipo==="negro");
-    if(rubrosB.length){
-      const totB=rubrosB.reduce((s,g)=>s+(g.monto||0),0);
-      const nRub=new Set(rubrosB.map(g=>g.rubro)).size;
-      if(!confirm(`OJO: ${ymLabel(mes).toUpperCase()} ya tiene Parte B guardada por ${money(totB)} (${rubrosB.length} movimiento(s) en ${nRub} rubro(s)).\n\nComo no leíste el informe de Parte B, eso se va a BORRAR del balance.\n\nSi querés conservarlo, cancelá y pegá también la parte B.\n\n¿Guardar igual?`))return;
-    }
-  }
+  // Protección por sección: solo se reemplaza lo que cargaste ahora. Compras (A, blanco) y Parte B
+  // (negro) son independientes: cargar una NO borra la otra. (Antes se reescribía el mes entero y
+  // cargar solo A borraba la B — y viceversa.)
   const mesPago=mesMasTres(mes);
+  const vb=diarioTmp.ventasb;
   const imp=Object.assign({},dPrev,{
     ivaVentas:ventas.ivaTotal,netoVentas:ventas.neto,
     ivaCompras:compras.ivaTotal,ivaCompNeto:compras.ivaCompNeto,ivaExcluido:compras.ivaExcluido,
     percIVACompras:compras.percIVA,percIIBBCompras:compras.percIIBB,netoCompras:compras.neto,
     retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,retSUSSClientes:ret.suss,mesPagoIVA:mesPago});
-  state.impuestos[mes]=imp;
-  await apiPost({action:"setDiarioIVA",mes,ivaVentas:ventas.ivaTotal,netoVentas:ventas.neto,
-    ivaCompras:compras.ivaTotal,ivaCompNeto:compras.ivaCompNeto,ivaExcluido:compras.ivaExcluido,
-    percIVACompras:compras.percIVA,percIIBBCompras:compras.percIIBB,netoCompras:compras.neto,
-    retIVAClientes:ret.retIVA,retIIBBClientes:ret.retIIBB,retGanancias:ret.retGan,retSUSSClientes:ret.suss,mesPagoIVA:mesPago});
-  // Historial de Ventas: se completa solo desde el informe (Ventas A y/o B). Reemplaza lo leído
-  // en esta carga; preserva lo no leído. Alimenta Balance, IIBB, Resumen anual, Stats y export.
-  const vb=diarioTmp.ventasb;
-  if(v || vb){
-    const prevV=state.ventas[mes]||{};
-    const nv={
-      blanco:    v  ? (v.neto||0)     : (prevV.blanco||0),
-      negro:     vb ? (vb.neto||0)    : (prevV.negro||0),
-      ivaDebito: v  ? (v.ivaTotal||0) : (prevV.ivaDebito||0),
-      retIVA: imp.retIVAClientes||0, retIIBB: imp.retIIBBClientes||0, retGan: imp.retGanancias||0
-    };
-    state.ventas[mes]=nv;
-    renderVentas();
-    await apiPost({action:"addVenta",mes,blanco:nv.blanco,negro:nv.negro,ivaDebito:nv.ivaDebito,retIVA:nv.retIVA,retIIBB:nv.retIIBB,retGan:nv.retGan});
-  }
-  // gastos al balance: una fila por proveedor (el rubro se sigue usando para agrupar)
+  // mes nuevo: sembrar los mismos defaults que Google (2,5 / 87,76 / 12,24), no dejarlos en 0/vacío
+  if(imp.alicIIBB==null) imp.alicIIBB=DEF_ALIC;
+  if(imp.coefCABA==null) imp.coefCABA=DEF_CC;
+  if(imp.coefBsAs==null) imp.coefBsAs=DEF_CB;
+  // gastos al balance: una fila por proveedor (el rubro se sigue usando para agrupar). Cálculo puro (no muta state).
   const items=[]; let sinRubro=0;
   const itemsDeProv=(provNeto,tipo)=>{
     Object.keys(provNeto).forEach(p=>{
@@ -4328,47 +4656,63 @@ $("di_guardar").onclick=async ()=>{
       items.push({rubro:r,prov:capProv(p),monto:provNeto[p],tipo});
     });
   };
-  if(compras.provNeto)itemsDeProv(compras.provNeto,"blanco");
   const pb=diarioTmp.partb;
-  if(pb && pb.provNeto)itemsDeProv(pb.provNeto,"negro");
-  if(items.length || compras.provNeto){
-    state.gastosInforme=state.gastosInforme.filter(g=>normMes(g.mes)!==mes);
-    items.forEach(it=>state.gastosInforme.push({mes,rubro:it.rubro,prov:it.prov,monto:it.monto,tipo:it.tipo}));
-    await apiPost({action:"setGastosInforme",mes,items:JSON.stringify(items)});
-  }
-  // Comisión sobre ventas a ACA: gasto NEGRO del mes (cálculo interno, no aparece en IVA Ventas).
-  // Solo si se leyó el informe de ventas en esta carga (v). Upsert por mes (no duplica).
-  let acaMsg="";
-  if(v){
-    const com=await imputarComisionACA(mes, v.netoACA||0);
-    if(com>0)acaMsg=` Comisión ACA (${comisionACAPct}%): ${money(com)} como gasto negro.`;
-  }
-  // Comisión 3% (cálculo interno, no aparece en las ventas): ambas van como gasto NEGRO (igual que
-  // ACA). Sentida Botánica: base = neto en blanco (Ventas A). Brenchio, Carla: base = neto en negro
-  // (Ventas B). Renglones separados para ver duplicados entre el lado negro y el blanco.
-  let com3Msg="";
-  if(v){
-    const cSB=await imputarComision3(mes, v.netoSB||0, "COM3SB", "SENTIDA BOTANICA", "negro");
-    if(cSB>0)com3Msg+=` Comisión Sentida Botánica (${comision3Pct}%): ${money(cSB)}.`;
-  }
-  if(vb){
-    const cBR=await imputarComision3(mes, vb.netoBr||0, "COM3BR", "BRENCHIO", "negro");
-    if(cBR>0)com3Msg+=` Comisión Brenchio (${comision3Pct}%): ${money(cBR)}.`;
-  }
-  if(v||vb)renderGastos();
-  // GT Cargas: guardamos el desglose de ESTA factura, keyed por N° de comprobante
-  // (reemplaza el mismo comprobante; dos facturas distintas del mismo mes no se pisan).
-  let gtMsg="";
+  const loadedA=!!compras.provNeto;              // cargué Compras A (blanco) en ESTA carga
+  const loadedB=!!(pb && pb.provNeto);           // cargué Parte B (negro) en ESTA carga
+  if(loadedA)itemsDeProv(compras.provNeto,"blanco");
+  if(loadedB)itemsDeProv(pb.provNeto,"negro");
+  // GT Cargas: desglose de ESTA factura (keyed por N° de comprobante). Validamos el comprobante acá.
+  let gtMsg="", gtObj=null, gtComp="";
   if(diarioTmp.gt){
-    const comp=(diarioTmp.gt.comprobante||"").trim();
-    if(!comp){
-      gtMsg=" El desglose GT no se guardó: falta el N° de comprobante.";
-    } else {
-      const gt={comprobante:comp,facturaMes:mes,total:diarioTmp.gt.total,porMes:diarioTmp.gt.porMes};
-      state.gtCargas[comp]=gt;
-      await apiPost({action:"setGTCargas",comprobante:comp,facturaMes:mes,data:JSON.stringify(gt)});
-    }
+    gtComp=(diarioTmp.gt.comprobante||"").trim();
+    if(!gtComp){ gtMsg=" El desglose GT no se guardó: falta el N° de comprobante."; }
+    else { gtObj={comprobante:gtComp,facturaMes:mes,total:diarioTmp.gt.total,porMes:diarioTmp.gt.porMes}; }
   }
+  // tablas que toca este guardado → una sola transacción con rollback (todo o nada)
+  const tablas=["impuestos"];
+  if(v||vb) tablas.push("ventas","gastos");
+  if(loadedA||loadedB) tablas.push("gastosInforme");
+  if(gtObj) tablas.push("gtCargas");
+  let acaMsg="", com3Msg="";
+  const aplicar=()=>{
+    state.impuestos[mes]=imp;
+    // Historial de Ventas: se completa solo desde el informe (Ventas A y/o B). Reemplaza lo leído
+    // en esta carga; preserva lo no leído. Alimenta Balance, IIBB, Resumen anual, Stats y export.
+    if(v || vb){
+      const prevV=state.ventas[mes]||{};
+      state.ventas[mes]={
+        blanco:    v  ? (v.neto||0)     : (prevV.blanco||0),
+        negro:     vb ? (vb.neto||0)    : (prevV.negro||0),
+        ivaDebito: v  ? (v.ivaTotal||0) : (prevV.ivaDebito||0),
+        retIVA: imp.retIVAClientes||0, retIIBB: imp.retIIBBClientes||0, retGan: imp.retGanancias||0
+      };
+    }
+    // Reemplazo POR SECCIÓN: borra del mes solo el tipo que cargaste (A=blanco / B=negro) y deja el otro intacto.
+    if(loadedA||loadedB){
+      state.gastosInforme=state.gastosInforme.filter(g=>{
+        if(normMes(g.mes)!==mes) return true;                 // otro mes: no se toca
+        if(g.tipo==="negro") return !loadedB;                 // B: se borra solo si cargué B
+        return !loadedA;                                      // A (blanco): se borra solo si cargué A
+      });
+      items.forEach(it=>state.gastosInforme.push({mes,rubro:it.rubro,prov:it.prov,monto:it.monto,tipo:it.tipo}));
+    }
+    // Comisiones (cálculo interno, no aparecen en IVA Ventas): solo mutan state.gastos. Upsert por mes.
+    // ACA y Sentida Botánica necesitan Ventas A (v); Brenchio necesita Ventas B (vb). Renglones separados.
+    if(v){
+      const com=imputarComisionACA(mes, v.netoACA||0);
+      if(com>0)acaMsg=` Comisión ACA (${comisionACAPct}%): ${money(com)} como gasto negro.`;
+      const cSB=imputarComision3(mes, v.netoSB||0, "COM3SB", "SENTIDA BOTANICA", "negro");
+      if(cSB>0)com3Msg+=` Comisión Sentida Botánica (${comision3Pct}%): ${money(cSB)}.`;
+    }
+    if(vb){
+      const cBR=imputarComision3(mes, vb.netoBr||0, "COM3BR", "BRENCHIO", "negro");
+      if(cBR>0)com3Msg+=` Comisión Brenchio (${comision3Pct}%): ${money(cBR)}.`;
+    }
+    if(gtObj) state.gtCargas[gtComp]=gtObj;
+  };
+  const ok=await apiTx(tablas, aplicar);
+  if(!ok){ showMsg("di_msg","err","No se pudo guardar. Quedó todo como antes; revisá la conexión y reintentá (no se cargó nada a medias)."); return; }
+  renderVentas(); renderGastos();
   diarioTmp={compras:null,ventas:null,ventasb:null,ret:null,partb:null,gt:null};
   renderDiarioIVA();
   let msg=`Informes de ${ymLabel(mes)} guardados. El IVA se paga en ${ymLabel(mesPago)}.`;
@@ -4696,11 +5040,23 @@ if($("i_print"))$("i_print").onclick=()=>{
 
 /* ---- datos: recargar / export ---- */
 /* ---- URL de la planilla: se pega una vez y queda en este navegador ---- */
-function pintarApiUrl(){
-  const i=$("d_api"); if(i)i.value=API||"";
+function pintarApiUrl(){   // pinta el estado de la sesión M365 + campos de config
+  const s=$("d_sesion");
+  if(s){
+    if(SESION.ok){
+      const modo = esWriter() ? '<b style="color:var(--green)">escritura</b>' : '<b style="color:var(--gold)">solo lectura</b>';
+      s.innerHTML = `Conectado como <b>${(SESION.cuenta&&SESION.cuenta.name)||"—"}</b> · modo ${modo}<br><span class="mono" style="color:var(--faint);font-size:11px">oid ${SESION.oid} · carpeta /${M365.carpeta}/</span>`;
+    } else { s.textContent = "Sin sesión."; }
+  }
+  const imp=$("d_import"); if(imp)imp.hidden = !esWriter();
   const e=$("d_email"); if(e)e.value=EMAIL_CONTADORA||"";
   const a=$("d_aca_pct"); if(a)a.value=comisionACAPct;
   const c3=$("d_com3_pct"); if(c3)c3.value=comision3Pct;
+  const fc=d=>{ d=String(d||"").replace(/\D/g,""); return d.length===11?`${d.slice(0,2)}-${d.slice(2,10)}-${d.slice(10)}`:d; };
+  const qa=$("d_cuit_aca"); if(qa)qa.value=fc(ACA_CUIT);
+  const qs=$("d_cuit_sb");  if(qs)qs.value=fc(SB_CUIT);
+  const qb=$("d_cuit_br");  if(qb)qb.value=fc(BR_CUIT);
+  const qg=$("d_cuit_gt");  if(qg)qg.value=fc(GT_CUIT);
 }
 if($("d_aca_save"))$("d_aca_save").onclick=()=>{
   const p=parseFloat(String($("d_aca_pct").value).replace(",",".").trim());
@@ -4715,6 +5071,16 @@ if($("d_com3_save"))$("d_com3_save").onclick=()=>{
   comision3Pct=p;
   apiPost({action:"setConfig", clave:"comision3", valor:JSON.stringify(comision3Pct)});
   showMsg("d_com3_msg","ok",`Comisión guardada: ${p}%. Rige al volver a leer los informes de ventas de cada mes.`);
+};
+if($("d_cuit_save"))$("d_cuit_save").onclick=async ()=>{
+  const sd=id=>String($(id).value||"").replace(/\D/g,"");
+  const aca=sd("d_cuit_aca"), sb=sd("d_cuit_sb"), br=sd("d_cuit_br"), gt=sd("d_cuit_gt");
+  const malo=[["ACA",aca],["Sentida Botánica",sb],["Brenchio",br],["GT Cargas",gt]].filter(([n,v])=>v&&v.length!==11).map(([n])=>n);
+  if(malo.length){ showMsg("d_cuit_msg","learn","CUIT inválido (deben tener 11 dígitos): "+malo.join(", ")); return; }
+  ACA_CUIT=aca; SB_CUIT=sb; BR_CUIT=br; GT_CUIT=gt;
+  const ok=await apiPost({action:"setConfig", clave:"cuitsComision", valor:JSON.stringify({aca,sb,br,gt})});
+  showMsg("d_cuit_msg", ok?"ok":"learn", ok?"CUIT guardados en SharePoint (compartido). Rigen al volver a leer los informes.":"No se pudieron guardar (¿modo lectura o sin conexión?).");
+  pintarApiUrl();
 };
 /* ---- tabla de reparto de gastos en cuotas (editable, en localStorage) ---- */
 function refrescarPorReparto(){
@@ -4753,38 +5119,62 @@ function renderReparto(){
 if($("d_reparto_add"))$("d_reparto_add").onclick=()=>{
   repartoProv.push({prov:"",cuotas:3,desde:"factura"}); guardarReparto(); renderReparto();
 };
-if($("d_email_save"))$("d_email_save").onclick=()=>{
+if($("d_email_save"))$("d_email_save").onclick=async ()=>{
   if(!guardarEmailContadora($("d_email").value)){ showMsg("d_email_msg","learn","Ese email no parece válido. Ej: nombre@dominio.com"); return; }
   $("d_email").value=EMAIL_CONTADORA;
-  showMsg("d_email_msg","ok","Email guardado en este navegador.");
+  const ok=await apiPost({action:"setConfig", clave:"emailContadora", valor:EMAIL_CONTADORA});   // compartido en la config de SharePoint
+  showMsg("d_email_msg", ok?"ok":"learn", ok?"Email guardado (compartido en SharePoint).":"Guardado solo en este navegador (no se pudo compartir: ¿modo lectura?).");
 };
 if($("d_email_clear"))$("d_email_clear").onclick=()=>{
   olvidarEmailContadora(); if($("d_email"))$("d_email").value="";
   showMsg("d_email_msg","ok","Email borrado de este navegador.");
 };
-$("d_api_save").onclick=async ()=>{
-  const u=$("d_api").value;
-  if(!guardarApiUrl(u)){
-    showMsg("d_api_msg","learn","Esa no parece una URL válida. Tiene que ser la de <b>Implementar → Nueva implementación</b> y terminar en <b>/exec</b>.");
-    return;
-  }
-  showMsg("d_api_msg","ok","URL guardada en este navegador. Conectando…");
-  setSync("busy","conectando…");
-  const j=await apiGet();
-  if(j&&j.ok){ setSync("ok"); fillSubs(); renderAll(); showMsg("d_api_msg","ok",`Conectada. ${state.gastos.length} gastos y ${Object.keys(state.ventas).length} meses de ventas.`); }
-  else { const mot=j&&j.error?j.error:"sin respuesta"; setSync("err","sin conexión",mot); showMsg("d_api_msg","learn",`Se guardó la URL, pero no respondió tras 3 intentos. Motivo: <b>${mot}</b>. Revisá que la implementación esté activa y con acceso para cualquiera.`); }
+if($("d_logout"))$("d_logout").onclick=()=>{ if(confirm("¿Cerrar sesión de Microsoft en esta computadora?")) cerrarSesion(); };
+if($("d_import"))$("d_import").onclick=async ()=>{
+  if(!esWriter()){ showMsg("d_api_msg","learn","Solo la cuenta con permiso de escritura puede importar."); return; }
+  const execUrl=(prompt("Pegá la URL /exec del Apps Script de Google (solo se usa esta vez para traer los datos):","")||"").trim();
+  if(!execUrl) return;
+  if(DBINIT && !confirm("Ya hay datos en SharePoint (/"+M365.carpeta+"/). La importación los REEMPLAZA. ¿Seguir?")) return;
+  showMsg("d_api_msg","ok","Importando desde Google… no cierres la pestaña.");
+  setSync("busy","importando…");
+  try{
+    const c=await importarDesdeGoogle(execUrl);
+    const resumen=Object.keys(c).map(t=>`${t}: ${c[t]}`).join(" · ");
+    const j=await apiGet(); if(j&&j.ok){ fillSubs(); renderAll(); }
+    setSync("ok");
+    showMsg("d_api_msg","ok",`Importación lista. ${resumen}`);
+  }catch(e){ setSync("err","falló la importación", e.message||String(e)); showMsg("d_api_msg","learn","No se pudo importar: "+(e.message||e)); }
 };
-$("d_api_clear").onclick=()=>{
-  if(!confirm("¿Borrar la URL guardada en este navegador?\n\nLa app deja de conectarse hasta que la pegues de nuevo. Tus datos en la planilla no se tocan."))return;
-  olvidarApiUrl(); pintarApiUrl(); setSync("err","sin configurar"); renderStats();
-  showMsg("d_api_msg","ok","URL borrada de este navegador.");
+if($("d_comparar"))$("d_comparar").onclick=async ()=>{
+  const execUrl=(prompt("Pegá la URL /exec del Apps Script de Google (solo lectura, para comparar):","")||"").trim();
+  if(!execUrl) return;
+  const box=$("d_comparar_res"); box.innerHTML="Comparando…"; setSync("busy","comparando…");
+  try{
+    const filas=await compararConGoogle(execUrl);
+    const todoOk=filas.every(f=>f.ok);
+    let h=`<table style="max-width:760px"><tbody><tr><th class="l">Tabla</th><th class="num">Google</th><th>Resultado</th></tr>`;
+    filas.forEach(f=>{
+      h+=`<tr><td class="l">${f.t}</td><td class="num">${f.n}</td><td>${f.ok?'<b style="color:var(--green)">IDÉNTICOS</b>':'<b style="color:var(--red)">DIFIERE</b>'}</td></tr>`;
+      if(!f.ok) h+=`<tr><td colspan="3" style="background:var(--paper2);font-size:11px;padding:8px 10px"><div class="mono">${f.difs.map(d=>String(d).replace(/</g,"&lt;")).join("<br>")}</div></td></tr>`;
+    });
+    h+=`</tbody></table>`;
+    const julNeg=totalGastosMes("2026-07","negro"); const esperado=9733842.22; const okNum=Math.abs(julNeg-esperado)<0.5;   // incluye comisión ACA 4% ($521.673,60), sumada después del control viejo (9.212.168,62)
+    h+=`<div class="sectlabel" style="margin-top:16px">Números de control (sobre los datos de SharePoint)</div>
+      <table style="max-width:640px"><tbody>
+      <tr><td class="l">TOTAL GASTOS negro — julio 2026</td><td class="num">${money(julNeg)}</td><td>${okNum?'<b style="color:var(--green)">OK</b>':`<b style="color:var(--red)">esperado ${money(esperado)}</b>`}</td></tr>
+      </tbody></table>`;
+    box.innerHTML=h;
+    setSync("ok");
+    showMsg("d_api_msg", (todoOk&&okNum)?"ok":"learn", (todoOk&&okNum)?"Todo IDÉNTICO y el número de control coincide.":"Hay diferencias — revisá el detalle de arriba.");
+  }catch(e){ box.innerHTML=""; setSync("err","falló la comparación", e.message||String(e)); showMsg("d_api_msg","learn","No se pudo comparar: "+(e.message||e)); }
 };
 $("d_reload").onclick=async ()=>{
-  showMsg("d_msg","ok","Recargando desde la planilla…");
+  showMsg("d_msg","ok","Recargando desde SharePoint…");
   setSync("busy","conectando…");
   const j=await apiGet();
   if(j&&j.ok){ setSync("ok"); fillSubs(); renderAll(); showMsg("d_msg","ok",`Recargado: ${state.gastos.length} gastos, ${Object.keys(state.ventas).length} meses de ventas.`); }
-  else { const mot=j&&j.error?j.error:"sin respuesta"; setSync("err","sin conexión",mot); showMsg("d_msg","learn",`No se pudo conectar con la planilla tras 3 intentos. Motivo: <b>${mot}</b>. Revisá la URL (API) y tu conexión.`); }
+  else if(j&&j.noInicializada){ setSync("err","base no inicializada"); showMsg("d_msg","learn",`La carpeta /${M365.carpeta}/ está vacía (todavía no se importaron los datos).`); }
+  else { const mot=j&&j.error?j.error:"sin respuesta"; setSync("err","sin conexión",mot); showMsg("d_msg","learn",`No se pudo leer de SharePoint. Motivo: <b>${mot}</b>. Probá recargar la página o revisá tu conexión.`); }
 };
 $("d_xlsx").onclick=()=>{
   if(!state.gastos.length&&!Object.keys(state.ventas).length){alert("No hay datos para exportar.");return;}
@@ -4815,7 +5205,7 @@ function renderStats(){
     <tr><td class="l">Período</td><td class="num">${meses.length?ymLabel(meses[0])+" – "+ymLabel(meses[meses.length-1]):"—"}</td></tr>
     <tr><td class="l">Total gastos histórico</td><td class="num">${money0(tg)}</td></tr>
     <tr><td class="l">Total ventas histórico</td><td class="num">${money0(tv)}</td></tr>`;
-  $("d_conn").textContent=apiConfigurada()?"Conectada a tu planilla de Google.":"⚠ Falta pegar la URL de la planilla (más arriba, en “Conexión con la planilla”).";
+  $("d_conn").textContent=SESION.ok?("Conectado a SharePoint (sitio BalanceEG, carpeta /"+M365.carpeta+"/). "+(esWriter()?"Modo escritura.":"Modo solo lectura.")):"⚠ Sin sesión de Microsoft.";
 }
 
 /* Panorama de carga de un mes (pantalla de inicio).
@@ -4870,24 +5260,143 @@ function renderHomeEstado(preferido){
 }
 function renderAll(){ renderGastos(); renderVentas(); renderBalance(); renderStats(); renderHomeEstado(); renderReparto(); renderProvRules(); renderSubProv(); }
 
-/* ---- boot ---- */
+/* ---- boot (Microsoft 365) ---- */
 initSelects();
 updateFlag();
-pintarApiUrl();
+function bannerSoloLectura(){
+  document.body.classList.add("solo-lectura");   // oculta por CSS los botones de alta/edición/borrado
+  if(document.getElementById("ro_banner"))return;
+  const b=document.createElement("div"); b.id="ro_banner";
+  b.style.cssText="position:fixed;top:0;left:0;right:0;z-index:2000;background:var(--gold);color:#fff;text-align:center;font-size:13px;font-weight:600;padding:5px 10px";
+  b.textContent="Modo solo lectura — podés mirar e imprimir, pero no se guardan cambios.";
+  document.body.appendChild(b); _ajustarPadBanners();
+}
+/* En modo lectura, oculta los CAMPOS de carga (no solo los botones) para que el lector no escriba
+   creyendo que se guarda. Se mantienen: filtros de mes/vista, buscadores y los campos de solo lectura
+   (displays). Corre tras cada cambio de vista (irA) porque algunas tablas regeneran inputs editables. */
+const _FILTROS_LECTURA=new Set(["b_mes","t_mes","di_mes","ch_mes","sv_mes","su_mes","cc_mes","r_anio1","r_anio2","he_mes","g_filtprov","g_filtrubro","i_rubro","i_prov","i_bn","i_desde","i_hasta","che_rango","che_filtro"]);
+function aplicarModoLecturaCarga(){
+  if(!document.body.classList.contains("solo-lectura"))return;
+  document.querySelectorAll("#content input, #content textarea, #content select").forEach(el=>{
+    if(_FILTROS_LECTURA.has(el.id)) return;              // filtros de mes/vista y buscadores: se mantienen
+    if(el.readOnly || el.type==="hidden") return;        // displays de solo lectura: se mantienen visibles
+    if(el.closest("[id$='_overlay']")) return;           // modales: sus disparadores ya están ocultos
+    const wrap=el.closest(".f")||el; wrap.style.display="none";   // oculta el campo de carga (label + input)
+  });
+}
+/* ---- CHEQUEO DE CONSISTENCIA al abrir: sueldos cuyo gasto derivado (gastoIdA/B) ya no existe ----
+   Solo detecta y avisa; NO escribe al abrir. La reparación es manual (botón) y nunca borra huérfanos. */
+function _ajustarPadBanners(){
+  let h=0; const ro=document.getElementById("ro_banner"), cc=document.getElementById("cc_banner");
+  if(ro)h+=26; if(cc)h+=30; document.body.style.paddingTop=h?h+"px":"";
+}
+function chequearConsistencia(){
+  const ids=new Set(state.gastos.map(g=>g.id));
+  const faltan=[];
+  state.sueldos.forEach(s=>{
+    if(s.gastoIdA && !ids.has(s.gastoIdA)){
+      const monto = s.tipo==="ccss" ? (s.monto||0) : totA(s);
+      faltan.push({sueldo:s, lado:"A", id:s.gastoIdA, monto, sub:(s.tipo==="ccss"?s.nombre:"Sueldos"), bn:"blanco"});
+    }
+    if(s.gastoIdB && !ids.has(s.gastoIdB)){
+      faltan.push({sueldo:s, lado:"B", id:s.gastoIdB, monto:totB(s), sub:"Sueldos", bn:"negro"});
+    }
+  });
+  return faltan;
+}
+/* Aplica las elecciones del reparador en UNA transacción (gastos + sueldos):
+   - quitarIds: ids de sueldos sobrantes → se eliminan junto con sus gastos derivados que aún existan.
+   - recrearItems: vínculos a recrear → se vuelve a crear el gasto con su mismo id (si el sueldo no fue quitado). */
+async function aplicarReparaciones(recrearItems, quitarIds){
+  return await apiTx(["gastos","sueldos"], ()=>{
+    quitarIds.forEach(id=>{
+      const s=state.sueldos.find(x=>x.id===id); if(!s)return;
+      [s.gastoIdA,s.gastoIdB].forEach(gid=>{ if(gid) state.gastos=state.gastos.filter(g=>g.id!==gid); });   // borra sus derivados que queden
+      state.sueldos=state.sueldos.filter(x=>x.id!==id);                                                     // quita el registro sobrante
+    });
+    recrearItems.forEach(f=>{
+      const s=f.sueldo; if(quitarIds.includes(s.id))return;   // si el sueldo se quitó, no recrear
+      const fecha=(normMes(s.mes)||s.mes)+"-01";
+      if(f.monto>0){ if(!state.gastos.some(g=>g.id===f.id)) state.gastos.push({id:f.id,fecha,prov:s.nombre,rubro:"CCSS, SIND Y SUELDOS",sub:f.sub,monto:f.monto,bn:f.bn,iva:0,piva:0,piibb:0}); }
+      else { if(f.lado==="A")s.gastoIdA=""; else s.gastoIdB=""; }   // importe 0: limpiar vínculo colgado
+    });
+  });
+}
+function abrirReparador(faltan, banner){
+  if(document.getElementById("cc_overlay"))return;
+  const ov=document.createElement("div"); ov.id="cc_overlay";
+  ov.style.cssText="position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px";
+  const card=document.createElement("div");
+  card.style.cssText="background:var(--card,#fff);color:var(--fg,#222);max-width:680px;width:100%;max-height:85vh;overflow:auto;border-radius:12px;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.35)";
+  const head=document.createElement("div");
+  head.innerHTML='<h3 style="margin:0 0 6px">Reparar vínculos de sueldos</h3><p style="font-size:13px;opacity:.8;margin:0 0 8px"><b>Recrear</b>: vuelve a crear el gasto que falta (si el sueldo es correcto). <b>Quitar</b>: elimina el registro de sueldo sobrante (y los gastos derivados que le queden). <b>No tocar</b>: lo deja igual.</p>';
+  card.appendChild(head);
+  const selects=[];
+  faltan.forEach(f=>{
+    const row=document.createElement("div");
+    row.style.cssText="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid rgba(128,128,128,.25)";
+    const info=document.createElement("span"); info.style.cssText="font-size:13px";
+    info.textContent=`${(f.sueldo.nombre||"(sin nombre)")} · ${ymLabel(f.sueldo.mes)} · ${f.bn} · ${f.monto>0?money(f.monto):"importe 0"}`;
+    const sel=document.createElement("select"); sel.style.cssText="font-size:13px;padding:3px 6px";
+    sel.innerHTML='<option value="no">No tocar</option><option value="recrear">Recrear el gasto</option><option value="quitar">Quitar el registro de sueldo</option>';
+    selects.push(sel); row.appendChild(info); row.appendChild(sel); card.appendChild(row);
+  });
+  const acts=document.createElement("div"); acts.style.cssText="display:flex;gap:10px;justify-content:flex-end;margin-top:16px";
+  const cancel=document.createElement("button"); cancel.textContent="Cancelar"; cancel.className="btn ghost sm"; cancel.onclick=()=>ov.remove();
+  const aplicar=document.createElement("button"); aplicar.textContent="Aplicar"; aplicar.className="btn gold sm";
+  aplicar.onclick=async ()=>{
+    const recrearItems=[], quitarIds=[];
+    faltan.forEach((f,i)=>{ const v=selects[i].value; if(v==="recrear")recrearItems.push(f); else if(v==="quitar" && !quitarIds.includes(f.sueldo.id))quitarIds.push(f.sueldo.id); });
+    if(!recrearItems.length && !quitarIds.length){ ov.remove(); return; }
+    const resumen=[];
+    recrearItems.forEach(f=>{ if(!quitarIds.includes(f.sueldo.id))resumen.push(`Recrear: ${f.sueldo.nombre||"(sin nombre)"} · ${ymLabel(f.sueldo.mes)} · ${f.bn} · ${money(f.monto)}`); });
+    quitarIds.forEach(id=>{ const s=state.sueldos.find(x=>x.id===id); if(s)resumen.push(`Quitar registro: ${s.nombre||"(sin nombre)"} · ${ymLabel(s.mes)}`); });
+    if(!confirm("Vas a aplicar:\n\n• "+resumen.join("\n• ")+"\n\n¿Confirmás?"))return;
+    aplicar.disabled=true; cancel.disabled=true; aplicar.textContent="Aplicando…";
+    const ok=await aplicarReparaciones(recrearItems, quitarIds);
+    if(!ok){ aplicar.disabled=false; cancel.disabled=false; aplicar.textContent="Aplicar"; return; }   // apiTx mostró el error; quedó como antes
+    ov.remove(); renderAll(); setSync("ok");
+    const resto=chequearConsistencia(); banner.remove(); _ajustarPadBanners();   // re-evaluar; si quedan, rehacer el banner
+    if(resto.length) bannerConsistencia(resto);
+  };
+  acts.appendChild(cancel); acts.appendChild(aplicar); card.appendChild(acts);
+  ov.appendChild(card); document.body.appendChild(ov);
+}
+function bannerConsistencia(faltan){
+  if(document.getElementById("cc_banner"))return;
+  const b=document.createElement("div"); b.id="cc_banner";
+  b.style.cssText="position:fixed;left:0;right:0;z-index:2001;background:#b45309;color:#fff;text-align:center;font-size:13px;font-weight:600;padding:6px 10px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap";
+  b.style.top=document.getElementById("ro_banner")?"26px":"0";
+  const txt=document.createElement("span");
+  txt.textContent=`Faltan ${faltan.length} gasto(s) derivado(s) de sueldos: no están sumando al balance.`;
+  b.appendChild(txt);
+  if(esWriter()){
+    const btn=document.createElement("button");
+    btn.textContent="Revisar y reparar"; btn.style.cssText="background:#fff;color:#b45309;border:0;border-radius:6px;padding:3px 12px;font-weight:700;cursor:pointer";
+    btn.onclick=()=>abrirReparador(faltan, b);
+    b.appendChild(btn);
+  } else {
+    const info=document.createElement("span"); info.textContent="Pedile a Raquel que los repare."; b.appendChild(info);
+  }
+  document.body.appendChild(b); _ajustarPadBanners();
+}
 (async function(){
-  if(!apiConfigurada()){ setSync("err","sin configurar"); renderAll();
-    irA("datos");
-    showMsg("d_api_msg","learn","Pegá acá la URL de tu planilla (la que termina en <b>/exec</b>). Se guarda solo en este navegador, no en el archivo."); return; }
+  setSync("busy","iniciando sesión…");
+  const ok=await iniciarSesion();
+  pintarApiUrl();
+  if(!ok){ setSync("err","sin sesión", SESION.error); renderAll(); irA("datos");
+    showMsg("d_api_msg","learn","No pude iniciar sesión de Microsoft. "+(SESION.error||"")+" Probá recargar la página."); return; }
+  if(!esWriter()) bannerSoloLectura();
   setSync("busy","conectando…");
   const j=await apiGet();
-  if(j&&j.ok){ setSync("ok"); fillSubs(); renderAll(); }
-  else {
-    const mot=j&&j.error?j.error:"sin respuesta";
-    setSync("err","sin conexión",mot); renderAll();
-    console.warn("apiGet falló tras 3 intentos:",mot);
-    irA("datos");
-    showMsg("d_api_msg","learn",`No pude conectar con la planilla (3 intentos). Motivo: <b>${mot}</b>. Apretá "Recargar desde la planilla" para reintentar, o revisá la URL y que la implementación esté activa y pública.`);
-  }
+  if(j&&j.ok){ setSync("ok"); fillSubs(); renderAll(); aplicarModoLecturaCarga(); const faltan=chequearConsistencia(); if(faltan.length) bannerConsistencia(faltan); }
+  else if(j&&j.noInicializada){ setSync("err","base no inicializada"); renderAll(); irA("datos");
+    showMsg("d_api_msg","learn", esWriter()
+      ? `La carpeta /${M365.carpeta}/ está vacía. Importá los datos una vez con el botón <b>"Importar desde Google (una vez)"</b> acá arriba.`
+      : `La base todavía no está cargada en SharePoint. Pedile a Raquel que haga la importación.`); }
+  else { const mot=j&&j.error?j.error:"sin respuesta"; setSync("err","sin conexión",mot); renderAll(); irA("datos");
+    console.warn("apiGet falló:",mot);
+    showMsg("d_api_msg","learn",`No pude leer los datos. Motivo: <b>${mot}</b>. Probá "Recargar desde SharePoint".`); }
 })();
 
 </script>
