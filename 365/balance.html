@@ -245,6 +245,38 @@ small.note{color:var(--faint);font-size:12px;font-style:italic;font-family:'Spec
 .estado-btn{font-family:inherit;font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid var(--edge);cursor:pointer;transition:.15s}
 .estado-btn.pend{background:#c47f1a;color:#fff;border-color:#c47f1a}
 .estado-btn.pagado{background:var(--paper2);color:var(--ink2);border-color:var(--edge)}
+/* ---- MODO SOLO LECTURA (lectores, ej. Alejandro): oculta TODO botón de alta/edición/borrado.
+   Se deja visible lo de lectura: navegación, filtros, imprimir, exportar y recargar. ---- */
+body.solo-lectura #g_add, body.solo-lectura #g_clear, body.solo-lectura #g_subadd,
+body.solo-lectura #ed_save,
+body.solo-lectura #t_save, body.solo-lectura #t_dedup, body.solo-lectura #pi_add,
+body.solo-lectura #di_calc_compras, body.solo-lectura #di_calc_ventas, body.solo-lectura #di_calc_ret,
+body.solo-lectura #di_calc_gt, body.solo-lectura #di_calc_partb, body.solo-lectura #di_calc_ventasb,
+body.solo-lectura #di_reset_compras, body.solo-lectura #di_reset_ventas, body.solo-lectura #di_reset_ret,
+body.solo-lectura #di_reset_gt, body.solo-lectura #di_reset_partb, body.solo-lectura #di_reset_ventasb,
+body.solo-lectura #di_guardar, body.solo-lectura #di_exclu_add,
+body.solo-lectura #ch_calc, body.solo-lectura #ch_clear, body.solo-lectura #ch_reset_extracto,
+body.solo-lectura #ch_save, body.solo-lectura #chm_add, body.solo-lectura #chm_save,
+body.solo-lectura #che_add, body.solo-lectura #che_calc, body.solo-lectura #che_clear,
+body.solo-lectura #sv_add, body.solo-lectura #sv_limpiar, body.solo-lectura #eds_save,
+body.solo-lectura #su_addccss, body.solo-lectura #su_addemp, body.solo-lectura #su_seed,
+body.solo-lectura #su_limpiar, body.solo-lectura #succ_save, body.solo-lectura #sum_save,
+body.solo-lectura #cc_addlinea, body.solo-lectura #cc_oficial_save, body.solo-lectura #cc_params_save,
+body.solo-lectura #d_aca_save, body.solo-lectura #d_com3_save, body.solo-lectura #d_cuit_save,
+body.solo-lectura #d_email_save, body.solo-lectura #d_email_clear, body.solo-lectura #d_prov_add,
+body.solo-lectura #d_reparto_add, body.solo-lectura #d_subprov_add, body.solo-lectura #d_comparar,
+body.solo-lectura #d_import,
+body.solo-lectura .del,
+body.solo-lectura [data-toggle], body.solo-lectura [data-edit], body.solo-lectura [data-del],
+body.solo-lectura [data-dels], body.solo-lectura [data-delche], body.solo-lectura [data-delch],
+body.solo-lectura [data-delcc], body.solo-lectura [data-delpi], body.solo-lectura [data-delsu],
+body.solo-lectura [data-edch], body.solo-lectura [data-edcc], body.solo-lectura [data-edsu],
+body.solo-lectura [data-eds], body.solo-lectura [data-pag], body.solo-lectura [data-estch],
+body.solo-lectura [data-ccreg], body.solo-lectura [data-rep], body.solo-lectura [data-repdel],
+body.solo-lectura [data-provrule], body.solo-lectura [data-provrubro], body.solo-lectura [data-provrubrob],
+body.solo-lectura [data-provdel], body.solo-lectura [data-subprovedit], body.solo-lectura [data-subprovdel]
+{ display:none !important; }
+body.solo-lectura #gasto_form_wrap{ display:none !important; }   /* formulario de alta de gastos completo */
 </style>
 </head>
 <body>
@@ -1113,7 +1145,8 @@ const M365 = {
   carpeta:"datos-prueba",                 // PRUEBA. En producción se cambia a "datos".
   scopes:["User.Read","Sites.ReadWrite.All","Files.ReadWrite.All"],
   graph:"https://graph.microsoft.com/v1.0",
-  writers:["0929d1c5-7ef7-4203-bc41-1289e1918cb8"]   // Object IDs (GUID) con permiso de escritura (Raquel).
+  writers:["0929d1c5-7ef7-4203-bc41-1289e1918cb8"],  // Object IDs (GUID) con permiso de escritura (Raquel).
+  lectores:["2b22fd5f-ca1d-4cd9-887f-1e5f65cb09e9"]  // lectores conocidos (solo lectura): Alejandro. El acceso real lo gobierna SharePoint.
 };
 const MAX_BACKUPS = 20;   // respaldos por tabla (rotativos)
 const TABLAS = ["gastos","ventas","proveedores","subcategorias","impuestos","cheque","servicios","chequesEmit","sueldos","gastosInforme","gtCargas","config"];
@@ -1132,10 +1165,20 @@ function msalApp(){
   });
   return _pca;
 }
+// ¿el error de MSAL es porque el navegador bloqueó el popup? → entonces usamos redirección
+function _popupBloqueado(e){
+  const c=((e&&e.errorCode)||"")+"";
+  if(c==="popup_window_error"||c==="empty_window_error"||c==="block_nested_popups") return true;
+  const m=((e&&e.message)||"").toLowerCase();
+  return m.includes("popup")&&(m.includes("block")||m.includes("could not open")||m.includes("error opening"));
+}
 async function msalToken(){
   const pca=msalApp();
   try{ const r=await pca.acquireTokenSilent({scopes:M365.scopes, account:SESION.cuenta}); return r.accessToken; }
-  catch(e){ const r=await pca.acquireTokenPopup({scopes:M365.scopes}); SESION.cuenta=pca.getAllAccounts()[0]||SESION.cuenta; return r.accessToken; }
+  catch(e){
+    try{ const r=await pca.acquireTokenPopup({scopes:M365.scopes}); SESION.cuenta=pca.getAllAccounts()[0]||SESION.cuenta; return r.accessToken; }
+    catch(e2){ if(_popupBloqueado(e2)){ await pca.acquireTokenRedirect({scopes:M365.scopes}); return ""; } throw e2; }   // popup bloqueado → redirección
+  }
 }
 async function iniciarSesion(){
   const pca=msalApp();
@@ -1143,7 +1186,10 @@ async function iniciarSesion(){
   let cuenta=pca.getAllAccounts()[0]||null;
   if(!cuenta){
     try{ await pca.loginPopup({scopes:M365.scopes}); cuenta=pca.getAllAccounts()[0]||null; }
-    catch(e){ SESION.error="No se pudo iniciar sesión: "+(e.message||e); return false; }
+    catch(e){
+      if(_popupBloqueado(e)){ try{ await pca.loginRedirect({scopes:M365.scopes}); }catch(e2){} return false; }   // popup bloqueado → redirección (la página navega y vuelve)
+      SESION.error="No se pudo iniciar sesión: "+(e.message||e); return false;
+    }
   }
   SESION.cuenta=cuenta;
   SESION.oid=(cuenta.idTokenClaims&&cuenta.idTokenClaims.oid)||cuenta.localAccountId||"";
@@ -1687,6 +1733,7 @@ function irA(v){
   if(v==="sueldos"){renderSueldos();renderCcssTab();}
   if(v==="informes")applyFilters();
   if(v==="datos")renderStats();
+  aplicarModoLecturaCarga();   // modo lectura: ocultar campos de carga de la vista recién mostrada
 }
 function irAInicio(){
   $("home").style.display="flex";
@@ -5217,11 +5264,25 @@ function renderAll(){ renderGastos(); renderVentas(); renderBalance(); renderSta
 initSelects();
 updateFlag();
 function bannerSoloLectura(){
+  document.body.classList.add("solo-lectura");   // oculta por CSS los botones de alta/edición/borrado
   if(document.getElementById("ro_banner"))return;
   const b=document.createElement("div"); b.id="ro_banner";
   b.style.cssText="position:fixed;top:0;left:0;right:0;z-index:2000;background:var(--gold);color:#fff;text-align:center;font-size:13px;font-weight:600;padding:5px 10px";
   b.textContent="Modo solo lectura — podés mirar e imprimir, pero no se guardan cambios.";
   document.body.appendChild(b); _ajustarPadBanners();
+}
+/* En modo lectura, oculta los CAMPOS de carga (no solo los botones) para que el lector no escriba
+   creyendo que se guarda. Se mantienen: filtros de mes/vista, buscadores y los campos de solo lectura
+   (displays). Corre tras cada cambio de vista (irA) porque algunas tablas regeneran inputs editables. */
+const _FILTROS_LECTURA=new Set(["b_mes","t_mes","di_mes","ch_mes","sv_mes","su_mes","cc_mes","r_anio1","r_anio2","he_mes","g_filtprov","g_filtrubro","i_rubro","i_prov","i_bn","i_desde","i_hasta","che_rango","che_filtro"]);
+function aplicarModoLecturaCarga(){
+  if(!document.body.classList.contains("solo-lectura"))return;
+  document.querySelectorAll("#content input, #content textarea, #content select").forEach(el=>{
+    if(_FILTROS_LECTURA.has(el.id)) return;              // filtros de mes/vista y buscadores: se mantienen
+    if(el.readOnly || el.type==="hidden") return;        // displays de solo lectura: se mantienen visibles
+    if(el.closest("[id$='_overlay']")) return;           // modales: sus disparadores ya están ocultos
+    const wrap=el.closest(".f")||el; wrap.style.display="none";   // oculta el campo de carga (label + input)
+  });
 }
 /* ---- CHEQUEO DE CONSISTENCIA al abrir: sueldos cuyo gasto derivado (gastoIdA/B) ya no existe ----
    Solo detecta y avisa; NO escribe al abrir. La reparación es manual (botón) y nunca borra huérfanos. */
@@ -5328,7 +5389,7 @@ function bannerConsistencia(faltan){
   if(!esWriter()) bannerSoloLectura();
   setSync("busy","conectando…");
   const j=await apiGet();
-  if(j&&j.ok){ setSync("ok"); fillSubs(); renderAll(); const faltan=chequearConsistencia(); if(faltan.length) bannerConsistencia(faltan); }
+  if(j&&j.ok){ setSync("ok"); fillSubs(); renderAll(); aplicarModoLecturaCarga(); const faltan=chequearConsistencia(); if(faltan.length) bannerConsistencia(faltan); }
   else if(j&&j.noInicializada){ setSync("err","base no inicializada"); renderAll(); irA("datos");
     showMsg("d_api_msg","learn", esWriter()
       ? `La carpeta /${M365.carpeta}/ está vacía. Importá los datos una vez con el botón <b>"Importar desde Google (una vez)"</b> acá arriba.`
