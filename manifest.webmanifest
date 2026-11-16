@@ -1,0 +1,16 @@
+{
+  "id": "/balance-eg/",
+  "name": "Balance EG",
+  "short_name": "Balance EG",
+  "lang": "es",
+  "description": "Balance interno de EG Corrugados.",
+  "start_url": "./balance.html",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#23201a",
+  "background_color": "#f4efe4",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
