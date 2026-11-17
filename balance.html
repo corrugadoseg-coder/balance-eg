@@ -1172,19 +1172,28 @@ function msalApp(){
   });
   return _pca;
 }
-// ¿el error de MSAL es porque el navegador bloqueó el popup? → entonces usamos redirección
+// ¿Esta página se abrió DENTRO de la ventanita de login de Microsoft? (MSAL la nombra "msal.…")
+// En ese caso NO se arranca la app: la ventana principal tiene que leer la respuesta del login
+// de la dirección (#code=…) y cerrar la ventanita. Si la app arrancara acá, la librería de login
+// borraría esa respuesta y la ventana principal quedaría "iniciando sesión…" para siempre.
+const ES_VENTANITA_LOGIN = !!window.opener && window.opener!==window && typeof window.name==="string" && window.name.indexOf("msal.")===0;
+// ¿La ventanita falló, la bloquearon, quedó trabada (se venció el tiempo) o la cerraron? → redirección
 function _popupBloqueado(e){
   const c=((e&&e.errorCode)||"")+"";
-  if(c==="popup_window_error"||c==="empty_window_error"||c==="block_nested_popups") return true;
+  if(["popup_window_error","empty_window_error","block_nested_popups","monitor_window_timeout","user_cancelled","hash_empty_error","interaction_in_progress"].includes(c)) return true;
   const m=((e&&e.message)||"").toLowerCase();
   return m.includes("popup")&&(m.includes("block")||m.includes("could not open")||m.includes("error opening"));
+}
+// Si una ventanita anterior quedó a medias, la librería cree que hay un login "en curso": se borra esa marca.
+function limpiarLoginTrabado(){
+  [window.sessionStorage, window.localStorage].forEach(s=>{ try{ s.removeItem("msal.interaction.status"); }catch(e){} });
 }
 async function msalToken(){
   const pca=msalApp();
   try{ const r=await pca.acquireTokenSilent({scopes:M365.scopes, account:SESION.cuenta}); return r.accessToken; }
   catch(e){
     try{ const r=await pca.acquireTokenPopup({scopes:M365.scopes}); SESION.cuenta=pca.getAllAccounts()[0]||SESION.cuenta; return r.accessToken; }
-    catch(e2){ if(_popupBloqueado(e2)){ await pca.acquireTokenRedirect({scopes:M365.scopes}); return ""; } throw e2; }   // popup bloqueado → redirección
+    catch(e2){ if(_popupBloqueado(e2)){ limpiarLoginTrabado(); await pca.acquireTokenRedirect({scopes:M365.scopes}); return ""; } throw e2; }   // ventanita con problemas → redirección
   }
 }
 async function iniciarSesion(){
@@ -1194,7 +1203,7 @@ async function iniciarSesion(){
   if(!cuenta){
     try{ await pca.loginPopup({scopes:M365.scopes}); cuenta=pca.getAllAccounts()[0]||null; }
     catch(e){
-      if(_popupBloqueado(e)){ try{ await pca.loginRedirect({scopes:M365.scopes}); }catch(e2){} return false; }   // popup bloqueado → redirección (la página navega y vuelve)
+      if(_popupBloqueado(e)){ limpiarLoginTrabado(); try{ await pca.loginRedirect({scopes:M365.scopes}); }catch(e2){ SESION.error="No se pudo iniciar sesión: "+(e2.message||e2); } return false; }   // ventanita con problemas → redirección (la página navega y vuelve)
       SESION.error="No se pudo iniciar sesión: "+(e.message||e); return false;
     }
   }
@@ -5393,7 +5402,12 @@ function bannerConsistencia(faltan){
   }
   document.body.appendChild(b); _ajustarPadBanners();
 }
-(async function(){
+if(ES_VENTANITA_LOGIN){
+  // Dentro de la ventanita de login: no tocar la dirección (#code=…) ni arrancar nada. La ventana principal la lee y la cierra.
+  document.body.innerHTML='<div style="font-family:Segoe UI,system-ui,sans-serif;text-align:center;padding:40px 20px">'+
+    '<div style="font-size:16px;font-weight:600">Iniciando sesión…</div>'+
+    '<div style="font-size:13px;opacity:.7;margin-top:8px">Esta ventanita se cierra sola. Si no se cierra en unos segundos, cerrala: la app entra sin ventanita.</div></div>';
+} else (async function(){
   setSync("busy","iniciando sesión…");
   const ok=await iniciarSesion();
   pintarApiUrl();
